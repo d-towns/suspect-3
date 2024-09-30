@@ -4,7 +4,7 @@ dotenv.config()
 
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from '@supabase/ssr'
 
-export const createClient = (context) => {
+export const createSupabaseClient = (context) => {
   return createServerClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
     cookies: {
       getAll() {

@@ -1,67 +1,81 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
-import { supabase } from '../db/supabase-client';
-interface Room {
-  id: string;
-  players: string[];
-}
+import { useAuth } from '../context/auth.context';
+import { Room } from '../models';
 
 const Rooms: React.FC = () => {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
 
   useEffect(() => {
-    checkSession();
-    fetchRooms();
+    const initializeComponent = async () => {
+      if (!loading) {
+        if (!user) {
+          navigate('/');
+        } else {
+          try {
+            console.log('Initializing socket');
+            await roomsService.initializeSocket();
+            console.log('Socket initialized');
+            setSocketConnected(true);
 
-    const roomsSubscription = supabase
-      .channel('public:rooms')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, fetchRooms)
-      .subscribe();
+            // Fetch rooms after socket is initialized
+            console.log('Fetching rooms');
+            const fetchedRooms = await roomsService.fetchRooms();
+            setRooms(fetchedRooms);
+            console.log('Rooms fetched:', fetchedRooms);
+
+            // Set up socket listeners for real-time updates
+            const socket = await roomsService.initializeSocket();
+            socket.on('room-created', (newRoom: Room) => {
+              setRooms(prevRooms => [...prevRooms, newRoom]);
+            });
+
+            socket.on('room-updated', (updatedRoom: Room) => {
+              setRooms(prevRooms =>
+                prevRooms.map(room => (room.id === updatedRoom.id ? updatedRoom : room))
+              );
+            });
+
+            socket.on('room-deleted', (deletedRoomId: string) => {
+              setRooms(prevRooms => prevRooms.filter(room => room.id !== deletedRoomId));
+            });
+          } catch (error) {
+            console.error('Error initializing component:', error);
+          }
+        }
+      }
+    };
+
+    initializeComponent();
 
     return () => {
-      supabase.removeChannel(roomsSubscription);
+      // Clean up socket listeners to prevent memory leaks
+      roomsService.stopHeartbeat();
     };
-  }, []);
-
-  const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user.email) {
-      navigate('/');
-      return;
-    }
-
-    setUserId(session.user.id);
-    setUserEmail(session.user.email);
-  };
-
-  const fetchRooms = async () => {
-    try {
-      const fetchedRooms = await roomsService.fetchRooms();
-      setRooms(fetchedRooms);
-    } catch (error) {
-      console.error('Error fetching rooms:', error);
-    }
-  };
+  }, [user, loading, navigate]);
 
   const createRoom = async () => {
-    if (!userId) return;
+    if (!user) return;
     try {
-      const roomId = await roomsService.createRoom(userId);
+      const roomId = await roomsService.createRoom(user.id);
       joinRoom(roomId);
     } catch (error) {
       console.error('Error creating room:', error);
+      alert('Error creating room: ' + (error as Error).message);
     }
   };
 
   const joinRoom = async (roomId: string) => {
-    if (!userId) return;
+    console.log('Joining room:', roomId);
+    console.log('User:', user);
+    if (!user) return;
     try {
-      await roomsService.joinRoom(roomId, userId);
-      alert(`You've joined room ${roomId}`);
+      await roomsService.joinRoom({ roomId, userId: user.id, userEmail: user.email });
+      console.log('Joined room:', roomId);
       navigate(`/lobby/${roomId}`);
     } catch (error) {
       console.error('Failed to join room:', error);
@@ -69,33 +83,56 @@ const Rooms: React.FC = () => {
     }
   };
 
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/');
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
   return (
-    <div>
-      <nav>
-        <a href="/rooms">Game Rooms</a>
-        <a href="/">Sign Up</a>
-        <button onClick={logout}>Logout</button>
-        <span id="userInfo">Logged in as: {userEmail}</span>
-      </nav>
-      <h1>Game Rooms</h1>
-      <button onClick={createRoom}>Create New Room</button>
-      <ul>
-        {rooms.map(room => (
-          <li key={room.id}>
-            Room {room.id} - Players: {room.players.length}
-            <button onClick={() => joinRoom(room.id)}>Join</button>
-          </li>
-        ))}
-      </ul>
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-center text-3xl font-extrabold text-gray-900 mb-8">Game Rooms</h1>
+        <div className="mb-6">
+          <button
+            onClick={createRoom}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Create New Room
+          </button>
+        </div>
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <ul className="divide-y divide-gray-200">
+            {rooms.map(room => (
+              <li key={room.id}>
+                <div className="px-4 py-4 sm:px-6 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="text-sm font-medium text-indigo-600 truncate">Room {room.id}</div>
+                    <div className="ml-2 flex-shrink-0 flex">
+                      <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Players: {room.players?.length || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ml-2 flex-shrink-0">
+                    <button
+                      onClick={() => joinRoom(room.id)}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo active:bg-indigo-700 transition ease-in-out duration-150"
+                    >
+                      Join
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+            {rooms.length === 0 && (
+              <li className="px-4 py-4 sm:px-6 text-center text-gray-500">
+                No rooms available. Create one!
+              </li>
+            )}
+          </ul>
+        </div>
+        {/* Optionally, display connection status */}
+        {!socketConnected && (
+          <div className="mt-4 text-center text-red-500">
+            Socket not connected. Please refresh the page.
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,97 +1,116 @@
 import { Router } from 'express';
 import { createSupabaseClient } from '../db/supabase.js';
-import { GameRoomSocketServer } from '../../socket/io.js';
 
 const router = Router();
 
-router.post("/create-room", createGameRoom);
-router.post("/join-room", joinGameRoom);
-router.get("/get-rooms", getGameRooms);
+// Define the Room and Player interfaces for clarity
+/**
+ * @typedef {Object} Room
+ * @property {string} id - Unique identifier for the room
+ * @property {string} host_id - User ID of the host
+ * @property {string[]} players - Array of user IDs in the room
+ */
 
-function getGameRooms(req, res) {
-    const supabase = createSupabaseClient(req.headers.authorization?.split(' ')[1]);
-    supabase
-        .from('game_rooms')
-        .select('*')
-        .then(({ data, error }) => {
-            if (error) {
-                return res.status(500).json({ success: false, message: `Error fetching game rooms: ${error.message}` });
-            }
-            return res.status(200).json({ success: true, rooms: data });
-        });
+/**
+ * @typedef {Object} Player
+ * @property {string} user_id - User ID
+ * @property {string} room_id - Room ID
+ */
+
+// Middleware for error handling
+const asyncHandler = fn => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// POST /create-room
+router.post('/create-room', asyncHandler(createGameRoom));
+
+// GET /get-rooms
+router.get('/get-rooms', asyncHandler(getGameRooms));
+
+// GET /get-room/:roomId
+router.get('/get-room/:roomId', asyncHandler(getRoom));
+
+async function getGameRooms(req, res) {
+  const supabase = createSupabaseClient({ req, res });
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching game rooms:', error);
+    return res.status(500).json({ success: false, message: `Error fetching game rooms: ${error.message}` });
+  }
+
+  return res.status(200).json({ success: true, rooms: data });
 }
 
-function joinGameRoom(req, res) {
-    const { userId, roomId } = req.body;
-    const supabase = createSupabaseClient(req.headers.authorization?.split(' ')[1]);
+// POST /create-room
+async function createGameRoom(req, res) {
+  const supabase = createSupabaseClient({ req, res });
+  const { userId } = req.body;
 
-    if (!userId || !roomId) {
-        return res.status(400).json({ success: false, message: `User ID and Room ID are required` });
-    }
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'User ID is required to create a room' });
+  }
 
-    supabase
-        .from('game_rooms')
-        .select('players')
-        .eq('room_id', roomId)
-        .single()
-        .then(({ data, error }) => {
-            if (error) {
-                return res.status(500).json({ success: false, message: "Error fetching game room" });
-            }
+  // Generate a unique room ID
+  const roomId = generateRoomId();
 
-            if (!data) {
-                return res.status(404).json({ success: false, message: "Game room not found" });
-            }
+  const roomData = {
+    id: roomId,
+    host_id: userId,
+    players: [userId],
+  };
 
-            const updatedPlayers = [...data.players, userId];
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .insert([roomData]);
 
-            supabase
-                .from('game_rooms')
-                .update({ players: updatedPlayers })
-                .eq('room_id', roomId)
-                .then(({ data, error }) => {
-                    if (error) {
-                        return res.status(500).json({ success: false, message: `Error joining game room: ${error.message}` });
-                    }
-                    return res.status(200).json({ success: true, message: "Successfully joined game room" });
-                });
-        });
+  if (error) {
+    console.error('Error creating game room:', error);
+    return res.status(500).json({ success: false, message: `Error creating game room: ${error.message}` });
+  }
+
+  // Add the host to the game_players table
+  const { error: playerError } = await supabase
+    .from('game_players')
+    .insert([{ user_id: userId, room_id: roomId }]);
+
+  if (playerError) {
+    console.error('Error adding host to game_players:', playerError);
+    return res.status(500).json({ success: false, message: `Error adding host to game: ${playerError.message}` });
+  }
+
+  return res.status(200).json({ success: true, roomId });
 }
 
-function createGameRoom(req, res, next) {
-    const supabase = createSupabaseClient(req.headers.authorization?.split(' ')[1]);
-    console.log(req.body);
-    const { userId } = req.body;
-    var roomId;
-    const roomData = {
-        host_id: userId,
-    }
-    console.log(roomData);
+// GET /get-room/:roomId
+async function getRoom(req, res) {
+  const { roomId } = req.params;
+  const supabase = createSupabaseClient({ req, res });
 
-    supabase
-        .from('game_rooms')
-        .insert([roomData]).select()
-        .then(({ data, error }) => {
-            if (error) {
-                return res.status(500).json({ success: false, message: `Error creating game room: ${error.message}` });
-            }
-            
-            roomId = data[0].id;
-            console.log(roomId);
-            supabase.from('game_players').insert([{
-                user_id: userId,
-                room_id: roomId
-            }]).then(({ data, error }) => {
-                if (error) {
-                    return res.status(500).json({ success: false, message: `Error creating game player: ${error.message}` });
-                }
-                return res.status(200).json({ success: true, roomId });
-            });
-        });
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .select('id, host_id')
+    .eq('id', roomId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching game room:', error);
+    return res.status(500).json({ success: false, message: `Error fetching game room: ${error.message}` });
+  }
+
+  if (!data) {
+    return res.status(404).json({ success: false, message: 'Game room not found' });
+  }
+
+  return res.status(200).json({ success: true, room: data });
 }
 
-var generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 7);
-}
+// Utility function to generate unique room IDs
+const generateRoomId = () => {
+  return Math.random().toString(36).substring(2, 8).toUpperCase(); // Generates a 6-character ID
+};
 
 export { router as gameRoomRouter };

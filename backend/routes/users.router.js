@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { createClient } from '../db/supabase.js';
+import { createSupabaseClient } from '../db/supabase.js';
 
 const router = Router();
 
 const signUpUser = async (req, res) => {
   const { email, password, name } = req.body;
-  const supabase = createClient({ req, res });
+  const supabase = createSupabaseClient({ req, res });
 
   if (!email || !password || !name) {
     return res.status(400).json({ message: "Please enter all fields" });
@@ -22,7 +22,7 @@ const signUpUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const supabase = createClient({ req, res });
+  const supabase = createSupabaseClient({ req, res });
 
   if (!email || !password) {
     return res.status(400).json({ message: "Please enter all fields" });
@@ -38,7 +38,7 @@ const loginUser = async (req, res) => {
 };
 
 const logoutUser = async (req, res) => {
-  const supabase = createClient({ req, res });
+  const supabase = createSupabaseClient({ req, res });
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -49,7 +49,7 @@ const logoutUser = async (req, res) => {
 };
 
 const getUser = async (req, res) => {
-  const supabase = createClient({ req, res });
+  const supabase = createSupabaseClient({ req, res });
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
@@ -59,34 +59,34 @@ const getUser = async (req, res) => {
   }
 };
 
-const getSession = async (req, res) => {
-  console.log('getSession called', req.headers.authorization);
-  const supabase = createClient({ req, res });
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    return res.status(200).json({ success: true, session: session, user: user });
-  } catch (error) {
-    console.error('Error in getSession:', error);
-    return res.status(401).json({ success: false, message: `Invalid or expired token` });
-  }
-};
+// const getSession = async (req, res) => {
+//   console.log('getSession called', req.headers.authorization);
+//   const supabase = createSupabaseClient({ req, res });
+//   try {
+//     const { data: { user }, error: userError } = await supabase.auth.getUser();
+//     if (userError) throw userError;
+//     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//     if (sessionError) throw sessionError;
+//     return res.status(200).json({ success: true, session: session, user: user });
+//   } catch (error) {
+//     console.error('Error in getSession:', error);
+//     return res.status(401).json({ success: false, message: `Invalid or expired token` });
+//   }
+// };
 
 router.post("/sign-up", signUpUser);
 router.post("/login", loginUser);
 router.get("/get-user", getUser);
 router.post("/logout", logoutUser);
-router.get("/get-session", getSession);
+// router.get("/get-session", getSession);
 
-router.get("/auth/confirm", async function (req, res, next) {
+router.get("/auth/confirm", async function (req, res) {
   const token_hash = req.query.token_hash
   const type = req.query.type
   const next = req.query.next ?? "/"
 
   if (token_hash && type) {
-    const supabase = createClient({ req, res })
+    const supabase = createSupabaseClient({ req, res })
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,

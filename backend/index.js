@@ -1,12 +1,12 @@
 import express from "express";
 import dotenv from 'dotenv'
-import { usersRouter } from "./backend/routes/users.router.js";
-import { gameRoomRouter } from "./backend/routes/game-room.router.js";
+import { usersRouter } from "./routes/users.router.js";
+import { gameRoomRouter } from "./routes/game-room.router.js";
 import { GameRoomSocketServer } from "./socket/io.js";
 import { createServer } from "node:http";
 import path from 'path';
 import { fileURLToPath } from 'url';
-
+import cors from 'cors';
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,30 +17,11 @@ const main = async () => {
     const app = express();
     const httpServer = createServer(app);
     app.use(express.json());
-    
-    // Serve static files
-    app.use(express.static(path.join(__dirname, 'frontend')));
+    app.use(cors({
+        origin: process.env.FRONTEND_URL,
+        credentials: true
+    }));
 
-    // Serve HTML files based on their names
-    app.get('/:page', (req, res, next) => {
-        const pageName = req.params.page;
-        const filePath = path.join(__dirname, 'frontend', `${pageName}.html`);
-        
-        res.sendFile(filePath, (err) => {
-            if (err) {
-                next(); // Pass to the next middleware if file doesn't exist
-            }
-        });
-    });
-    // Serve lobby.html for the /lobby/:roomId route
-    app.get('/lobby/:roomId', (req, res) => {
-        res.sendFile(path.join(__dirname, 'frontend', 'lobby.html'));
-    });
-
-    // Serve index.html for the root route
-    app.get('/', (req, res) => {
-        res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-    });
 
     // 404 handler for any unmatched routes
     // API routes
@@ -57,7 +38,7 @@ const main = async () => {
     const gameServer = GameRoomSocketServer.getInstance(httpServer);
     
 
-    httpServer.listen(5000, () => {
+    httpServer.listen(3000, () => {
         console.log('Server is running on port 3000');
     });
 
