@@ -2,17 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { Socket } from 'socket.io-client';
 import { Player, ChatMessage, Room } from '../models';
-
-// Initialize socket outside of the component
-let socket: Socket | null = null;
+import { useSocket } from '../hooks/useSocket';
 
 type PlayersMap = Map<string, Player>;
 
 interface LobbyState {
   room: Room | null;
   players: PlayersMap;
+  gameStarting: boolean;
   chat: {
     messages: ChatMessage[];
     inputMessage: string;
@@ -29,10 +27,20 @@ export const Lobby: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const { 
+    socket, 
+    isConnected, 
+    joinRoom, 
+    getPlayersInRoom, 
+    sendChatMessage, 
+    startGame, 
+    sendReadyStatus 
+  } = useSocket();
 
   const [lobbyState, setLobbyState] = useState<LobbyState>({
     room: null,
     players: new Map(),
+    gameStarting: false,
     chat: {
       messages: [],
       inputMessage: '',
@@ -46,13 +54,16 @@ export const Lobby: React.FC = () => {
 
   useEffect(() => {
     const initializeLobby = async () => {
+      console.log(`user: ${user}`)
+      console.log(`roomId: ${roomId}`)
       if (!user || !roomId) return;
       console.log('Initializing lobby for room:', roomId);
       try {
-        await roomsService.joinRoom({ roomId, userId: user.id, userEmail: user.email });
+        await joinRoom();
         console.log('Joined room:', roomId);
-        await requestOnlinePlayersList();
-        console.log('Requested online players list');
+        const players = await getPlayersInRoom();
+        console.log('Players in room:', players);
+        updatePlayerList(players);
         const room = await roomsService.getRoom(roomId);
         console.log('Room:', room);
 
@@ -64,48 +75,48 @@ export const Lobby: React.FC = () => {
             userIsHost: room.host_id === user.id,
           },
         }));
-
-        if (!socket) {
-          console.log('Initializing socket');
-          socket = await roomsService.initializeSocket();
-          setupSocketListeners(socket);
-        }
       } catch (error) {
         console.error('Error initializing lobby:', error);
       }
     };
 
     initializeLobby();
+  }, [user, roomId, joinRoom, getPlayersInRoom]);
+
+  useEffect(() => {
+    if (socket && isConnected) {
+      socket.on('player-list', updatePlayerList);
+      socket.on('chat-message', addChatMessage);
+      socket.on('player-ready', updatePlayerReadyStatus);
+      socket.on('all-players-ready', () =>
+        setLobbyState(prevState => ({
+          ...prevState,
+          gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
+        }))
+      );
+      socket.on('game-starting', () => {
+        setLobbyState(prevState => ({
+          ...prevState,
+          gameStarting: true
+        }));
+      });
+      socket.on('game-started', () => navigate(`/game/${roomId}`));
+      socket.on('player-left', removePlayer);
+      socket.on('player-joined', addPlayer);
+    }
 
     return () => {
-      if (roomId) {
-        roomsService.stopHeartbeat(roomId);
-        // Optionally leave the room on cleanup
-        // if (socket) {
-        //   socket.emit('leave-room', roomId);
-        // }
+      if (socket) {
+        socket.off('player-list');
+        socket.off('chat-message');
+        socket.off('player-ready');
+        socket.off('all-players-ready');
+        socket.off('game-started');
+        socket.off('player-left');
+        socket.off('player-joined');
       }
     };
-  }, [user, roomId]);
-
-  const setupSocketListeners = (socket: Socket) => {
-    socket.on('player-list', updatePlayerList);
-    socket.on('chat-message', addChatMessage);
-    socket.on('player-ready', updatePlayerReadyStatus);
-    socket.on('all-players-ready', () =>
-      setLobbyState(prevState => ({
-        ...prevState,
-        gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
-      }))
-    );
-    socket.on('game-started', startGame);
-    socket.on('player-left', removePlayer);
-    socket.on('player-joined', addPlayer);
-  };
-
-  const startGame = () => {
-    navigate(`/game/${roomId}`);
-  };
+  }, [socket, isConnected]);
 
   const removePlayer = (player: Player) => {
     console.log('Player left:', player);
@@ -126,16 +137,6 @@ export const Lobby: React.FC = () => {
       return { ...prevState, players: updatedPlayers, 
         gameStatus: { ...prevState.gameStatus, allPlayersReady: false } };
     });
-  };
-
-  const requestOnlinePlayersList = async () => {
-    try {
-      const players = await roomsService.getOnlinePlayers(roomId!);
-      console.log('Online players:', players);
-      updatePlayerList(players);
-    } catch (error) {
-      console.error('Failed to get online players list:', error);
-    }
   };
 
   const updatePlayerList = (newPlayers: Player[]) => {
@@ -177,47 +178,46 @@ export const Lobby: React.FC = () => {
     }
   };
 
-  const sendMessage = async () => {
-    console.log('Sending message:', lobbyState.chat.inputMessage);
+  const handleSendMessage = () => {
     if (lobbyState.chat.inputMessage && user) {
-      try {
-        const newMessage: ChatMessage = { userEmail: user.email, message: lobbyState.chat.inputMessage };
-        setLobbyState(prevState => ({
-          ...prevState,
-          chat: {
-            messages: [...prevState.chat.messages, newMessage],
-            inputMessage: '',
-          },
-        }));
-        await roomsService.sendChatMessage(roomId!, user.email, lobbyState.chat.inputMessage);
-      } catch (error) {
-        console.error('Error sending message:', error);
-      }
-    }
-  };
-
-  const handleStartGameClick = async () => {
-    try {
-      await roomsService.startGame(roomId!);
-    } catch (error) {
-      console.error('Error starting game:', error);
-      alert('Error starting game: ' + (error as Error).message);
-    }
-  };
-
-  const handleReadyClick = async () => {
-    try {
-      const newReadyStatus = !lobbyState.gameStatus.isReady;
-      await roomsService.sendReadyStatus(roomId!, user!.email, newReadyStatus);
+      sendChatMessage(lobbyState.chat.inputMessage);
       setLobbyState(prevState => ({
         ...prevState,
-        gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus },
+        chat: {
+          messages: [...prevState.chat.messages, { userEmail: user.email, message: lobbyState.chat.inputMessage }],
+          inputMessage: '',
+        },
       }));
-      updatePlayerReadyStatus({ email: user!.email, isReady: newReadyStatus });
-    } catch (error) {
-      console.error('Error sending ready status:', error);
-      alert('Error updating ready status: ' + (error as Error).message);
     }
+  };
+
+  const handleStartGameClick = () => {
+    setLobbyState(prevState => ({
+      ...prevState,
+      gameStarting: true
+    }));
+    startGame();
+  };
+
+  const handleReadyClick = () => {
+    const newReadyStatus = !lobbyState.gameStatus.isReady;
+    sendReadyStatus(newReadyStatus);
+    
+    // Update local state optimistically
+    setLobbyState(prevState => {
+      const updatedPlayers = new Map(prevState.players);
+      if (user) {
+        const currentPlayer = updatedPlayers.get(user.email);
+        if (currentPlayer) {
+          updatedPlayers.set(user.email, { ...currentPlayer, isReady: newReadyStatus });
+        }
+      }
+      return {
+        ...prevState,
+        players: updatedPlayers,
+        gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus },
+      };
+    });
   };
 
   return (
@@ -312,7 +312,7 @@ export const Lobby: React.FC = () => {
                   className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
                 />
                 <button
-                  onClick={sendMessage}
+                  onClick={handleSendMessage}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   Send
@@ -321,6 +321,18 @@ export const Lobby: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Game Starting Splash Screen */}
+        {lobbyState.gameStarting && (
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white p-8 rounded-lg shadow-xl text-center">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
+              <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
+              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

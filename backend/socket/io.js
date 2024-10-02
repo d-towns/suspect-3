@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
+import OpenaiGameService from '../services/openai-game-service.js';
 
 export class GameRoomSocketServer {
 	static instance = null;
@@ -10,7 +11,7 @@ export class GameRoomSocketServer {
 		if (GameRoomSocketServer.instance) {
 			return GameRoomSocketServer.instance;
 		}
-
+		this.openaiGameService = new OpenaiGameService();
 		this.io = new Server(httpServer, {
 			cors: {
 				origin: "*", // Allow all origins
@@ -43,8 +44,11 @@ export class GameRoomSocketServer {
 
 			socket.on('join-room', (params, callback) => {
 				console.log('join-room called with params:', params);
+				// ONLY JOIN THE ROOM IF THE USER IS NOT ALREADY IN THE ROOM
 				const {roomId, userId, userEmail} = params;
-				socket.join(roomId);
+				if (!socket.rooms.has(roomId)) {
+					socket.join(roomId);
+				}
 				socket.userEmail = userEmail; // Store userEmail in socket
 				socket.userId = userId; // Store userId in socket
 				socket.roomId = roomId; // Store roomId in socket
@@ -95,9 +99,36 @@ export class GameRoomSocketServer {
 				socket.lastHeartbeat = Date.now();
 			});
 
-			socket.on('start-game', (roomId) => {
+			socket.on('start-game', async (roomId) => {
 				console.log(`Starting game in room ${roomId}`);
-				this.io.to(roomId).emit('game-started');
+				// emit an event to the room that the game is starting
+				this.emitToRoom(roomId, 'game-starting');
+				try {
+					// Get a list of all the player ids in the room
+					const room = this.io.sockets.adapter.rooms.get(roomId);
+					const playerIds = Array.from(room).map(socketId => {
+						const socket = this.io.sockets.sockets.get(socketId);
+						return {
+							id: socket.userId,
+							email: socket.userEmail
+						};
+					});
+
+					// Create a game thread with the number of players
+					const thread = await OpenaiGameService.createGameThread(playerIds);
+					console.log(`Thread created: ${thread.id}`);
+
+					// Run the thread and stream the results
+					const run = await OpenaiGameService.runThreadAndStream(thread.id, roomId);
+
+					// Emit game started event
+					this.emitToRoom(roomId, 'game-started');
+
+					console.log(`Game started in room ${roomId}`);
+				} catch (error) {
+					console.error(`Error starting game in room ${roomId}:`, error);
+					this.emitToRoom(roomId, 'game-start-error', { message: 'Failed to start the game. Please try again.' });
+				}
 			});
 
 			socket.on('player-ready', (roomId, userEmail, isReady) => {
@@ -187,6 +218,7 @@ export class GameRoomSocketServer {
 	}
 
 	emitToRoom(roomId, event, data) {
+		console.log(`Emitting event ${event} to room ${roomId}`);
 		this.io.to(roomId).emit(event, data);
 	}
 
@@ -210,7 +242,7 @@ export class GameRoomSocketServer {
 			const s = this.io.sockets.sockets.get(socketId);
 			return s.isReady;
 		  });
-	
+
 		  if (allReady) {
 			console.log(`All players in room ${roomId} are ready. Game will start soon!`);
 			this.io.to(roomId).emit('all-players-ready');

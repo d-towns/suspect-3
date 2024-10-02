@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { Room } from '../models';
+import { useSocket } from '../hooks/useSocket';
 
 const Rooms: React.FC = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [socketConnected, setSocketConnected] = useState<boolean>(false);
+  const { socket, isConnected } = useSocket();
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -17,32 +18,10 @@ const Rooms: React.FC = () => {
           navigate('/');
         } else {
           try {
-            console.log('Initializing socket');
-            await roomsService.initializeSocket();
-            console.log('Socket initialized');
-            setSocketConnected(true);
-
-            // Fetch rooms after socket is initialized
             console.log('Fetching rooms');
             const fetchedRooms = await roomsService.fetchRooms();
             setRooms(fetchedRooms);
             console.log('Rooms fetched:', fetchedRooms);
-
-            // Set up socket listeners for real-time updates
-            const socket = await roomsService.initializeSocket();
-            socket.on('room-created', (newRoom: Room) => {
-              setRooms(prevRooms => [...prevRooms, newRoom]);
-            });
-
-            socket.on('room-updated', (updatedRoom: Room) => {
-              setRooms(prevRooms =>
-                prevRooms.map(room => (room.id === updatedRoom.id ? updatedRoom : room))
-              );
-            });
-
-            socket.on('room-deleted', (deletedRoomId: string) => {
-              setRooms(prevRooms => prevRooms.filter(room => room.id !== deletedRoomId));
-            });
           } catch (error) {
             console.error('Error initializing component:', error);
           }
@@ -51,12 +30,31 @@ const Rooms: React.FC = () => {
     };
 
     initializeComponent();
-
-    return () => {
-      // Clean up socket listeners to prevent memory leaks
-      roomsService.stopHeartbeat();
-    };
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (socket && isConnected) {
+      socket.on('room-created', (newRoom: Room) => {
+        setRooms(prevRooms => [...prevRooms, newRoom]);
+      });
+
+      socket.on('room-updated', (updatedRoom: Room) => {
+        setRooms(prevRooms =>
+          prevRooms.map(room => (room.id === updatedRoom.id ? updatedRoom : room))
+        );
+      });
+
+      socket.on('room-deleted', (deletedRoomId: string) => {
+        setRooms(prevRooms => prevRooms.filter(room => room.id !== deletedRoomId));
+      });
+
+      return () => {
+        socket.off('room-created');
+        socket.off('room-updated');
+        socket.off('room-deleted');
+      };
+    }
+  }, [socket, isConnected]);
 
   const createRoom = async () => {
     if (!user) return;
@@ -72,11 +70,17 @@ const Rooms: React.FC = () => {
   const joinRoom = async (roomId: string) => {
     console.log('Joining room:', roomId);
     console.log('User:', user);
-    if (!user) return;
+    if (!user || !socket) return;
     try {
-      await roomsService.joinRoom({ roomId, userId: user.id, userEmail: user.email });
-      console.log('Joined room:', roomId);
-      navigate(`/lobby/${roomId}`);
+      socket.emit('join-room', { roomId, userId: user.id, userEmail: user.email }, (response: { success: boolean; error?: string }) => {
+        if (response.success) {
+          console.log('Joined room:', roomId);
+          navigate(`/lobby/${roomId}`);
+        } else {
+          console.error('Failed to join room:', response.error);
+          alert('Failed to join room: ' + response.error);
+        }
+      });
     } catch (error) {
       console.error('Failed to join room:', error);
       alert('Failed to join room: ' + (error as Error).message);
@@ -127,7 +131,7 @@ const Rooms: React.FC = () => {
           </ul>
         </div>
         {/* Optionally, display connection status */}
-        {!socketConnected && (
+        {!isConnected && (
           <div className="mt-4 text-center text-red-500">
             Socket not connected. Please refresh the page.
           </div>

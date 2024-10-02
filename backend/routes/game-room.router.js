@@ -92,7 +92,7 @@ async function getRoom(req, res) {
 
   const { data, error } = await supabase
     .from('game_rooms')
-    .select('id, host_id')
+    .select('id, host_id, game_state')
     .eq('id', roomId)
     .single();
 
