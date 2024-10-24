@@ -15,7 +15,7 @@ const Rooms: React.FC = () => {
     const initializeComponent = async () => {
       if (!loading) {
         if (!user) {
-          navigate('/');
+          navigate('/login');
         } else {
           try {
             console.log('Fetching rooms');

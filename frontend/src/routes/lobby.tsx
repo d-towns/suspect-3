@@ -94,13 +94,14 @@ export const Lobby: React.FC = () => {
           gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
         }))
       );
-      socket.on('game-starting', () => {
+      socket.on('game-creating', () => {
         setLobbyState(prevState => ({
           ...prevState,
           gameStarting: true
         }));
       });
-      socket.on('game-started', () => navigate(`/game/${roomId}`));
+      socket.on('game-created', () => navigate(`/game/${roomId}`));
+      
       socket.on('player-left', removePlayer);
       socket.on('player-joined', addPlayer);
     }
@@ -111,7 +112,7 @@ export const Lobby: React.FC = () => {
         socket.off('chat-message');
         socket.off('player-ready');
         socket.off('all-players-ready');
-        socket.off('game-started');
+        socket.off('game-created');
         socket.off('player-left');
         socket.off('player-joined');
       }

@@ -1,4 +1,5 @@
-import { Server } from "socket.io";
+import { Server} from "socket.io";
+import { createClient } from "@supabase/supabase-js";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
@@ -63,6 +64,19 @@ export class GameRoomSocketServer {
 				socket.to(roomId).emit('user-left', { userEmail });
 			});
 
+			socket.on('start-next-round', async (roomId) => {
+				const userId = socket.userId;
+				const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+				const { data, error } = await supabase.from('game_rooms').select().eq('id', roomId);
+				if (error) {
+					console.error('Error fetching game room:', error);
+					return;
+				}
+				const room = data[0];
+				const game_state = OpenaiGameService.decryptGameState(room.game_state)
+				await OpenaiGameService.startRealtimeInterregation(roomId, userId, game_state);
+			});
+
 			socket.on('chat-message', (roomId, userEmail, message) => {
 				console.log(`New message in room ${roomId}: ${message}`);
 				// how many socket are going to receive this message?
@@ -102,7 +116,7 @@ export class GameRoomSocketServer {
 			socket.on('start-game', async (roomId) => {
 				console.log(`Starting game in room ${roomId}`);
 				// emit an event to the room that the game is starting
-				this.emitToRoom(roomId, 'game-starting');
+				this.emitToRoom(roomId, 'game-creating');
 				try {
 					// Get a list of all the player ids in the room
 					const room = this.io.sockets.adapter.rooms.get(roomId);
@@ -119,15 +133,35 @@ export class GameRoomSocketServer {
 					console.log(`Thread created: ${thread.id}`);
 
 					// Run the thread and stream the results
-					const run = await OpenaiGameService.runThreadAndStream(thread.id, roomId);
+					const run = await OpenaiGameService.runThreadAndProcess(thread.id, roomId);
 
 					// Emit game started event
-					this.emitToRoom(roomId, 'game-started');
+					this.emitToRoom(roomId, 'game-created');
+
+					// start the game by connecting to the realtime API, sending the firs tuser message with the users crime and current guilt score
+					// and then start the game loop
+					// this.openaiGameService.startGame(roomId, playerIds, thread.id);
 
 					console.log(`Game started in room ${roomId}`);
 				} catch (error) {
 					console.error(`Error starting game in room ${roomId}:`, error);
 					this.emitToRoom(roomId, 'game-start-error', { message: 'Failed to start the game. Please try again.' });
+				}
+			});
+
+			socket.on('joined-game', (roomId, userId) => {
+				socket.inGame = true;
+				// if all sockets in the room are in game, start the game
+				const room = this.io.sockets.adapter.rooms.get(roomId);
+				if (room) {
+					const allInGame = Array.from(room).every(socketId => {
+						const s = this.io.sockets.sockets.get(socketId);
+						return s.inGame;
+					});
+					if (allInGame) {
+						console.log(`All players in room ${roomId} have joined the game. Starting game...`);
+						this.emitToRoom(roomId, 'game-starting');
+					}
 				}
 			});
 

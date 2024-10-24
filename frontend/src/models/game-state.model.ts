@@ -1,3 +1,18 @@
+export interface ConversationExhange {
+  speaker: string,
+  message: string
+}
+export interface Round {
+  player: string,
+  type: 'evidence' | 'kill',
+  conversation: ConversationExhange[],
+  results: {
+    platyerFlipped?: string,
+    guiltScoreUpdate?: number
+    votedRat: string
+  };
+}
+
 export interface GameState {
     status: 'setup' | 'interrogation' | 'finished';
     crime?: {
@@ -6,6 +21,7 @@ export interface GameState {
       time: string;
       description: string;
     };
+    rounds:Round[];
     players: {
       id: string;
       identity: string;

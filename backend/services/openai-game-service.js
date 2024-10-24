@@ -15,6 +15,13 @@ import dotenv from "dotenv";
 import { GameRoomSocketServer } from '../socket/io.js';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+// import { strict } from "assert";
+// import { io } from "socket.io-client";
+import Websocket from "ws";
+import fs from "fs";
+import decode, { decoders } from "audio-decode";
+import { log } from "console";
+
 
 dotenv.config({ path: '../.env' })
 
@@ -23,6 +30,9 @@ class OpenaiGameService {
         organization: process.env.OPENAI_ORGANIZATION_ID,
         project: process.env.OPENAI_PROJECT_ID,
     });
+
+    static lastAudioMessageDeltas = [];
+    static lastAudioMessageTranscript = [];
 
     static async createGameMasterAssistant() {
         console.log("Creating Game Master Assistant...");
@@ -39,7 +49,7 @@ class OpenaiGameService {
 
 2. Assign identities to players:
     - Each player gets a unique identity related to the crime scenario
-    - Use the provided player IDs when assigning identities   - Each player gets a unique identity related to the crime scenario
+    - Use the provided player IDs when assigning identities - Each player gets a unique identity related to the crime scenario
 
 3. Generate evidence pieces:
    - Create 6 evidence pieces related to the crime
@@ -55,143 +65,130 @@ class OpenaiGameService {
 6. Evaluate guilt:
    - Assess each player's guilt on a scale from 0.01 (innocent) to 1.00 (guilty)
    - Update the score based on players' responses and inconsistencies
+6. Assign rounds:
+    - Conduct a total of n*2 rounds, where n is the number of players
+    - Each round is either an interrogation or a kill round
+    - Interrogation rounds are for individual players, assign a player attribute for these rounds using their player ID uuid
+    - Kill rounds involve all players voting on a suspected "rat", make the player attribute for these rounds be "all"
+    - Assign a interregation round for each player
 
 Remember to be impartial but thorough in your investigation.`,
                 model: "gpt-4o",
-                tools: [
-                    {
-                        type: "function",
-                        function: {
-                            name: "update_game_state",
-                            description: "Update the game state with new information",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    crime: {
+                tools: [{
+                    type: "function",
+                    function: {
+                        name: "update_game_state",
+                        strict: true,
+                        description: "Update the game state with new information",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                status: { 
+                                    type: "string", 
+                                    enum: ["setup", "interrogation", "finished"],
+                                    description: "The current status of the game"
+                                },
+                                crime: {
+                                    type: "object",
+                                    properties: {
+                                        type: { type: "string" },
+                                        location: { type: "string" },
+                                        time: { type: "string" },
+                                        description: { type: "string" }
+                                    },
+                                    required: ["type", "location", "time", "description"],
+                                    additionalProperties: false
+                                },
+                                rounds: {
+                                    type: "array",
+                                    items: {
                                         type: "object",
                                         properties: {
-                                            type: { type: "string" },
-                                            location: { type: "string" },
-                                            time: { type: "string" },
-                                            description: { type: "string" }
-                                        }
-                                    },
-                                    players: {
-                                        type: "array",
-                                        items: {
-                                            type: "object",
-                                            properties: {
-                                                id: { type: "string" },
-                                                identity: { type: "string" },
-                                                evidence: {
-                                                    type: "array",
-                                                    items: { type: "string" }
+                                            player: { type: "string" },
+                                            type: { 
+                                                type: "string", 
+                                                enum: ["interrogation", "kill"],
+                                                description: "The type of round"
+                                            },
+                                            conversation: {
+                                                type: "array",
+                                                items: {
+                                                    type: "object",
+                                                    properties: {
+                                                        speaker: { type: "string" },
+                                                        message: { type: "string" }
+                                                    },
+                                                    required: ["speaker", "message"],
+                                                    additionalProperties: false
+                                                }
+                                            },
+                                            results: {
+                                                type: "object",
+                                                properties: {
+                                                    guiltScoreUpdate: { 
+                                                        type: "number",
+                                                    },
+                                                    playerFlipped: { type: "boolean" },
+                                                    votedRat: { type: "string" }
                                                 },
-                                                guiltScore: { type: "number" }
+                                                required: ["guiltScoreUpdate", "playerFlipped", "votedRat"],
+                                                additionalProperties: false
                                             }
-                                        }
-                                    },
-                                    allEvidence: {
-                                        type: "array",
-                                        items: { type: "string" }
+                                        },
+                                        required: ["type", "conversation", "results", "player"],
+                                        additionalProperties: false
                                     }
                                 },
-                                required: ["crime", "players", "allEvidence"]
-                            }
-                        }
-                    }
+                                players: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            id: { type: "string" },
+                                            identity: { type: "string" },
+                                            evidence: {
+                                                type: "array",
+                                                items: { type: "string" }
+                                            },
+                                            guiltScore: { 
+                                                type: "number",
+                                            },
+                                            interrogated: { type: "boolean" }
+                                        },
+                                        required: ["id", "identity", "evidence", "guiltScore", "interrogated"],
+                                        additionalProperties: false
+                                    }
+                                },
+                                allEvidence: {
+                                    type: "array",
+                                    items: { type: "string" }
+                                },
+                                interrogationProgress: { 
+                                    type: "number",
+                                },
+                                outcome: {
+                                    type: "object",
+                                    properties: {
+                                        teamWon: { type: "boolean" },
+                                        averageGuiltScore: { 
+                                            type: "number",
+                                        }
+                                    },
+                                    required: ["teamWon", "averageGuiltScore"],
+                                    additionalProperties: false
+                                }
+                    },
+                    required: ["status", "crime", "players", "allEvidence", "interrogationProgress", "outcome", "rounds"],
+                    additionalProperties: false
+                }
+            }
+        }
                 ],
             });
             console.log("Game Master Assistant created successfully:", assistant.id);
             return assistant;
         } catch (error) {
             console.error("Error creating Game Master Assistant:", error);
-            throw error;
-        }
-    }
-
-    static async createGameStateManager() {
-        console.log("Creating Game State Manager Assistant...");
-        try {
-            const assistant = await this.client.beta.assistants.create({
-                name: "Game State Manager",
-                instructions: `You are the Game State Manager for Suspect 3. Your role is to process the game thread and generate a structured JSON game state object. This object will be sent to the frontend client and stored in the database. Here are your key responsibilities:
-
-1. Parse the game thread to extract relevant information
-2. Generate a JSON object containing:
-- Current game state (setup, interrogation, or finished)
-- Crime details
-- Player information (identities, evidence, guilt scores)
-    - Ensure that the player IDs in the game state match the original IDs provided
-- Interrogation progress
-- Game outcome (if finished)
-
-3. Ensure the JSON object is properly structured and contains all necessary information for the frontend to render the game state.`,
-                model: "gpt-4o",
-                tools: [
-                    {
-                        type: "function",
-                        function: {
-                            name: "generate_game_state",
-                            description: "Generate a structured JSON game state object",
-                            parameters: {
-                                type: "object",
-                                properties: {
-                                    gameState: {
-                                        type: "object",
-                                        properties: {
-                                            status: { type: "string", enum: ["setup", "interrogation", "finished"] },
-                                            crime: {
-                                                type: "object",
-                                                properties: {
-                                                    type: { type: "string" },
-                                                    location: { type: "string" },
-                                                    time: { type: "string" },
-                                                    description: { type: "string" }
-                                                }
-                                            },
-                                            players: {
-                                                type: "array",
-                                                items: {
-                                                    type: "object",
-                                                    properties: {
-                                                        id: { type: "string" },
-                                                        identity: { type: "string" },
-                                                        evidence: {
-                                                            type: "array",
-                                                            items: { type: "string" }
-                                                        },
-                                                        guiltScore: { type: "number" },
-                                                        interrogated: { type: "boolean" }
-                                                    }
-                                                }
-                                            },
-                                            allEvidence: {
-                                                type: "array",
-                                                items: { type: "string" }
-                                            },
-                                            interrogationProgress: { type: "number" },
-                                            outcome: {
-                                                type: "object",
-                                                properties: {
-                                                    teamWon: { type: "boolean" },
-                                                    averageGuiltScore: { type: "number" }
-                                                }
-                                            }
-                                        },
-                                        required: ["status", "crime", "players", "allEvidence"]
-                                    }
-                                },
-                                required: ["gameState"]
-                            }
-                        }
-                    }
-                ],
-            });
-            console.log("Game State Manager Assistant created successfully:", assistant.id);
-            return assistant;
-        } catch (error) {
-            console.error("Error creating Game State Manager Assistant:", error);
             throw error;
         }
     }
@@ -222,58 +219,72 @@ Remember to be impartial but thorough in your investigation.`,
         return crime;
     }
 
-    static async runThreadAndStream(threadId, roomId) {
+    static async runThreadAndProcess(threadId, roomId) {
         console.log(`Running thread: ${threadId} with Game Master assistant: ${process.env.OPENAI_GAMEMASTER_ASSISTANT_ID}`);
-        const socketServer = GameRoomSocketServer.getInstance();
         
         try {
+            console.log("Using assistant:", process.env.OPENAI_GAMEMASTER_ASSISTANT_ID);
             const run = await this.client.beta.threads.runs.create(threadId, {
                 assistant_id: process.env.OPENAI_GAMEMASTER_ASSISTANT_ID
             });
             console.log("Run created:", run.id);
 
-            let gameState = null;
-
-            gameState = await this.processRun(threadId, run.id, 'update_game_state');
+            const gameState = await this.waitForRunCompletion(threadId, run.id);
 
             if (gameState) {
-                console.log("Game state created, processing with Game State Manager");
-                const stateManagerThread = await this.client.beta.threads.create();
-                console.log("State Manager thread created:", stateManagerThread.id);
-                await this.client.beta.threads.messages.create(stateManagerThread.id, {
-                    role: "user",
-                    content: JSON.stringify(gameState),
-                });
-                console.log("Game state added to State Manager thread");
-
-                const stateManagerRun = await this.client.beta.threads.runs.create(stateManagerThread.id, {
-                    assistant_id: process.env.OPENAI_GAME_STATE_MANAGER_ASSISTANT_ID
-                });
-                console.log("State Manager run created:", stateManagerRun.id);
-
-                const structuredGameState = await this.processRun(stateManagerThread.id, stateManagerRun.id, 'generate_game_state');
-
-                if (structuredGameState) {
-                    console.log("Structured game state created:", structuredGameState);
-                    
-                    // Save the encrypted game state to the database
-                    await this.saveGameState(roomId, structuredGameState.gameState);
-                    
-                    socketServer.emitToRoom(roomId, 'game-state-update', structuredGameState.gameState);
-                    console.log("Game state update emitted to room:", roomId);
-                }
+                console.log("Game state created:", gameState);
+                
+                // Save the encrypted game state to the database
+                await this.saveGameState(roomId, gameState);
+                // TODO: this may be redundant since we can setup listeners using supabase on the game_rooms table
+                const socketServer = GameRoomSocketServer.getInstance();
+                socketServer.emitToRoom(roomId, 'game-state-update', gameState);
+                console.log("Game state update emitted to room:", roomId);
             }
 
             console.log("Thread run completed");
             return run;
         } catch (error) {
-            console.error("Error running thread and streaming:", error);
+            console.error("Error running thread and processing:", error);
             throw error;
         }
     }
-
-    static async processRun(threadId, runId, expectedFunctionName) {
-        let result = null;
+    /**
+     * 
+     * @param {*} threadId 
+     * @param {*} runId 
+     * @returns gameState Object -> to be saved in encrytped format in the db
+     * 
+     * Remember: the OpenAI Aissistant is tring the conversation threah into the strctured output using the function call
+     * 
+     * control the flow of the game with user messages
+     * they will come in the form of audio or text
+     * audio for the interregations
+     * text for the kill rounds and game management
+     * how do i know when it is safe to start the game?
+     * when all of the players are in the started game ( at the game/{game_id} page )
+     * once that is the case i can start the first round
+     * there are teo types of rounds
+     * iterregation roudns or kill rounds
+     * There are a total of n*2 rounds in a game where n is the number of total players
+     * so the game state needs to have rounds object, 
+     * an array with a round object in each with their type, conversation (i rounds), and results ( guilt socre update, if the player flipped, who was voted as a rat,)
+     * if the first game state update comes with a rounds object, we can take the first i round player and put then into the room, and start the interregation
+     * client needs to have its socket ready to receive the first audio from the realtime API
+     * I rounds are 
+     * - for a specific player
+     * - last 2 minutes
+     * - have guilt score updates after each back and forth exchange which send update-game state events so each player can see the score update
+     * K rounds
+     * - involve every players
+     * - have each player vote on if a player is a rat
+     * - if there is a consensus on someone being a rat
+     * -- if it is true, the player is removed from the game and lose significant rank
+     * -- if it is false, guilt scores are doubled what happened to the suspected rat is now added to the game crime for each player, making the game harder
+     * 
+     * 
+     */
+    static async waitForRunCompletion(threadId, runId) {
         let run = { status: 'queued' };
 
         while (run.status !== 'completed') {
@@ -282,35 +293,232 @@ Remember to be impartial but thorough in your investigation.`,
             console.log("Run status:", run.status);
 
             if (run.status === 'requires_action') {
-                console.log("Run requires action");
                 const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
                 const toolOutputs = [];
 
                 for (const toolCall of toolCalls) {
-                    if (toolCall.function.name === expectedFunctionName) {
-                        console.log(`Executing ${expectedFunctionName}`);
+                    if (toolCall.function.name === 'update_game_state') {
+                        console.log("Executing update_game_state");
                         const functionArgs = JSON.parse(toolCall.function.arguments);
-                        result = functionArgs;
                         toolOutputs.push({
                             tool_call_id: toolCall.id,
                             output: JSON.stringify({ success: true })
                         });
+                        return functionArgs;
                     }
                 }
 
-                await this.client.beta.threads.runs.submitToolOutputs(threadId, runId, { tool_outputs: toolOutputs });
-                console.log("Tool outputs submitted");
+                if (toolOutputs.length > 0) {
+                    await this.client.beta.threads.runs.submitToolOutputs(threadId, runId, { tool_outputs: toolOutputs });
+                    console.log("Tool outputs submitted");
+                }
             }
         }
 
-        if (!result) {
-            const messages = await this.client.beta.threads.messages.list(threadId);
-            const lastMessage = messages.data[0];
-            result = JSON.parse(lastMessage.content[0].text.value);
-        }
-
-        return result;
+        const messages = await this.client.beta.threads.messages.list(threadId);
+        const lastMessage = messages.data[0];
+        return JSON.parse(lastMessage.content[0].text.value);
     }
+
+    static startRealtimeInterregation(roomId, userId, gameState) {
+        const url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01";
+        const ws = new Websocket(url, {
+            headers: {
+                "Authorization": "Bearer " + process.env.OPENAI_API_KEY,
+                "OpenAI-Beta": "realtime=v1",
+            },
+        });
+
+        ws.on('open', () => {
+            const user = gameState.players.find(player => player.id === userId);
+            if (!user) {
+                console.error('User not found in game state');
+                return;
+            }
+
+            const event = {
+                type: 'conversation.item.create',
+                item: {
+                  type: 'message',
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'input_text',
+                      text: `Interrogate ${user.identity} with a guilt score of ${user.guiltScore}. Here is the crime scenario: ${JSON.stringify(gameState.crime)}. Conduct a thorough interrogation.`
+                    }
+                  ]
+                }
+              };
+
+            ws.send(JSON.stringify(event));
+            ws.send(JSON.stringify({ type: 'response.create' }));
+            console.log('Sent user conversation item to realtime API:', event);
+        });
+
+        ws.on('message', async (data) => { 
+            console.log('Received message from OpenAI Realtime API:', data);
+            try {
+                const event = JSON.parse(data);
+                if( event.type === 'response.audio.delta') {
+                    this.lastAudioMessageDeltas.push(event.delta);
+                  }
+                    if (event.type === 'response.audio_transcript.delta') {
+                    this.lastAudioMessageTranscript.push(event.delta);
+                    }
+                  if (event.type === 'response.audio.done') {
+                    console.log('Received audio message deltas:', this.lastAudioMessageDeltas);
+                    const audioBuffer = await this.convertAudioMessageDeltasToAudio([...this.lastAudioMessageDeltas]);
+                    const socketServer = GameRoomSocketServer.getInstance();
+                    const conversationItem = {
+                        audioBuffer,
+                        audioTranscript: this.lastAudioMessageTranscript.join(' ')
+                    }
+                    // write the audio buffer to the file system
+                    console.log('Writing audio buffer to file system');
+                    const audioWav = await decoders.wav(audioBuffer);
+                    fs.writeFileSync(event.response_id + '_audio.wav', Buffer.from(audioWav.getChannelData(0)));
+                    fs.writeFileSync(event.response_id + '_audio_transcript.txt', this.lastAudioMessageTranscript.join(' '));
+
+                    socketServer.emitToRoom(roomId, 'realtime-audio-message', conversationItem);
+                    this.lastAudioMessageDeltas = [];
+                }
+                
+                console.log(event);
+              } catch (e) {
+                console.error(e);
+              }
+            });
+
+        ws.on('disconnect', () => {
+            console.log('Disconnected from OpenAI Realtime API');
+        });
+
+        ws.on('error', (error) => {
+            console.error('Error with OpenAI Realtime API:', error);
+        });
+
+        // socket.on('open', () => {
+        //     console.log('Connected to OpenAI Realtime API');
+
+        //     const user = gameState.players.find(player => player.id === userId);
+        //     if (!user) {
+        //         console.error('User not found in game state');
+        //         return;
+        //     }
+
+        //     const event = {
+        //         type: 'conversation.item.create',
+        //         item: {
+        //           type: 'message',
+        //           role: 'user',
+        //           content: [
+        //             {
+        //               type: 'input_text',
+        //               text: `Interrogate ${user.identity} with a guilt score of ${user.guiltScore}. Here is the crime scenario: ${JSON.stringify(gameState.crime)}. Conduct a thorough interrogation.`
+        //             }
+        //           ]
+        //         }
+        //       };
+
+        //     socket.emit(JSON.stringify(event));
+        //     console.log('Sent user conversation item to realtime API:', conversationItem);
+        // });
+
+        // socket.on('message', (data) => { 
+        //     console.log('Received message from OpenAI Realtime API:', data);
+        //     try {
+        //         const event = JSON.parse(data);
+        //         const socketServer = GameRoomSocketServer.getInstance();
+        //         socketServer.emitToRoom(roomId, 'realtime-message', event);
+        //         console.log(event);
+        //       } catch (e) {
+        //         console.error(e);
+        //       }
+        //     });
+
+        // socket.on('disconnect', () => {
+        //     console.log('Disconnected from OpenAI Realtime API');
+        // });
+
+        // socket.on('error', (error) => {
+        //     console.error('Error with OpenAI Realtime API:', error);
+        // });
+    }
+
+    static async convertAudioMessageDeltasToAudio(audioMessageDeltas) {
+        // Convert Base64 encoded string into a Blob
+        const audioMessage = audioMessageDeltas.join('');
+        const byteCharacters = atob(audioMessage);
+        // Convert the string to an ArrayBuffer
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const pcm16ArrayBuffer = byteNumbers.buffer;
+    
+        // Create WAV header
+        /**
+         * 
+         * @param {*} sampleRate 
+         * @param {*} numChannels 
+         * @param {*} bytesPerSample 
+         * @param {*} numFrames 
+         * @returns 
+         */
+        const createWavHeader = (sampleRate, numChannels, bytesPerSample, numFrames) => {
+          const buffer = new ArrayBuffer(44);
+          const view = new DataView(buffer);
+    
+          /* RIFF identifier */
+          view.setUint32(0, 1380533830, false);
+          /* file length minus RIFF identifier length and file description length */
+          view.setUint32(4, 36 + numFrames * numChannels * bytesPerSample, true);
+          /* RIFF type */
+          view.setUint32(8, 1463899717, false);
+          /* format chunk identifier */
+          view.setUint32(12, 1718449184, false);
+          /* format chunk length */
+          view.setUint32(16, 16, true);
+          /* sample format (raw) */
+          view.setUint16(20, 1, true);
+          /* channel count */
+          view.setUint16(22, numChannels, true);
+          /* sample rate */
+          view.setUint32(24, sampleRate, true);
+          /* byte rate (sample rate * block align) */
+          view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
+          /* block align (channel count * bytes per sample) */
+          view.setUint16(32, numChannels * bytesPerSample, true);
+          /* bits per sample */
+          view.setUint16(34, bytesPerSample * 8, true);
+          /* data chunk identifier */
+          view.setUint32(36, 1684108385, false);
+          /* data chunk length */
+          view.setUint32(40, numFrames * numChannels * bytesPerSample, true);
+    
+          return buffer;
+        };
+    
+        const sampleRate = 24000;
+        const numChannels = 1;
+        const bytesPerSample = 2;
+        const numFrames = pcm16ArrayBuffer.byteLength / bytesPerSample;
+    
+        const wavHeader = createWavHeader(sampleRate, numChannels, bytesPerSample, numFrames);
+    
+        // Concat wavHeader ArrayBuffer + PCM16 ArrayBuffer
+        const audioBuffer = new Uint8Array(wavHeader.byteLength + pcm16ArrayBuffer.byteLength);
+        audioBuffer.set(new Uint8Array(wavHeader), 0);
+        audioBuffer.set(new Uint8Array(pcm16ArrayBuffer), wavHeader.byteLength);
+        
+        return audioBuffer;
+    
+        // play audio
+
+    
+        // Send the array buffer via WebSocke
+      };
+        
 
     static encryptGameState(gameState) {
         const gameStateString = JSON.stringify(gameState);
@@ -334,19 +542,14 @@ Remember to be impartial but thorough in your investigation.`,
     static async saveGameState(roomId, gameState) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const encryptedGameState = this.encryptGameState(gameState);
-        console.log("Saving encrypted game state", encryptedGameState);
-        console.log("Saving game state for room ID:", roomId);
-        // make a select query to test the client and roomId
-        const { data: testData, error: testError } = await supabase
-            .from('game_rooms')
-            .select('*')
-            .eq('id', roomId);
-        console.log(" Test Supabase response:", testData, testError);
+        console.log("Saving encrypted game state for room ID:", roomId);
+        
         const { data, error } = await supabase
             .from('game_rooms')
             .update({ game_state: encryptedGameState })
-            .eq('id', roomId).select();
-        console.log("Supabase response:", data, error);
+            .eq('id', roomId)
+            .select();
+        
         if (error) {
             console.error('Error saving encrypted game state:', error);
             throw error;
