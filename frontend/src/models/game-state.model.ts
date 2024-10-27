@@ -11,24 +11,29 @@ export interface Round {
     guiltScoreUpdate?: number
     votedRat: string
   };
+  status: 'inactive' | 'active' | 'completed';
+}
+
+export interface Player {
+  id: string;
+  identity: string;
+  evidence: string[];
+  guiltScore: number;
+  interrogated: boolean;
+}
+
+export interface Crime {
+  type: string;
+  location: string;
+  time: string;
+  description: string;
 }
 
 export interface GameState {
     status: 'setup' | 'interrogation' | 'finished';
-    crime?: {
-      type: string;
-      location: string;
-      time: string;
-      description: string;
-    };
+    crime?: Crime;
     rounds:Round[];
-    players: {
-      id: string;
-      identity: string;
-      evidence: string[];
-      guiltScore: number;
-      interrogated: boolean;
-    }[];
+    players: Player[];
     allEvidence: string[];
     interrogationProgress?: number;
     outcome?: {

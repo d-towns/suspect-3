@@ -36,11 +36,22 @@ export const useSocket = () => {
     };
   }, []);
 
+  const emitEvent = useCallback((event: string, data: any) => {
+    if (socket && isConnected) {
+      socket.emit(event, data);
+    }
+  } , [socket, isConnected]);
+
   const joinRoom = useCallback(() => {
     if (socket && isConnected && roomId && user) {
       socket.emit('join-room', { roomId, userId: user.id, userEmail: user.email }, (response: { success: boolean; error?: string }) => {
         if (response.success) {
           console.log(`Joined room: ${roomId}`);
+          // if we are in a game room, we should send a joined-game event
+          // check if game is in the url using navigator
+          if (window.location.pathname.includes('game')) {
+            socket.emit('joined-game');
+          }
         } else {
           console.error(`Failed to join room: ${response.error}`);
         }
@@ -112,6 +123,7 @@ export const useSocket = () => {
     getPlayersInRoom, 
     sendChatMessage, 
     startGame, 
-    sendReadyStatus 
+    sendReadyStatus,
+    emitEvent
   };
 };

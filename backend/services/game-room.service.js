@@ -1,9 +1,10 @@
 import { createSupabaseClient } from '../db/supabase.js';
 import { GameRoomSocketServer } from '../socket/io.js';
+import { createClient } from '@supabase/supabase-js';
 
 export class GameRoomService {
     static async createGameRoom(userId) {
-        const supabase = createSupabaseClient();
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const roomId = this.generateRoomId();
         const roomData = {
             id: roomId, // Changed from room_id to id to match the router
@@ -36,10 +37,10 @@ export class GameRoomService {
     }
 
     static async getGameRoom(roomId) {
-        const supabase = createSupabaseClient();
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const { data, error } = await supabase
             .from('game_rooms')
-            .select('id, host_id')
+            .select('*')
             .eq('id', roomId)
             .single();
 
@@ -51,7 +52,7 @@ export class GameRoomService {
     }
 
     static async getAllGameRooms() {
-        const supabase = createSupabaseClient();
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const { data, error } = await supabase
             .from('game_rooms')
             .select('*');

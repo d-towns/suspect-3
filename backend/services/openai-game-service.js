@@ -33,6 +33,7 @@ class OpenaiGameService {
 
     static lastAudioMessageDeltas = [];
     static lastAudioMessageTranscript = [];
+    static roomRealtimeSessions = new Map();
 
     static async createGameMasterAssistant() {
         console.log("Creating Game Master Assistant...");
@@ -68,6 +69,7 @@ class OpenaiGameService {
 6. Assign rounds:
     - Conduct a total of n*2 rounds, where n is the number of players
     - Each round is either an interrogation or a kill round
+    - Each round has a status, it is either inactive, active, or completed
     - Interrogation rounds are for individual players, assign a player attribute for these rounds using their player ID uuid
     - Kill rounds involve all players voting on a suspected "rat", make the player attribute for these rounds be "all"
     - Assign a interregation round for each player
@@ -105,6 +107,11 @@ Remember to be impartial but thorough in your investigation.`,
                                         type: "object",
                                         properties: {
                                             player: { type: "string" },
+                                            status: {
+                                                type: "string",
+                                                enum: ["inactive", "active", "completed"],
+                                                description: "The status of the round"
+                                            },
                                             type: { 
                                                 type: "string", 
                                                 enum: ["interrogation", "kill"],
@@ -135,7 +142,7 @@ Remember to be impartial but thorough in your investigation.`,
                                                 additionalProperties: false
                                             }
                                         },
-                                        required: ["type", "conversation", "results", "player"],
+                                        required: ["type", "conversation", "results", "player", "status"],
                                         additionalProperties: false
                                     }
                                 },
@@ -312,6 +319,10 @@ Remember to be impartial but thorough in your investigation.`,
                     await this.client.beta.threads.runs.submitToolOutputs(threadId, runId, { tool_outputs: toolOutputs });
                     console.log("Tool outputs submitted");
                 }
+            } else if(run.status === 'failed') {
+                console.error("Run failed:", run);
+                console.error("Error:", run.last_error);
+                return null;
             }
         }
 
@@ -319,6 +330,35 @@ Remember to be impartial but thorough in your investigation.`,
         const lastMessage = messages.data[0];
         return JSON.parse(lastMessage.content[0].text.value);
     }
+
+    static async addUserResponseToInputAudioBuffer(roomId, userId, base64AudioChunk) {
+        const ws = this.roomRealtimeSessions.get(roomId);
+        if (!ws) {
+            console.error('Realtime session not found for room:', roomId);
+            return;
+        }
+
+        const event = {
+            type: 'input_audio_buffer.append',
+            audio: base64AudioChunk
+        }
+
+        ws.send(JSON.stringify(event));
+        console.log('Added audio chunk to input audio buffer to realtime API:', event);
+    }
+
+    static async createInterrogationResponse(roomId) {
+        const ws = this.roomRealtimeSessions.get(roomId);
+        if (!ws) {
+            console.error('Realtime session not found for room:', roomId);
+            return;
+        }
+
+        ws.send(JSON.stringify({type: 'input_audio_buffer.commit'}));
+        ws.send(JSON.stringify({type: 'response.create'}));
+        console.log('Created response in realtime API:', event)
+    }
+
 
     static startRealtimeInterregation(roomId, userId, gameState) {
         const url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01";
@@ -329,6 +369,10 @@ Remember to be impartial but thorough in your investigation.`,
             },
         });
 
+        console.log('Connecting to OpenAI Realtime API...');
+
+        this.roomRealtimeSessions.set(roomId, ws);
+
         ws.on('open', () => {
             const user = gameState.players.find(player => player.id === userId);
             if (!user) {
@@ -338,15 +382,17 @@ Remember to be impartial but thorough in your investigation.`,
 
             const event = {
                 type: 'conversation.item.create',
+
                 item: {
                   type: 'message',
                   role: 'user',
                   content: [
                     {
                       type: 'input_text',
-                      text: `Interrogate ${user.identity} with a guilt score of ${user.guiltScore}. Here is the crime scenario: ${JSON.stringify(gameState.crime)}. Conduct a thorough interrogation.`
+                      text: `${user.identity} enters the room for interrogation, with a guilt score of ${user.guiltScore}. the evidence of their involvement in the crime is ${user.evidence.join(', ')}.`
                     }
                   ]
+                  
                 }
               };
 
@@ -356,37 +402,79 @@ Remember to be impartial but thorough in your investigation.`,
         });
 
         ws.on('message', async (data) => { 
-            console.log('Received message from OpenAI Realtime API:', data);
             try {
                 const event = JSON.parse(data);
-                if( event.type === 'response.audio.delta') {
-                    this.lastAudioMessageDeltas.push(event.delta);
-                  }
-                    if (event.type === 'response.audio_transcript.delta') {
-                    this.lastAudioMessageTranscript.push(event.delta);
-                    }
-                  if (event.type === 'response.audio.done') {
-                    console.log('Received audio message deltas:', this.lastAudioMessageDeltas);
-                    const audioBuffer = await this.convertAudioMessageDeltasToAudio([...this.lastAudioMessageDeltas]);
-                    const socketServer = GameRoomSocketServer.getInstance();
-                    const conversationItem = {
-                        audioBuffer,
-                        audioTranscript: this.lastAudioMessageTranscript.join(' ')
-                    }
-                    // write the audio buffer to the file system
-                    console.log('Writing audio buffer to file system');
-                    const audioWav = await decoders.wav(audioBuffer);
-                    fs.writeFileSync(event.response_id + '_audio.wav', Buffer.from(audioWav.getChannelData(0)));
-                    fs.writeFileSync(event.response_id + '_audio_transcript.txt', this.lastAudioMessageTranscript.join(' '));
-
-                    socketServer.emitToRoom(roomId, 'realtime-audio-message', conversationItem);
-                    this.lastAudioMessageDeltas = [];
-                }
+                console.log('Received event from OpenAI Realtime API:', event.type);
                 
-                console.log(event);
-              } catch (e) {
+                switch (event.type) {
+                    case 'error':
+                        console.error('Error from OpenAI Realtime API:', event);
+                        break;
+                    
+                    case 'session.created':
+                        // take the session object and update its instructions to respond to the user's most previous message in the conversation, and do not respond as the user, but as their interrogator only
+                        const session = event.session;
+                        session.instructions = 
+                        `You are AI who is acting as a police detective for a co-operative criminal mystery game. 
+                        You will interrogate a set of suspects for this crime:
+                         
+                        ${JSON.stringify(gameState.crime.description)}. 
+                        Time of the crime: ${gameState.crime.time}.
+                        Location of the crime: ${gameState.crime.location}.
+
+                        The identities of the suspects are as follows:
+                        ${gameState.players.map(player => `${player.identity}`).join('\n')}
+                        
+                        Conduct a thorough interrogation, but only respond as the interrogator.
+                        Do not respond as the user, but as their interrogator only. 
+                        Use the provided player identities when referring to the players. Only one player will be in the interrogation room at a time. 
+                        You can know who is in the room by using the user messages that are in the conversation that define who is entering the room.
+                        When a new suspect enters the room, you can assume that the previous one has left. 
+                        You are able to play the suspects off of each other, using a previous suspect's statements against them and the other suspects. 
+                        When a user enters the room, start the interrogation by asking them about the crime, and their involvement in it. `;
+                        delete session['id'];
+                        delete session['object'];
+                        delete session['expires_at'];
+                        ws.send(JSON.stringify({ type: 'session.update', session }));
+                        break;
+                    
+                    case 'session.updated':
+                        console.log('Session updated:', event);
+                        break;
+                    
+                    case 'response.audio.delta':
+                        this.lastAudioMessageDeltas.push(event.delta);
+                        break;
+                    
+                    case 'response.audio_transcript.delta':
+                        this.lastAudioMessageTranscript.push(event.delta);
+                        break;
+                    
+                    case 'response.audio.done':
+                        const audioBuffer = await this.convertAudioMessageDeltasToAudio([...this.lastAudioMessageDeltas]);
+                        const socketServer = GameRoomSocketServer.getInstance();
+                        const conversationItem = {
+                            audioBuffer,
+                            audioTranscript: this.lastAudioMessageTranscript.join(' ')
+                        };
+                        // write the audio buffer to the file system
+                        console.log('Writing audio buffer to file system');
+                        const audioWav = await decoders.wav(audioBuffer);
+                        fs.writeFileSync(event.response_id + '_audio.wav', Buffer.from(audioWav.getChannelData(0)));
+                        fs.writeFileSync(event.response_id + '_audio_transcript.txt', this.lastAudioMessageTranscript.join(' '));
+
+                        socketServer.emitToRoom(roomId, 'realtime-audio-message', conversationItem);
+                        this.lastAudioMessageDeltas = [];
+                        this.lastAudioMessageTranscript = [];
+                        break;
+                    
+                    default:
+                        console.warn('Unhandled event type:', event.type);
+                        break;
+                }
+            } catch (e) {
                 console.error(e);
-              }
+            }
             });
 
         ws.on('disconnect', () => {
@@ -396,53 +484,6 @@ Remember to be impartial but thorough in your investigation.`,
         ws.on('error', (error) => {
             console.error('Error with OpenAI Realtime API:', error);
         });
-
-        // socket.on('open', () => {
-        //     console.log('Connected to OpenAI Realtime API');
-
-        //     const user = gameState.players.find(player => player.id === userId);
-        //     if (!user) {
-        //         console.error('User not found in game state');
-        //         return;
-        //     }
-
-        //     const event = {
-        //         type: 'conversation.item.create',
-        //         item: {
-        //           type: 'message',
-        //           role: 'user',
-        //           content: [
-        //             {
-        //               type: 'input_text',
-        //               text: `Interrogate ${user.identity} with a guilt score of ${user.guiltScore}. Here is the crime scenario: ${JSON.stringify(gameState.crime)}. Conduct a thorough interrogation.`
-        //             }
-        //           ]
-        //         }
-        //       };
-
-        //     socket.emit(JSON.stringify(event));
-        //     console.log('Sent user conversation item to realtime API:', conversationItem);
-        // });
-
-        // socket.on('message', (data) => { 
-        //     console.log('Received message from OpenAI Realtime API:', data);
-        //     try {
-        //         const event = JSON.parse(data);
-        //         const socketServer = GameRoomSocketServer.getInstance();
-        //         socketServer.emitToRoom(roomId, 'realtime-message', event);
-        //         console.log(event);
-        //       } catch (e) {
-        //         console.error(e);
-        //       }
-        //     });
-
-        // socket.on('disconnect', () => {
-        //     console.log('Disconnected from OpenAI Realtime API');
-        // });
-
-        // socket.on('error', (error) => {
-        //     console.error('Error with OpenAI Realtime API:', error);
-        // });
     }
 
     static async convertAudioMessageDeltasToAudio(audioMessageDeltas) {
