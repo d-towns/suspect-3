@@ -1,13 +1,14 @@
 import { Server } from "socket.io";
 import { createClient } from "@supabase/supabase-js";
-import { GameRoomService } from "../services/game-room.service.js";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
 import OpenaiGameService from "../services/openai-game-service.js";
+import { GameRoomService } from "../services/game-room.service.js";
 
 function startInterval(initialNumber, tickCallback, doneCallback) {
   (function () {
+    console.log("Starting interval IIFE...");
     let number = initialNumber;
 
     const intervalId = setInterval(() => {
@@ -26,34 +27,6 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
   })();
 }
 
-class Countdown {
-  constructor(initialNumber, tickCallback, doneCallback) {
-    this.number = initialNumber;
-    this.tickCallback = tickCallback;
-    this.doneCallback = doneCallback;
-    this.intervalId = setInterval(() => this.decrement(), 1000);
-  }
-
-  decrement() {
-    this.number--;
-    if (this.tickCallback) {
-      this.tickCallback(this.number);
-    }
-
-    if (this.number <= 0) {
-      this.stop();
-      if (this.doneCallback) {
-        this.doneCallback();
-      }
-    }
-  }
-
-  stop() {
-    clearInterval(this.intervalId);
-    console.log("Countdown stopped.");
-  }
-}
-
 export class GameRoomSocketServer {
   static instance = null;
 
@@ -69,7 +42,7 @@ export class GameRoomSocketServer {
       },
     });
 
-    this.rommRoundTimers = new Map();
+    this.roomRoundTimers = new Map();
 
     this.io.on("connection", (socket) => {
       console.log("A user connected");
@@ -88,6 +61,7 @@ export class GameRoomSocketServer {
         this.handleOnlinePlayersList.bind(this, socket)
       );
       socket.on('realtime-audio-response', this.handleRealtimeAudioResponse.bind(this, socket));
+      socket.on('realtime-audio-response-end', this.handleRealtimeAudioResponseEnd.bind(this, socket));
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
       socket.on("start-game", this.handleStartGame.bind(this, socket));
       socket.on("joined-game", this.handleJoinedGame.bind(this, socket));
@@ -158,7 +132,7 @@ export class GameRoomSocketServer {
       return;
     }
     const room = data[0];
-    const game_state = OpenaiGameService.decryptGameState(room.game_state);
+    const game_state = GameRoomService.decryptGameState(room.game_state);
     await OpenaiGameService.startRealtimeInterregation(
       roomId,
       userId,
@@ -167,7 +141,7 @@ export class GameRoomSocketServer {
   }
 
   async handleRealtimeAudioResponse(socket, audioData) {
-    await OpenaiGameService.addUserResponseToInputAudioBuffer(socket.roomId, socket.userId, audioData);
+    await OpenaiGameService.addUserResponseToInputAudioBuffer(socket.roomId, socket.userId, audioData.audioBuffer);
   }
 
   async handleRealtimeAudioResponseEnd(socket) {
@@ -227,6 +201,9 @@ export class GameRoomSocketServer {
       const thread = await OpenaiGameService.createGameThread(playerIds);
       console.log(`Thread created: ${thread.id}`);
 
+      // save the thread id to the game room
+      await GameRoomService.updateGameRoom(roomId, { thread_id: thread.id });
+
       const run = await OpenaiGameService.runThreadAndProcess(
         thread.id,
         roomId
@@ -242,14 +219,14 @@ export class GameRoomSocketServer {
     }
   }
   /** the game loop  
-   * the first round will have different time than the rest of the roudns
-   * it will last 30 secodns and give the players time to read there cards
-   * once that timer ends, we should call the startrealtimeinterrogation function in the openaigame service
+   * the first round will have different time than the rest of the rounds
+   * it will last 30 seconds and give the players time to read their cards
+   * once that timer ends, we should call the startRealtimeInterrogation function in the openaiGameService
    * with the user who is the host of the room
    * all rounds after the first should have a 2 minute timer
    * Client Side:
-   * - the client will send the audio data in chunks that will appaned to the input audio buffer
-   * - once the response timer ends client side the createInterrogationResponse function in the openaigame service will be called
+   * - the client will send the audio data in chunks that will append to the input audio buffer
+   * - once the response timer ends client side the createInterrogationResponse function in the openaiGameService will be called
    * Server Side: ( this is what we need to implement)
    * once the two minute timer ends for the round, we need to take the conversation and add it to the game thread so that it can be run and then a function call can be made to generate the new game state
    * that state will be encrypted and stored in the database via supabase
@@ -257,16 +234,100 @@ export class GameRoomSocketServer {
    * then we start the next round 
    * 
    * 
-   * it should start the first roundtimer,
-  * once that time ends,
-  * 
-  * 
-  * and start the next roundtimer
   */
-  async startGameLoop(socket, roomId) { }
+  async startGameLoop(socket, roomId) {
+    // function to emit the round tick event to the room
+
+
+    let listenerFunc = null;
+    const initialGameRoom = await GameRoomService.getGameRoom(roomId);
+    const emitRoundTick = (number) => {
+      this.roomRoundTimers.set(socket.roomId, number);
+      this.emitToRoom(roomId, "round-timer-tick", { countdown: number });
+    };
+    // function to start the first round, this will be called after the first round timer ends
+    // this will start the first round and then start the interval for the rest of the rounds
+    const emitRoundStart = async () => {
+      console.log("Starting round...");
+      this.emitToRoom(roomId, "round-start");
+
+      // get the room and its game state
+      const room = this.io.sockets.adapter.rooms.get(roomId);
+      const gameRoom = await GameRoomService.getGameRoom(roomId);
+      const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
+
+      // get the next round player, if there is no inactive round, the game is over
+      const nextRound = gameState.rounds.find(round => round.status === 'active');
+      const nextRoundPlayerSocket = Array.from(room).map((socketId) => {
+        const s = this.io.sockets.sockets.get(socketId);
+        console.log("Socket:", s.userId);
+        if (s.userId === nextRound.player) {
+          return s;
+        }
+      }).filter(Boolean)[0];
+
+      console.log("Next Round player:", nextRoundPlayerSocket);
+
+      console.log("Game state:", gameState);
+      // if there is a next round player, start the realtime session and the interrogation
+      if (nextRoundPlayerSocket) {
+        // check to see what type of round it is
+        if(nextRound.type == 'interrogation') {
+          await OpenaiGameService.openRealtimeSession(roomId, gameState, gameRoom.thread_id);
+          // run the game thread to update the round state
+          // await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
+
+          await OpenaiGameService.startRealtimeInterregation(roomId, nextRoundPlayerSocket.userId, gameState, listenerFunc);
+          // console.log("host socket", nextRoundPlayerSocket.userId);
+          // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
+          startInterval(600, emitRoundTick, handleRoundEnd);
+        } else {
+          console.error("Game Cannot start with a kill round");
+        }
+      }
+    };
+
+    const handleRoundEnd = async () => {
+
+      // Process the conversation and update the game state by running the thread
+      // conversation transcripts for both the player in the room and the AI are stored in the game thread in the openai game service upson
+      // Realtime API server-sent events 'response.audio_transcript.done and 'conversation.item.input_audio_transcript.done'
+      this.emitToRoom(roomId, "round-end");
+      
+
+      await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
+
+      // get the game state and start the interrogation or kill round
+      const gameRoom = await GameRoomService.getGameRoom(roomId);
+      const game = GameRoomService.decryptGameState(gameRoom.game_state);
+
+      //get the next inactive round
+      const inactiveRound = game.rounds.find(round => round.status === 'inactive');
+      if (inactiveRound.type =='interrogation') {
+        listenerFunc = await OpenaiGameService.startRealtimeInterregation(roomId, inactiveRound.player, game, listenerFunc);
+        startInterval(120, emitRoundTick, handleRoundEnd);
+
+      } else if(inactiveRound.type == 'kill') {
+        //kill round
+      } else {
+        //end the game
+        OpenaiGameService.endGame(roomId);
+        this.emitToRoom(roomId, "game-end");
+      }
+
+      // Start the next round
+      this.roomRoundTimers.set(socket.roomId, 120);
+      startInterval(120, emitRoundTick, handleRoundEnd);
+    };
+
+    // Start the first round with a 30-second timer
+    this.roomRoundTimers.set(socket.roomId, 30);
+    startInterval(30, emitRoundTick, emitRoundStart);
+  }
 
 
   async handleJoinedGame(socket, roomId, userId) {
+    if(socket.inGame === undefined) {
     socket.inGame = true;
     console.log(
       `User ${socket.userEmail} joined the game in room ${socket.roomId}`
@@ -278,41 +339,19 @@ export class GameRoomSocketServer {
         return s.inGame;
       });
       const gameRoom = await GameRoomService.getGameRoom(socket.roomId);
-      const game = OpenaiGameService.decryptGameState(gameRoom.game_state);
-
-      if (allInGame && game.status === "setup" && gameRoom.host_id === socket.userId) {
+      const game = GameRoomService.decryptGameState(gameRoom.game_state);
+      if (allInGame && gameRoom.host_id === socket.userId && this.roomRoundTimers.get(socket.roomId) === undefined) {
         console.log(
           `All players in room ${socket.roomId} have joined the game. Starting game...`
         );
 
-        /**
-         * This should start the game loop
-         * TODO: Implement the game loop function
-         * it should start the first roundtimer,
-         * once that time ends, update the game state
-         * and start the next roundtimer
-         */
-
         this.emitToRoom(socket.roomId, "game-starting");
 
-        const emitRoundTick = (number) => {
-          this.emitToRoom(socket.roomId, "round-timer-tick", {
-            countdown: number,
-          });
-        };
-        // const emitRoundStart = async () => {
-        //   this.emitToRoom(socket.roomId, "round-start");
-        //   await OpenaiGameService.startRealtimeInterregation(
-        //     socket.roomId,
-        //     socket.userId,
-        //     game
-        //   );
-        // };
-        console.log("Starting interval for round start");
-        // startInterval(30, emitRoundTick, emitRoundStart);
-		startInterval(30, emitRoundTick);
+        // Start the game loop
+        this.startGameLoop(socket, socket.roomId);
       }
     }
+  }
   }
 
   handlePlayerReady(socket, roomId, userEmail, isReady) {
@@ -391,9 +430,21 @@ export class GameRoomSocketServer {
     this.io.to(roomId).emit(event, data);
   }
 
+  emitToSocket(socketId, event, data) {
+    console.log(`Emitting event ${event} to socket ${socketId}`);
+    this.io.to(socketId).emit(event, data);
+  }
+
   joinRoom(socket, roomId, userId) {
     socket.join(roomId);
     this.emitToRoom(roomId, "user-joined", { userId });
+  }
+
+  getSocketForUser(userId) {
+    const userSocket = Array.from(this.io.sockets.sockets.values()).find(
+      (s) => s.userId === userId
+    );
+    return userSocket;
   }
 
   on(event, callback) {

@@ -55,34 +55,28 @@ async function createGameRoom(req, res) {
   }
 
   // Generate a unique room ID
-  const roomId = generateRoomId();
 
   const roomData = {
-    id: roomId,
     host_id: userId,
-    players: [userId],
+    created_at: new Date()
   };
 
   const { data, error } = await supabase
     .from('game_rooms')
-    .insert([roomData]);
+    .insert([roomData]).select().single();
 
   if (error) {
     console.error('Error creating game room:', error);
     return res.status(500).json({ success: false, message: `Error creating game room: ${error.message}` });
   }
 
+  console.log('Game room created:', data);
+
   // Add the host to the game_players table
-  const { error: playerError } = await supabase
-    .from('game_players')
-    .insert([{ user_id: userId, room_id: roomId }]);
 
-  if (playerError) {
-    console.error('Error adding host to game_players:', playerError);
-    return res.status(500).json({ success: false, message: `Error adding host to game: ${playerError.message}` });
-  }
 
-  return res.status(200).json({ success: true, roomId });
+
+  return res.status(200).json({ success: true, roomId: data.id });
 }
 
 // GET /get-room/:roomId
@@ -108,9 +102,9 @@ async function getRoom(req, res) {
   return res.status(200).json({ success: true, room: data });
 }
 
-// Utility function to generate unique room IDs
+// Utility function to generate unique room UUID
 const generateRoomId = () => {
-  return Math.random().toString(36).substring(2, 8).toUpperCase(); // Generates a 6-character ID
+  return 
 };
 
 export { router as gameRoomRouter };

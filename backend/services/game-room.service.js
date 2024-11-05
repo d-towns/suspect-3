@@ -1,17 +1,17 @@
 import { createSupabaseClient } from '../db/supabase.js';
 import { GameRoomSocketServer } from '../socket/io.js';
 import { createClient } from '@supabase/supabase-js';
+import crypto from "crypto";
 
 export class GameRoomService {
     static async createGameRoom(userId) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const roomId = this.generateRoomId();
         const roomData = {
-            id: roomId, // Changed from room_id to id to match the router
             host_id: userId,
-            players: [userId],
             created_at: new Date()
         }
+        console.log(roomData);
 
         const { data, error } = await supabase
             .from('game_rooms')
@@ -33,7 +33,21 @@ export class GameRoomService {
     }
 
     static generateRoomId() {
-        return Math.random().toString(36).substring(2, 8).toUpperCase(); // Changed to match the router's version
+        return 
+    }
+
+    static async updateGameRoom(roomId, updates) {
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        const { data, error } = await supabase
+            .from('game_rooms')
+            .update(updates)
+            .eq('id', roomId);
+
+        if (error) {
+            throw new Error(`Error updating game room: ${error.message}`);
+        }
+
+        return data;
     }
 
     static async getGameRoom(roomId) {
@@ -62,4 +76,52 @@ export class GameRoomService {
 
         return data;
     }
+
+    static encryptGameState(gameState) {
+        const gameStateString = JSON.stringify(gameState);
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv(
+          "aes-256-cbc",
+          Buffer.from(process.env.ENCRYPTION_KEY, "hex"),
+          iv
+        );
+        let encrypted = cipher.update(gameStateString);
+        encrypted = Buffer.concat([encrypted, cipher.final()]);
+        return iv.toString("hex") + ":" + encrypted.toString("hex");
+      }
+    
+      static decryptGameState(encryptedGameState) {
+        const textParts = encryptedGameState.split(":");
+        const iv = Buffer.from(textParts.shift(), "hex");
+        const encryptedText = Buffer.from(textParts.join(":"), "hex");
+        const decipher = crypto.createDecipheriv(
+          "aes-256-cbc",
+          Buffer.from(process.env.ENCRYPTION_KEY, "hex"),
+          iv
+        );
+        let decrypted = decipher.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return JSON.parse(decrypted.toString());
+      }
+    
+      static async saveGameState(roomId, gameState) {
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+        const encryptedGameState = this.encryptGameState(gameState);
+        console.log("Saving encrypted game state for room ID:", roomId);
+    
+        const { data, error } = await supabase
+          .from("game_rooms")
+          .update({ game_state: encryptedGameState })
+          .eq("id", roomId)
+          .select();
+    
+        if (error) {
+          console.error("Error saving encrypted game state:", error);
+          throw error;
+        }
+        console.log("Encrypted game state saved successfully");
+      }
 }
