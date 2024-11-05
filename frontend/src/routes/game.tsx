@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
-import { GameState, Player } from '../models/game-state.model';
+import { ConversationItem, GameState, Player } from '../models/game-state.model';
 import { useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import decode, { decoders } from 'audio-decode';
+import decodeAudio, {decoders} from 'audio-decode';
 import { FaMicrophone } from 'react-icons/fa6'
-import { convertAudioData } from '../utils/audio-helpers';
+import { base64EncodeAudio, wavBlobToBase64PCM16 } from '../utils/audio-helpers';
+import AudioPlayer from '../components/audioPlayer';
+import {MediaRecorder, register, IMediaRecorder} from 'extendable-media-recorder';
+import {connect} from 'extendable-media-recorder-wav-encoder';
+import AudioRecorder from '../components/audio-recorder';
+
+
 
 const Game = () => {
   const { socket, emitEvent } = useSocket();
@@ -15,13 +21,15 @@ const Game = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
-  const [interragationTranscript, setInterragationTranscript] = useState<any[]>([]);
+  const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [recordingTimer, setRecordingTimer] = useState<number>(15);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [detailsRevealed, setDetailsRevealed] = useState<boolean>(false);
+  const mediaRecorderRef = useRef<IMediaRecorder | null>(null);
+  const [capturedStream, setCapturedStream] = useState<MediaStream | null>(null);
+  const [audioBlobs, setAudioBlobs] = useState<Buffer[] | Blob[]>([]);
   const [isRecording, setIsRecording] = useState<boolean>(false);
-
 
   useEffect(() => {
     if (socket) {
@@ -29,17 +37,23 @@ const Game = () => {
         console.log('Received game state update:', newState);
         setGameState(newState);
       });
+      socket.on('game-state-updating', (newState: GameState) => {
+        console.log('Received game state updating:', newState);
+        setGameState(newState);
+      });
 
       socket.on('realtime-audio-message', async (params: any) => {
-        console.log('Received audio message:', params);
-        const audioWav = await decoders.wav(params.audioBuffer);
+        try {
+          console.log('Received audio message:', params);
+          const { audioBuffer, audioTranscript } = params;
+          const audioWav = await decoders.wav(params.audioBuffer);
 
-        setInterragationTranscript(prev => [...prev, params.audioTranscript]);
-        const audioContext = new AudioContext();
-        const audioBufferSource = audioContext.createBufferSource();
-        audioBufferSource.buffer = audioWav;
-        audioBufferSource.connect(audioContext.destination);
-        audioBufferSource.start();
+          setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript }]);
+          console.log('Playing audio message:', audioWav);
+        } catch (error) {
+          console.error('Error playing audio message:', error);
+        }
+
 
       });
 
@@ -53,6 +67,15 @@ const Game = () => {
        * [*] TODO: Createa startrecording function that cretes a MediaStream and MediaRecorder object and starts recording audio
        * [*] TODO: Stream the audio to the server through websocket events in the MediaRecorder ondataavailable event callback
        * [*] TODO: (moved to useSocket hook) Emit a joined-game event to the server socket to let the server know that the user has joined the game
+       * [*] TODO: automatically start recording after the most recent audo message has been played fully
+       * [*] TODO: send a 'realtime-audio-response-end' event to the server when the user stops recording ( either by timer ending or manually )
+       * [] TODO: once the round timer ends for all rounds after the first, since it is controlled by the server, we will then move to a loading screen and wait for the game state to update
+       * [] TODO: once we have the update, we can show the new guily score for the player and the new round timer
+       * [] TODO: once the interrogation round is over, we enter the kill round
+       * [] TODO: in the kill round, each player will see each others guilt score and will have to vote on who they think is a rat
+       * [] TODO: Once the kill round voting is over, the players will ahve either voted for a player or not, 
+       * [] TODO: if a player recives at least n // 2 votes where n is the number of players and they did rat out the other players, they will lose the game and leaderboard rank
+       * [] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
        */
 
       socket.on('game-starting', async (params: any) => {
@@ -90,7 +113,7 @@ const Game = () => {
 
   useEffect(() => {
     if (roundTimer === 1) {
-      setInterragationTranscript([]);
+      setInterrogationTranscript([]);
     }
   }, [roundTimer]);
 
@@ -112,45 +135,88 @@ const Game = () => {
 
 
   const startRecording = async () => {
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    })
     try {
+        const capturedStream = stream;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRecorderRef.current = mediaRecorder;
+        let audioBlobs: Blob[] = [];
+        // Use the extended MediaRecorder library
+        await register(await connect());
+        const audioContext = new AudioContext({ sampleRate: 24000 });
+        const mediaStreamAudioSourceNode = new MediaStreamAudioSourceNode(audioContext, { mediaStream: stream });
+        const mediaStreamAudioDestinationNode = new MediaStreamAudioDestinationNode(audioContext);
+        mediaStreamAudioSourceNode.connect(mediaStreamAudioDestinationNode);
+        
+        mediaRecorderRef.current = new MediaRecorder(mediaStreamAudioDestinationNode.stream, {
+          mimeType: 'audio/wav'
+        });
+  
+        // Add audio blobs while recording 
+        mediaRecorderRef.current.addEventListener('dataavailable', async (event) => {
+          audioBlobs.push(event.data);
+          // const base64Chunk = await wavBlobToBase64PCM16(event.data)
+          // console.log('Received audio chunk:', event.data);
+          // const arrayBuffer = await event.data.arrayBuffer();
+          // // console.log('Received audio chunk:', arrayBuffer.byteLength);
+          // const audioBuffer = await decoders.wav();
+          // const channelData = audioBuffer.getChannelData(0);
+          // const base64Chunk = base64EncodeAudio(channelData);
+          // emitEvent('realtime-audio-response', { audioBuffer: base64Chunk });
+          // console.log('Audio data available:', base64Chunk);
+        });
 
+        // on stop, stop all of the tracs in the stream
+        mediaRecorderRef.current.addEventListener('stop',async  () => {
+          capturedStream.getTracks().forEach(track => track.stop());
+          const audioBlob = new Blob(audioBlobs, { type: 'audio/wav' });
+          // const audioBuffer = await decoders.wav(audioBlob);
+          const base64Chunk = await wavBlobToBase64PCM16(audioBlob);
+          console.log('Received audio chunk:', base64Chunk);
 
-      mediaRecorder.ondataavailable = async (event) =>{
-        const base64AudioString = convertAudioData(event);
-        emitEvent('realtime-audio-message', { audioBuffer: base64AudioString});
-      };
-
-      mediaRecorder.onstop = async () => {
-        console.log('Recording stopped');
-      };
-
-      mediaRecorder.start(1000);
-
-      const recordingInterval = setInterval(() => {
-        setRecordingTimer(prev => prev - 1);
-        if (recordingTimer === 0) {
-          clearInterval(recordingInterval);
-          stopRecording();
-        }
-      }, 1000);
-
-      setIsRecording(true);
-      console.log('Recording started');
+        });
+  
+        mediaRecorderRef.current.start(1000);
+        setIsRecording(true);
+        console.log('Recording started');
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Error starting recording:', error);
     }
+
+    // const chunks: Buffer[] = [];
+
+    // recording.on('data', (data :any) => {
+    //   chunks.push(data);
+    // });
+
+    // recording.on('end', async () => {
+    //   const audioBuffer = Buffer.concat(chunks);
+    //   const base64AudioString = audioBuffer.toString('base64');
+    //   console.log('Audio data available:', base64AudioString);
+    //   emitEvent('realtime-audio-response', { audioBuffer: base64AudioString });
+    // });
+
+    // const recordingInterval = setInterval(() => {
+    //   setRecordingTimer((prev) => prev - 1);
+    //   if (recordingTimer === 0) {
+    //     clearInterval(recordingInterval);
+    //     stopRecording();
+    //     setRecordingTimer(15);
+    //   }
+    // }, 1000);
+
+    // setIsRecording(true);
+    // console.log('Recording started');
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      console.log('Recording stopped');
-    }
+
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    emitEvent('realtime-audio-response-end', {});
+    console.log('Recording stopped');
   };
   /**
    * UI FLow
@@ -169,20 +235,21 @@ const Game = () => {
 
   return (
     <div>
-      {roundTimer > 0 && (
-        <div className="fixed top-0 right-0 p-4 bg-gray-800 text-white rounded-bl-lg">
-          <p>Time left in round: {roundTimer} seconds</p>
-        </div>
-      )}
       <div className="h-screen bg-gray-900 text-white flex flex-col">
         {/* HUD-like top bar */}
-        <div className="bg-gray-800 p-4 flex justify-between items-center">
-          <div className="flex-1 ml-7 text-left">
+        <div className="bg-gray-800 p-4 flex items-center">
+          <div className="flex-1 ml-7">
             <h2 className="text-4xl font-bold">Suspect 3</h2>
             <p className="text-lg">
               Round: {gameState.status ? gameState.status.charAt(0).toUpperCase() + gameState.status.slice(1) : 'Unknown'}
             </p>
           </div>
+          {roundTimer > 0 && (
+            <div className="p-4 bg-gray-800 text-white flex-col">
+              <p>Time left in round:</p>
+              <p> {roundTimer} seconds</p>
+            </div>
+          )}
           <div className="flex-1 text-left">
             <h3 className="text-xl font-bold">Guilt Meter</h3>
             <div className="w-full bg-gray-700 rounded-full h-2.5">
@@ -198,34 +265,37 @@ const Game = () => {
         {/* Main game area */}
         <div className="flex-1 p-6 flex">
           {/* Left panel: Crime and Evidence */}
-          <div className="w-1/4 bg-gray-800 p-4 rounded-lg mr-4 overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">Identity</h2>
-            <p className="mb-4">{currentPlayer?.identity || 'Unknown'} </p>
-            <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
-            {gameState.crime && (
-              <>
-                <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
-                <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
-                <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
-                <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
-              </>
-            )}
-            <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
-            <ul className="list-disc list-inside">
-              {currentPlayer?.evidence?.map((item, index) => (
-                <li key={index}>{item}</li>
-              )) || <li>No evidence available</li>}
-            </ul>
-          </div>
+          {detailsRevealed ? (
+            <div className="w-1/4 bg-gray-800 p-4 rounded-lg mr-7 overflow-y-auto ">
+              <h2 className="text-2xl font-bold mb-4">Identity</h2>
+              <p className="mb-4">{currentPlayer?.identity || 'Unknown'} </p>
+              <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
+              {gameState.crime && (
+                <>
+                  <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
+                  <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
+                  <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
+                  <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
+                </>
+              )}
+              <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
+              <ul className="list-disc list-inside">
+                {currentPlayer?.evidence?.map((item, index) => (
+                  <li key={index}>{item}</li>
+                )) || <li>No evidence available</li>}
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <button className='bg-red-800 mr-4 text-white p-2 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900' onClick={() => setDetailsRevealed(true)}>
+                Reveal Identity and Evidence
+              </button>
+            </div>
+          )}
 
           {/* Right panel: Interrogation chat */}
-          {roundTimer > 0 ? (
-            <div className="flex w-full flex-col items-center justify-center p-4 bg-gray-800 text-white rounded-bl-lg">
-              <p className="text-lg mb-2">Next round begins in:</p>
-              <p className="text-5xl">{roundTimer} seconds</p>
-            </div>
-          ) :
-            gameState.rounds?.find(round => round.status === 'inactive')?.player == currentPlayer?.id ? (
+          {
+            gameState.rounds?.find(round => round.status === 'active')?.player == currentPlayer?.id ? (
 
               <div className="flex-1 bg-gray-800 p-4 rounded-lg flex flex-col">
                 <h2 className="text-2xl font-bold mb-4">Interrogation</h2>
@@ -233,18 +303,22 @@ const Game = () => {
                   ref={chatAreaRef}
                   className="flex-1 overflow-y-auto mb-4 bg-gray-700 p-4 rounded"
                 >
-                  {interragationTranscript.map((message, index) => (
-                    <p key={index} className="mb-2">{message}</p>
+                  {interrogationTranscript.map((conversationItem, index) => (
+                    <div className='flex'>
+                        <AudioPlayer key={index} audioData={conversationItem.audioBuffer} /> 
+                        <p>{conversationItem.audioTranscript}</p>
+                    </div>
                   ))}
                 </div>
                 <div className="flex justify-center">
                   {/* TODO: use a radix tab to switch between text and audio messages */}
-                  <button
+                  {socket && <AudioRecorder socket={socket} emitEvent={emitEvent} />}
+                  {/* <button
                     onClick={() => {
                       if (isRecording) {
                         stopRecording();
                       } else {
-                      startRecording();
+                        startRecording();
                       }
                     }}
                     className={`
@@ -252,8 +326,8 @@ const Game = () => {
               flex-row
               gap-2
               items-center
-              ${isRecording 
-              ? 'bg-red-700' : 'bg-gray-700'}
+              ${isRecording
+                        ? 'bg-red-700' : 'bg-gray-700'}
               } text-white p-2 rounded-lg
               hover:bg-gray-600
               focus:outline-none
@@ -266,7 +340,11 @@ const Game = () => {
                     <div>
                       <FaMicrophone />
                     </div>
-                  </button>
+                    <div>
+                      {recordingTimer}
+                    </div>
+
+                  </button> */}
 
                   {/* <input 
               type="text" 
@@ -285,20 +363,20 @@ const Game = () => {
                 </div>
               </div>) :
               <div className="flex w-full flex-col items-center justify-center p-4 bg-gray-800 text-white rounded-bl-lg">
-                <p className="text-5xl">{gameState.players.find(player => gameState.rounds?.find(round => round.status === 'inactive')?.player == player.id)?.identity.split(',')[0]} enters the room...</p>
+                <p className="text-5xl">{gameState.players.find(player => gameState.rounds?.find(round => round.status === 'active')?.player == player.id)?.identity.split(',')[0]} enters the room...</p>
               </div>
           }
         </div>
 
         {/* Interrogation Progress */}
-        {gameState.status === 'interrogation' && gameState.interrogationProgress !== undefined && (
+        {/* {gameState.status === 'interrogation' && gameState.interrogationProgress !== undefined && (
           <div className="bg-gray-800 p-4">
             <h2 className="text-xl font-semibold mb-2">Interrogation Progress</h2>
             <div className="w-full bg-gray-700 rounded-full h-2.5">
               <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${gameState.interrogationProgress}%` }}></div>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Game Outcome */}
         {gameState.status === 'finished' && gameState.outcome && (

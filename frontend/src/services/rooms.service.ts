@@ -1,9 +1,9 @@
 import axiosInstance from '../utils/axios-instance';
-import { Room } from '../models';
+import { GameRoom } from '../models';
 import { decryptGameState } from '../utils/decrypt';
 
 export const roomsService = {
-  fetchRooms: async (): Promise<Room[]> => {
+  fetchRooms: async (): Promise<GameRoom[]> => {
     try {
       const response = await axiosInstance.get('/games/get-rooms');
       if (response.data.success) {
@@ -29,7 +29,7 @@ export const roomsService = {
     }
   },
 
-  getRoom: async (roomId: string): Promise<Room> => {
+  getRoom: async (roomId: string): Promise<GameRoom> => {
     try {
       const response = await axiosInstance.get(`/games/get-room/${roomId}`);
       if (response.data.room) {

@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { Room } from '../models';
+import { GameRoom } from '../models';
 import { useSocket } from '../hooks/useSocket';
 
 const Rooms: React.FC = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [rooms, setRooms] = useState<GameRoom[]>([]);
   const { socket, isConnected } = useSocket();
 
   useEffect(() => {
@@ -34,11 +34,11 @@ const Rooms: React.FC = () => {
 
   useEffect(() => {
     if (socket && isConnected) {
-      socket.on('room-created', (newRoom: Room) => {
+      socket.on('room-created', (newRoom: GameRoom) => {
         setRooms(prevRooms => [...prevRooms, newRoom]);
       });
 
-      socket.on('room-updated', (updatedRoom: Room) => {
+      socket.on('room-updated', (updatedRoom: GameRoom) => {
         setRooms(prevRooms =>
           prevRooms.map(room => (room.id === updatedRoom.id ? updatedRoom : room))
         );

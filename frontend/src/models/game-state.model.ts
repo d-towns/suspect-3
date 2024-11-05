@@ -2,9 +2,15 @@ export interface ConversationExhange {
   speaker: string,
   message: string
 }
+
+export interface ConversationItem {
+  audioBuffer: ArrayBuffer,
+  audioTranscript: string
+}
+
 export interface Round {
   player: string,
-  type: 'evidence' | 'kill',
+  type: 'interrogation' | 'kill',
   conversation: ConversationExhange[],
   results: {
     platyerFlipped?: string,

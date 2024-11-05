@@ -2,13 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { Player, ChatMessage, Room } from '../models';
+import { Player, ChatMessage, GameRoom } from '../models';
 import { useSocket } from '../hooks/useSocket';
 
 type PlayersMap = Map<string, Player>;
 
 interface LobbyState {
-  room: Room | null;
+  room: GameRoom | null;
   players: PlayersMap;
   gameStarting: boolean;
   chat: {

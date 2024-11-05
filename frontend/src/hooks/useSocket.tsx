@@ -32,6 +32,7 @@ export const useSocket = () => {
     setSocket(newSocket);
 
     return () => {
+      
       newSocket.disconnect();
     };
   }, []);
