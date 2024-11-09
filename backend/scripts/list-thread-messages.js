@@ -1,13 +1,13 @@
 import OpenAI from 'openai'
 
-const listThreadmessages = async (threadId) => {
+ export const listThreadmessages = async (threadId) => {
     try {
         const client = new OpenAI({
             organization: process.env.OPENAI_ORGANIZATION_ID,
             project: process.env.OPENAI_PROJECT_ID,
           });
         const threadMessages = await client.beta.threads.messages.list(
-            threadId
+            threadId, {limit: 100}
           );
           for (let message of threadMessages.data) {
               console.log(message.content[0].text)

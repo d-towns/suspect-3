@@ -20,7 +20,7 @@ const resetGameState = async () => {
             gameThreadId
           );
         const messageIds = threadMessages.data.map((message) => message.id);
-        const messageIdsToDelete = messageIds.slice(1);
+        const messageIdsToDelete = messageIds.reverse().slice(2);
         for(let id of messageIdsToDelete)  {
             await client.beta.threads.messages.del(
                 gameThreadId,
