@@ -266,7 +266,6 @@ export class GameRoomSocketServer {
         }
       }).filter(Boolean)[0];
 
-      console.log("Next Round player:", nextRoundPlayerSocket);
 
       console.log("Game state:", gameState);
       // if there is a next round player, start the realtime session and the interrogation
@@ -282,7 +281,7 @@ export class GameRoomSocketServer {
           // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
           startInterval(600, emitRoundTick, handleRoundEnd);
         } else {
-          console.error("Game Cannot start with a kill round");
+          console.error("Game Cannot start with a voting round");
         }
       }
     };
@@ -294,33 +293,44 @@ export class GameRoomSocketServer {
       // Realtime API server-sent events 'response.audio_transcript.done and 'conversation.item.input_audio_transcript.done'
       this.emitToRoom(roomId, "round-end");
       
+      try {
+        const gameRoom = await GameRoomService.getGameRoom(roomId);
+        const game = GameRoomService.decryptGameState(gameRoom.game_state);
+        const interrogationResults = await OpenaiGameService.deduceGuiltScore(roomId);
+
+      // add the interrogation results to the game thread
+      const content = {
+        role: 'assistant',
+        content: `The Interrogator has deduced that ${interrogationResults.player} is now ${interrogationResults.guiltScore}% guilty. Please update the game state accrodingly`
+      }
+      await OpenaiGameService.addMessageToThread(gameRoom.thread_id, content);
+
 
       await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
 
-      // get the game state and start the interrogation or kill round
-      const gameRoom = await GameRoomService.getGameRoom(roomId);
-      const game = GameRoomService.decryptGameState(gameRoom.game_state);
+      // get the game state and start the interrogation or voting round
+
 
       //get the next inactive round
       const inactiveRound = game.rounds.find(round => round.status === 'inactive');
       if (inactiveRound.type =='interrogation') {
         listenerFunc = await OpenaiGameService.startRealtimeInterregation(roomId, inactiveRound.player, game, listenerFunc);
-        startInterval(120, emitRoundTick, handleRoundEnd);
+        startInterval(600, emitRoundTick, handleRoundEnd);
 
       } else if(inactiveRound.type == 'kill') {
-        //kill round
+        this.emitToRoom(roomId, "kill-round-start");
+        this.roomRoundTimers.set(socket.roomId, 600);
+        startInterval(600, emitRoundTick, handleRoundEnd);
       } else {
         //end the game
         OpenaiGameService.endGame(roomId);
         this.emitToRoom(roomId, "game-end");
       }
+    } catch (error) {
+      console.error("Error handling round end:", error);
+    }
 
-      // Start the next round
-      this.roomRoundTimers.set(socket.roomId, 120);
-      startInterval(120, emitRoundTick, handleRoundEnd);
     };
-
-    // Start the first round with a 30-second timer
     this.roomRoundTimers.set(socket.roomId, 30);
     startInterval(30, emitRoundTick, emitRoundStart);
   }

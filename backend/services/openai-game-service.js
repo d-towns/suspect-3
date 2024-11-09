@@ -74,7 +74,14 @@ class OpenaiGameService {
               .object({
                 guiltScoreUpdate: z.number(),
                 playerFlipped: z.boolean(),
-                votedRat: z.string(),
+                votingResults: z.array(
+                  z
+                    .object({
+                      player: z.string(),
+                      suspect: z.string(),
+                    })
+                    .strict()
+                ),
               })
               .strict(),
           })
@@ -115,37 +122,53 @@ class OpenaiGameService {
    - Location
    - Time of occurrence
    - Brief description of what happened
+   - Use the provided player IDs when assigning identities to players
+   - the crime scenario has a culprit, and the goal of the game is to determine who the culprit is
 
-2. Assign identities to players:
+2. Generate evidence pieces:
+   - Create 6 evidence pieces related to the crime
+
+3. Assign identities to players:
     - Each player gets a unique identity related to the crime scenario
     - The identities should be assigned in a way that makes it difficult for players to determine who committed the crime
     - Give the identity a real name and a brief description of their background
+    - Only one player can be the culprit. Assign evidence in a way that makes it difficult to determine who the culprit is
     - Use the provided player IDs when assigning identities - Each player gets a unique identity related to the crime scenario
 
-3. Generate evidence pieces:
-   - Create 6 evidence pieces related to the crime
 
 4. Distribute evidence:
    - Assign 3 out of 6 evidence pieces to each player
 
-5. Conduct interrogations:
-   - Question each player for 5 minutes
-   - Try to determine if they committed the crime
-   - Point out inconsistencies between players' stories
+5. Analyze interrogations:
+   - a conversation between the player and the a in game interrogator will be conducted and placed in the game thread
+    - The interrogator will be an AI acting as a police detective
+    - The goal of the interrogation is to determine the guilt of the player
+    - The interrogator will use the evidence provided to assess the player's guilt
+    - there will be a message in the conversation about the guilt score updates of each player after each back and forth exchange
+    - use that to update the game state
 
-6. Evaluate guilt:
-   - Assess each player's guilt on a scale from 0.01 (innocent) to 1.00 (guilty)
-   - Update the score based on players' responses and inconsistencies
+7. Analyze voting rounds:
+    - voting rounds are where all players vote on a suspect who they think is the killer
+    - the votes will be placed in the game thread
+    - if there is a consensus on someone being the culprit, update the game state accordingly
+    - if the vote was correct, the non-culprit players win the game
+    - if the vote was incorrect, the culprit wins the game
 
 7. Assign rounds:
     - Conduct a total of n*2 rounds, where n is the number of players. so the total number of rounds is 2 times the number of players. there should never be more rounds than the number of players multiplied by 2
-    - Each round is either an interrogation or a kill round
+    - Each round is either an interrogation or a voting round
+    - Interrogation Round Rules:
     - The player attribute for each round should be the player ID uuid
     - When the game state is first created, the first round should be an interrogation round for the first player. the round should be active and the status should be active
     - Each round has a status, it is either inactive, active, or completed
     - Interrogation rounds are for individual players, assign a player attribute for these rounds using their player ID uuid
-    - Kill rounds involve all players voting on a suspected "rat", make the player attribute for these rounds be "all"
-    - Conduct the rounds in sequence, starting with the first player and alternating between interrogation and kill rounds
+    - voting round Rules:
+    - voting rounds involve all players voting on a suspect who they think is the killer, make the player attribute for these rounds be "all".
+    - there will be messages for each player and who they voted for
+    - place those votes in the game state inside the round object
+    - if there is a consensus on someone being the culprit, update the game state accordingly
+    - if the vote was correct, the non-culprit players win the game
+    - Conduct the rounds in sequence, starting with the first player and alternating between interrogation and voting rounds
     - Assign a interregation round for each player
 
 Remember to be impartial but thorough in your investigation.`,
@@ -156,6 +179,18 @@ Remember to be impartial but thorough in your investigation.`,
       return assistant;
     } catch (error) {
       console.error("Error creating Game Master Assistant:", error);
+      throw error;
+    }
+  }
+
+  static addMessageToThread(threadId, content) {
+    console.log(`Adding message to thread: ${threadId} with role: ${role}`);
+    try {
+      const message = this.client.beta.threads.messages.create(threadId, content);
+      console.log("Message added to thread:", message);
+      return message;
+    } catch (error) {
+      console.error("Error adding message to thread:", error);
       throw error;
     }
   }
@@ -234,12 +269,12 @@ Remember to be impartial but thorough in your investigation.`,
    * control the flow of the game with user messages
    * they will come in the form of audio or text
    * audio for the interregations
-   * text for the kill rounds and game management
+   * text for the voting rounds and game management
    * how do i know when it is safe to start the game?
    * when all of the players are in the started game ( at the game/{game_id} page )
    * once that is the case i can start the first round
    * there are teo types of rounds
-   * iterregation roudns or kill rounds
+   * iterregation roudns or voting rounds
    * There are a total of n*2 rounds in a game where n is the number of total players
    * so the game state needs to have rounds object,
    * an array with a round object in each with their type, conversation (i rounds), and results ( guilt socre update, if the player flipped, who was voted as a rat,)
@@ -289,6 +324,22 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
+  static async createMessageInThread(threadId, role, content) {
+    console.log(`Creating message in thread: ${threadId} with role: ${role}`);
+    try {
+      const message = await this.client.beta.threads.messages.create(threadId, {
+        role,
+        content,
+      });
+      console.log("Message created:", message);
+      return message;
+    } catch (error) {
+      console.error("Error creating message in thread:", error);
+      throw error;
+    }
+  }
+
+
   static async addUserResponseToInputAudioBuffer(
     roomId,
     userId,
@@ -310,7 +361,7 @@ Remember to be impartial but thorough in your investigation.`,
       })
     );
 
-    await saveBase64PCM16ToWav(base64AudioChunk, outputPath);
+    // await saveBase64PCM16ToWav(base64AudioChunk, outputPath);
 
     console.log(
       "Added audio to conversation item in realtime session for room: ",
@@ -333,6 +384,50 @@ Remember to be impartial but thorough in your investigation.`,
     console.log("Created response in realtime session for room:", roomId);
   }
 
+
+  static async deduceGuiltScore(roomId) {
+    return new Promise((resolve, reject) => {
+      try {
+      const ws = this.roomRealtimeSessions.get(roomId);
+      if (!ws) {
+        console.error("Realtime session not found for room:", roomId);
+        return;
+      }
+      // add a conversation item to he realtiem chat to update the guilt score of the player
+      ws.send({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "input_text",
+              text: `This interrogation session is over. Call the function update_guilt_score to update the guilt score of the player based on the evidence and the player's responses.`,
+            }
+          ]
+        },
+      });
+
+      ws.send(JSON.stringify({type: 'response.create'}));
+
+      ws.on("message", async (data) => {
+        const event = JSON.parse(data);
+        if (event.type === "response.function_call_arguments.done") {
+          await this.client.beta.threads.messages.create(threadId, {
+            role: "assistant",
+            content: `Interrogation results: ${JSON.stringify(event.arguments)}`,
+          });
+          resolve(event.arguments);
+        }
+      });
+    } catch {
+      reject("Error updating guilt score");
+    }
+    });
+  }
+
+
+
   static async openRealtimeSession(roomId, gameState, threadId) {
     return new Promise((resolve, reject) => {
       const url =
@@ -352,7 +447,7 @@ Remember to be impartial but thorough in your investigation.`,
         this.roomRealtimeSessions.delete(roomId);
       });
 
-      ws.on("error", (error) => {
+      ws.on("error", (error) => {å
         console.error("Error with OpenAI Realtime API:", error);
         reject(error);
       });
@@ -386,12 +481,42 @@ Remember to be impartial but thorough in your investigation.`,
                         You can know who is in the room by using the user messages that are in the conversation that define who is entering the room.
                         When a new suspect enters the room, you can assume that the previous one has left. 
                         You are able to play the suspects off of each other, using a previous suspect's statements against them and the other suspects. 
-                        When a user enters the room, start the interrogation by asking them about the crime, and their involvement in it. `;
+                        When a user enters the room, start the interrogation by asking them about the crime, and their involvement in it. 
+
+                        Once the conversation is over, call the function in order to 
+                        `;
               session.input_audio_transcription = {
                 model: "whisper-1",
               };
-              session.modalities = ["audio"]
               session.turn_detection = null;
+              session.tools = [
+                {
+                  "type": "function",
+                  "name": "update_guilt_score",
+                  "description": "Update the guilt score of the player based on the evidence and the player's responses",
+                  "parameters": {
+                      "type": "object",
+                      "properties": {
+                          "player": {
+                              "type": "string",
+                              "description": "The player ID to update the guilt score for"
+                          },
+                          "deduction": {
+                              "type": "array",
+                              "items": {
+                                  "type": "string"
+                              },
+                              "description": "Reasons as to why the guilt score is being updated to the new value"
+                          },
+                          "guilt_score": {
+                              "type": "number",
+                              "description": "The new guilt score for the player"
+                          }
+                      },
+                      "required": ["player", "deduction", "guilt_score"]
+                  }
+              }
+              ]
               delete session["id"];
               delete session["object"];
               delete session["expires_at"];
@@ -401,6 +526,7 @@ Remember to be impartial but thorough in your investigation.`,
             case "session.updated":
               console.log("Session updated:", event);
               break;
+
             case "conversation.item.input_audio_transcription.completed":
               // commit the transcript to the game thread as a user message
               console.log("Audio transcription completed", event.transcript);
@@ -418,34 +544,34 @@ Remember to be impartial but thorough in your investigation.`,
               ws.send(JSON.stringify({ type: "response.create" }));
               break;
 
-            case "conversation.item.created":
-              // add the conversation item to the game thread using the item.role to determine if it is a user or assistant message
-              const item = event.item;
-              const role = item.role;
-              console.log(
-                `Conversation item created with role: ${role} and status: ${item.status}`
-              );
-              let message;
-              if (item.status === "completed") {
-                console.log("Conversation item is completed", item);
-                if (item.content[0].type === "input_text") {
-                  console.log(
-                    "Adding user conversation item:",
-                    item.content[0].text
-                  );
-                  message = item.content[0].text;
-                } else {
-                  message = item.content[0].transcript;
-                }
-                if (message) {
-                  console.log("Adding conversation item to game thread:", item);
-                  await this.client.beta.threads.messages.create(threadId, {
-                    role,
-                    content: message,
-                  });
-                }
-              }
-              break;
+            // case "conversation.item.created":
+            //   // add the conversation item to the game thread using the item.role to determine if it is a user or assistant message
+            //   const item = event.item;
+            //   const role = item.role;
+            //   console.log(
+            //     `Conversation item created with role: ${role} and status: ${item.status}`
+            //   );
+            //   let message;
+            //   if (item.status === "completed") {
+            //     console.log("Conversation item is completed", item);
+            //     if (item.content[0].type === "input_text") {
+            //       console.log(
+            //         "Adding user conversation item:",
+            //         item.content[0].text
+            //       );
+            //       message = item.content[0].text;
+            //     } else {
+            //       message = item.content[0].transcript;
+            //     }
+            //     if (message) {
+            //       console.log("Adding conversation item to game thread:", item);
+            //       await this.client.beta.threads.messages.create(threadId, {
+            //         role,
+            //         content: message,
+            //       });
+            //     }
+            //   }
+            //   break;
             case "response.audio.done":
               console.log("Audio response received from OpenAI Realtime API");
               const audioBuffer = await convertAudioMessageDeltasToAudio([
@@ -503,6 +629,7 @@ Remember to be impartial but thorough in your investigation.`,
               break;
 
             case "response.audio_transcript.delta":
+              // TODO: emit an event to the client with the transcript delta so that the client can display the transcript in real-time
               this.lastAudioMessageTranscript.push(event.delta);
               break;
             default:
