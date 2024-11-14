@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import dotenv from 'dotenv';
+import { GameRoomService } from "../services/game-room.service.js";
 dotenv.config({ path: '../.env' });
-async function runThead() {
-    const threadId = process.argv.slice(2)[0];
+export async function runThread(gameRoomId) {
+    const threadId = await GameRoomService.getGameRoom(gameRoomId).thread_id
     const client = new OpenAI({
         organization: process.env.OPENAI_ORGANIZATION_ID,
         project: process.env.OPENAI_PROJECT_ID,
@@ -19,11 +20,10 @@ async function runThead() {
         const finalMessage = await client.beta.threads.messages.list(
             threadId, {limit: 1}
           );
-            console.log(JSON.parse(finalMessage.content[0].text))
+            console.log(finalMessage.data[0].content[0].text.value)
+            
       } else if(run.status === "failed") {
         console.log("Error during run:" + run.last_error)
       }
 
 }
-
-runThead();

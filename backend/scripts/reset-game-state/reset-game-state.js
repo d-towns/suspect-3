@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { GameRoomService } from '../services/game-room.service.js';
+import { GameRoomService } from '../../services/game-room.service.js';
 import OpenAI from "openai";
 // read in the uuid from args
-const resetGameState = async () => {
+export const resetGameState = async (gameRoomId) => {
     try {
-        const gameRoomId = process.argv.slice(2)[0]
         console.log(`resetting game state for game room ${gameRoomId}`)
         const gameRoom = await GameRoomService.getGameRoom(gameRoomId)
         const gameState = GameRoomService.decryptGameState(gameRoom.game_state)
@@ -31,8 +30,10 @@ const resetGameState = async () => {
         gameState.rounds[0].status = "active"
         for(let i = 1; i < gameState.rounds.length; i++) {
             gameState.rounds[i].status = "inactive"
+            gameState.rounds[i].conversation = []
         }
         gameState.status = 'setup'
+
         console.log('Updated state: ', gameState)
 
         const newEncryptedState = GameRoomService.encryptGameState(gameState)
@@ -46,5 +47,3 @@ const resetGameState = async () => {
 
 
 }
-
-resetGameState();

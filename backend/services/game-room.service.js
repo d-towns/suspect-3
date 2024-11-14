@@ -6,7 +6,7 @@ import crypto from "crypto";
 export class GameRoomService {
     static async createGameRoom(userId) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-        const roomId = this.generateRoomId();
+
         const roomData = {
             host_id: userId,
             created_at: new Date()
@@ -15,21 +15,13 @@ export class GameRoomService {
 
         const { data, error } = await supabase
             .from('game_rooms')
-            .insert([roomData]);
+            .insert([roomData]).select().single();
 
         if (error) {
             throw new Error(`Error creating game room: ${error.message}`);
         }
 
-        // Add the host to the game_players table
-        const { error: playerError } = await supabase
-            .from('game_players')
-            .insert([{ user_id: userId, room_id: roomId }]);
-
-        if (playerError) {
-            throw new Error(`Error adding host to game: ${playerError.message}`);
-        }
-        return roomId;
+        return data;
     }
 
     static generateRoomId() {
