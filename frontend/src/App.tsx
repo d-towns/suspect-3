@@ -4,13 +4,13 @@ import Navbar from './components/navbar';
 import { AuthProvider, useAuth } from './context/auth.context';
 
 const App: React.FC = () => {
-  // const { user } = useAuth();
-  // const navigate = useNavigate();
-  // useEffect(() => {
-  //   if (!user) {
-  //     navigate('/login');
-  //   }
-  // }, [user]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user]);
   return (
     <AuthProvider>
       <div className="flex flex-col min-h-screen">
