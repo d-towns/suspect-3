@@ -39,6 +39,7 @@ export const useSocket = () => {
 
   const emitEvent = useCallback((event: string, data: any) => {
     if (socket && isConnected) {
+      console.log(`Emitting event: ${event} with data: ${JSON.stringify(data)}`);
       socket.emit(event, data);
     }
   } , [socket, isConnected]);

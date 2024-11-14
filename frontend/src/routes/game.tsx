@@ -1,45 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
-import { ConversationItem, GameState, Player } from '../models/game-state.model';
+import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
 import { useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import decodeAudio, {decoders} from 'audio-decode';
-import { FaMicrophone } from 'react-icons/fa6'
-import { base64EncodeAudio, wavBlobToBase64PCM16 } from '../utils/audio-helpers';
 import AudioPlayer from '../components/audioPlayer';
-import {MediaRecorder, register, IMediaRecorder} from 'extendable-media-recorder';
-import {connect} from 'extendable-media-recorder-wav-encoder';
 import AudioRecorder from '../components/audio-recorder';
+import ResponseLoading from '../components/responseLoading';
 
 
 
 const Game = () => {
-  const { socket, emitEvent } = useSocket();
+  const { socket, emitEvent } = useSocket(); 
   const { user } = useAuth();
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const { roomId } = useParams<{ roomId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [messages, setMessages] = useState<string[]>([]);
   const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [roundTimer, setRoundTimer] = useState<number>(0);
-  const [recordingTimer, setRecordingTimer] = useState<number>(15);
+  const [resultsLoading, setResultsLoading  ] = useState<boolean>(false);
+  const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
+  const [responseLoading, setResponseLoading] = useState<boolean>(false);
+  const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
+  const [killerVote, setKillerVote] = useState<string>();
   const [detailsRevealed, setDetailsRevealed] = useState<boolean>(false);
-  const mediaRecorderRef = useRef<IMediaRecorder | null>(null);
-  const [capturedStream, setCapturedStream] = useState<MediaStream | null>(null);
-  const [audioBlobs, setAudioBlobs] = useState<Buffer[] | Blob[]>([]);
-  const [isRecording, setIsRecording] = useState<boolean>(false);
 
   useEffect(() => {
     if (socket) {
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
+        setResultsLoading(false);
+
       });
-      socket.on('game-state-updating', (newState: GameState) => {
-        console.log('Received game state updating:', newState);
-        setGameState(newState);
+      socket.on('game-state-updating', () => {
+        console.log('Game state is updating');
+        setResultsLoading(true);
       });
 
       socket.on('realtime-audio-message', async (params: any) => {
@@ -49,11 +47,12 @@ const Game = () => {
           const audioWav = await decoders.wav(params.audioBuffer);
 
           setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript }]);
+
+          setResponseLoading(false);
           console.log('Playing audio message:', audioWav);
         } catch (error) {
           console.error('Error playing audio message:', error);
         }
-
 
       });
 
@@ -62,8 +61,20 @@ const Game = () => {
         console.log('Round timer tick:', params.countdown);
       });
 
+      socket.on('voting-round-start', (params: any) => {
+        console.log('Voting round starting:', params);
+      });
+
+
+      socket.on('user-audio-transcript', (params: any) => {
+        console.log('Received audio transcript:', params);
+        setInterrogationTranscript(prev => [...prev , { audioBuffer: null, audioTranscript: params.audioTranscript }]);
+        setAudioTranscribing(false);
+      }
+      );
+
       /**
-       * [*] TODO: Create roundTimer state object that will keep track of the time left in the round, updates on websocket events from the server
+       * [*] TODO: Create state object that will keep track of the time left in the round, updates on websocket events from the server
        * [*] TODO: Createa startrecording function that cretes a MediaStream and MediaRecorder object and starts recording audio
        * [*] TODO: Stream the audio to the server through websocket events in the MediaRecorder ondataavailable event callback
        * [*] TODO: (moved to useSocket hook) Emit a joined-game event to the server socket to let the server know that the user has joined the game
@@ -71,9 +82,9 @@ const Game = () => {
        * [*] TODO: send a 'realtime-audio-response-end' event to the server when the user stops recording ( either by timer ending or manually )
        * [] TODO: once the round timer ends for all rounds after the first, since it is controlled by the server, we will then move to a loading screen and wait for the game state to update
        * [] TODO: once we have the update, we can show the new guily score for the player and the new round timer
-       * [] TODO: once the interrogation round is over, we enter the kill round
-       * [] TODO: in the kill round, each player will see each others guilt score and will have to vote on who they think is a rat
-       * [] TODO: Once the kill round voting is over, the players will ahve either voted for a player or not, 
+       * [] TODO: once the interrogation round is over, we enter the voting round
+       * [] TODO: in the voting round, each player will see each others guilt score and will have to vote on who they think is a rat
+       * [] TODO: Once the voting round voting is over, the players will ahve either voted for a player or not, 
        * [] TODO: if a player recives at least n // 2 votes where n is the number of players and they did rat out the other players, they will lose the game and leaderboard rank
        * [] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
        */
@@ -87,21 +98,19 @@ const Game = () => {
       if (socket) {
         socket.off('game-state-update');
         socket.off('realtime-audio-message');
-        socket.off('round-timer-tick');
+        socket.off('round-timer-tick'); 
         // Remove other listeners
       }
     };
   }, [socket]);
 
-  useEffect(() => {
-    if (chatAreaRef.current) {
-      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
-    }
-  }, [messages]);
+
+
 
   useEffect(() => {
     if (roomId) {
       roomsService.getRoom(roomId).then((room) => {
+        console.log('Room:', room);
         if (room.game_state && typeof room.game_state === 'object') {
           console.log(room);
           setGameState(room.game_state);
@@ -118,106 +127,35 @@ const Game = () => {
   }, [roundTimer]);
 
   useEffect(() => {
+    const setCurrentPlayerState = () => {
     if (gameState && user) {
       const player = gameState.players.find(player => player.id === user.id);
       if (player) {
         setCurrentPlayer(player);
       }
+
     }
+  }
+  const getActiveRoundFromGameState = () => {
+    if (gameState) {
+      const activeRound = gameState.rounds.find(round => round.status === 'active');
+      if (activeRound) {
+        setActiveRound(activeRound.type);
+      }
+    }
+  }
+
+  setCurrentPlayerState();
+  getActiveRoundFromGameState();
+
   }, [gameState, user]);
 
 
-  // const startNextRound = () => {
-  //   if (socket) {
-  //     socket.emit('start-next-round', roomId);
-  //   }
-  // }
-
-
-  const startRecording = async () => {
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true
-    })
-    try {
-        const capturedStream = stream;
-
-        let audioBlobs: Blob[] = [];
-        // Use the extended MediaRecorder library
-        await register(await connect());
-        const audioContext = new AudioContext({ sampleRate: 24000 });
-        const mediaStreamAudioSourceNode = new MediaStreamAudioSourceNode(audioContext, { mediaStream: stream });
-        const mediaStreamAudioDestinationNode = new MediaStreamAudioDestinationNode(audioContext);
-        mediaStreamAudioSourceNode.connect(mediaStreamAudioDestinationNode);
-        
-        mediaRecorderRef.current = new MediaRecorder(mediaStreamAudioDestinationNode.stream, {
-          mimeType: 'audio/wav'
-        });
-  
-        // Add audio blobs while recording 
-        mediaRecorderRef.current.addEventListener('dataavailable', async (event) => {
-          audioBlobs.push(event.data);
-          // const base64Chunk = await wavBlobToBase64PCM16(event.data)
-          // console.log('Received audio chunk:', event.data);
-          // const arrayBuffer = await event.data.arrayBuffer();
-          // // console.log('Received audio chunk:', arrayBuffer.byteLength);
-          // const audioBuffer = await decoders.wav();
-          // const channelData = audioBuffer.getChannelData(0);
-          // const base64Chunk = base64EncodeAudio(channelData);
-          // emitEvent('realtime-audio-response', { audioBuffer: base64Chunk });
-          // console.log('Audio data available:', base64Chunk);
-        });
-
-        // on stop, stop all of the tracs in the stream
-        mediaRecorderRef.current.addEventListener('stop',async  () => {
-          capturedStream.getTracks().forEach(track => track.stop());
-          const audioBlob = new Blob(audioBlobs, { type: 'audio/wav' });
-          // const audioBuffer = await decoders.wav(audioBlob);
-          const base64Chunk = await wavBlobToBase64PCM16(audioBlob);
-          console.log('Received audio chunk:', base64Chunk);
-
-        });
-  
-        mediaRecorderRef.current.start(1000);
-        setIsRecording(true);
-        console.log('Recording started');
-    } catch (error) {
-      console.error('Error starting recording:', error);
-    }
-
-    // const chunks: Buffer[] = [];
-
-    // recording.on('data', (data :any) => {
-    //   chunks.push(data);
-    // });
-
-    // recording.on('end', async () => {
-    //   const audioBuffer = Buffer.concat(chunks);
-    //   const base64AudioString = audioBuffer.toString('base64');
-    //   console.log('Audio data available:', base64AudioString);
-    //   emitEvent('realtime-audio-response', { audioBuffer: base64AudioString });
-    // });
-
-    // const recordingInterval = setInterval(() => {
-    //   setRecordingTimer((prev) => prev - 1);
-    //   if (recordingTimer === 0) {
-    //     clearInterval(recordingInterval);
-    //     stopRecording();
-    //     setRecordingTimer(15);
-    //   }
-    // }, 1000);
-
-    // setIsRecording(true);
-    // console.log('Recording started');
-  };
-
-  const stopRecording = () => {
-
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
-    emitEvent('realtime-audio-response-end', {});
-    console.log('Recording stopped');
-  };
+  const handleAudioRecorded = (arrayBuffer: ArrayBuffer) => {
+    console.log('Audio recorded:', arrayBuffer);
+    setAudioTranscribing(true);
+    setResponseLoading(true);
+  }
   /**
    * UI FLow
    * once all players are in the game, ( we receive the game-starting event )
@@ -233,8 +171,19 @@ const Game = () => {
     </div>;
   }
 
+  const handleVoteSubmission = () => {
+    if (killerVote && user) {
+      const vote: VotingRoundVote = {
+        playerId: killerVote,
+        voterId: user?.id
+      };
+      emitEvent('voting-round-vote', vote);
+    }
+  }
+
   return (
     <div>
+      {gameState?.status !== 'finished' ? (
       <div className="h-screen bg-gray-900 text-white flex flex-col">
         {/* HUD-like top bar */}
         <div className="bg-gray-800 p-4 flex items-center">
@@ -294,8 +243,40 @@ const Game = () => {
           )}
 
           {/* Right panel: Interrogation chat */}
-          {
-            gameState.rounds?.find(round => round.status === 'active')?.player == currentPlayer?.id ? (
+          { !resultsLoading ? (
+            user && activeRound === 'voting' ? (
+              <div>
+                <div className="flex-1 bg-gray-800 p-4 rounded-lg flex flex-col">
+                  <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
+                  <div>
+                    <p className='text-xl font-bold mb-4 text-center'> Interrogator's Deduction</p>
+                    <div>
+                      <p className='text-lg p-4'> {gameState.rounds?.reverse().find(round => round.status === 'completed')?.results?.deduction}</p>
+                      </div>
+                    </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {gameState.players.map((player) => (
+                    <div
+                      key={player.id}
+                      className={`p-12 rounded-lg  cursor-pointer ${killerVote === player.id ? 'bg-green-500' : 'bg-gray-700'}`}
+                      onClick={() => setKillerVote(player.id)}
+                    >
+                      <p className="text-xl font-bold">{player.identity}</p>
+                      <p className="text-lg">Guilt Score: {Number(player.guiltScore.toFixed(2)) * 100}%</p>
+
+                    </div>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  className='bg-red-800 text-white p-2 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900'
+                  onClick={handleVoteSubmission}
+                >
+                  Submit Vote
+                </button>
+                </div>
+            ) :
+            activeRound === 'interrogation' && gameState.rounds?.find(round => round.status === 'active')?.player == currentPlayer?.id ? (
 
               <div className="flex-1 bg-gray-800 p-4 rounded-lg flex flex-col">
                 <h2 className="text-2xl font-bold mb-4">Interrogation</h2>
@@ -305,88 +286,37 @@ const Game = () => {
                 >
                   {interrogationTranscript.map((conversationItem, index) => (
                     <div className='flex'>
-                        <AudioPlayer key={index} audioData={conversationItem.audioBuffer} /> 
+                        <AudioPlayer key={index} audioData={conversationItem?.audioBuffer} /> 
                         <p>{conversationItem.audioTranscript}</p>
                     </div>
                   ))}
+                  {responseLoading && <ResponseLoading label='Interrogator is responsing'/>}
+                  {audioTranscribing && <ResponseLoading label='Transcribing player response'/>}
                 </div>
                 <div className="flex justify-center">
                   {/* TODO: use a radix tab to switch between text and audio messages */}
-                  {socket && <AudioRecorder socket={socket} emitEvent={emitEvent} />}
-                  {/* <button
-                    onClick={() => {
-                      if (isRecording) {
-                        stopRecording();
-                      } else {
-                        startRecording();
-                      }
-                    }}
-                    className={`
-              flex
-              flex-row
-              gap-2
-              items-center
-              ${isRecording
-                        ? 'bg-red-700' : 'bg-gray-700'}
-              } text-white p-2 rounded-lg
-              hover:bg-gray-600
-              focus:outline-none
-              focus:ring-2
-              focus:ring-blue-500
-              focus:ring-offset-2
-              focus:ring-offset-gray-900  
-                 `}>
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                    <div>
-                      <FaMicrophone />
-                    </div>
-                    <div>
-                      {recordingTimer}
-                    </div>
-
-                  </button> */}
-
-                  {/* <input 
-              type="text" 
-              className="flex-1 bg-gray-700 text-white p-2 rounded-l"
-              placeholder="Type your response..." 
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            />
-            <button 
-              className="bg-blue-500 text-white px-4 py-2 rounded-r"
-              onClick={handleSendMessage}
-            >
-              Send
-            </button> */}
+                  {socket && <AudioRecorder socket={socket} emitEvent={emitEvent} onAudioRecorded={handleAudioRecorded}/>}
                 </div>
-              </div>) :
+              </div> ) :
               <div className="flex w-full flex-col items-center justify-center p-4 bg-gray-800 text-white rounded-bl-lg">
                 <p className="text-5xl">{gameState.players.find(player => gameState.rounds?.find(round => round.status === 'active')?.player == player.id)?.identity.split(',')[0]} enters the room...</p>
               </div>
-          }
-        </div>
-
-        {/* Interrogation Progress */}
-        {/* {gameState.status === 'interrogation' && gameState.interrogationProgress !== undefined && (
-          <div className="bg-gray-800 p-4">
-            <h2 className="text-xl font-semibold mb-2">Interrogation Progress</h2>
-            <div className="w-full bg-gray-700 rounded-full h-2.5">
-              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${gameState.interrogationProgress}%` }}></div>
+          ) : (
+            <div className="w-full bg-gray-800 p-4 rounded-lg ml-7">
+              <h2 className="text-2xl font-bold mb-4">Results</h2>
+              <p>Results are being calculated...</p>
+              <ResponseLoading label='Calculating Results'/>
             </div>
-          </div>
-        )} */}
-
-        {/* Game Outcome */}
-        {gameState.status === 'finished' && gameState.outcome && (
-          <div className="bg-gray-800 p-4 mt-4 rounded-lg">
-            <h2 className="text-2xl font-bold mb-2">Game Outcome</h2>
-            <p><strong>Team Won:</strong> {gameState.outcome.teamWon ? 'Yes' : 'No'}</p>
-            <p><strong>Average Guilt Score:</strong> {gameState.outcome.averageGuiltScore?.toFixed(2) || 'N/A'}</p>
+          )}
+        </div>
+      </div>
+       ) : 
+        (
+          <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+            <div className="text-2xl font-bold">Game Over</div>
+            <div className="text-xl">Team {gameState.outcome?.winner} Won</div>
           </div>
         )}
-      </div>
     </div>
   );
 };

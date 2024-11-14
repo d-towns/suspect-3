@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause } from 'react-icons/fa6';
 
 interface AudioPlayerProps {
-    audioData: ArrayBuffer;
+    audioData: ArrayBuffer | null;
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
@@ -16,7 +16,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
     useEffect(() => {
         const context = new AudioContext();
         setAudioContext(context);
-
+        console.log('Audio data:', audioData);
+        if (!audioData) return;
         context.decodeAudioData(audioData, (buffer) => {
             setAudioBuffer(buffer);
         });
@@ -68,6 +69,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
     };
 
     return (
+        <>
+        { audioData && (
         <div className="audio-player">
             <div className="progress-circle" style={{ position: 'relative', width: '50px', height: '50px' }}>
                 <svg className="progress-ring" width="50" height="50">
@@ -87,6 +90,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
                 </button>
             </div>
         </div>
+    )}
+    </>
     );
 };
 

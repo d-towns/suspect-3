@@ -1,16 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef} from 'react';
 import { Socket } from 'socket.io-client';
 import { WavRecorder } from 'wavtools';
 import { FaMicrophone } from 'react-icons/fa6';
 import decodeAudio from 'audio-decode';
-import { base64EncodeAudio, PCMtoBase64 } from '../utils/audio-helpers';
+import { base64EncodeAudio } from '../utils/audio-helpers';
 
 interface AudioRecorderParams {
     socket: Socket;
     emitEvent: (event: string, data: any) => void;
+    onAudioRecorded: (buffer: ArrayBuffer) => void;
 };
 
-const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent }: AudioRecorderParams) => {
+const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAudioRecorded }: AudioRecorderParams) => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -24,11 +25,9 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent }: Aud
       await recorderRef.current.record(async (data) => {
         const { mono } = data;
 
-        console.log('Mono:', mono.buffer);
 
         // Convert Int16Array to Uint8Array
         const uint8Array = new Uint8Array(mono);
-        console.log('Uint8Array:', uint8Array);
       
         // Convert Uint8Array to a binary string
         let binary = '';
@@ -40,7 +39,6 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent }: Aud
         const base64String = btoa(binary);
         emitEvent('realtime-audio-response', { audioBuffer: base64String });
       
-        console.log('Base64 Encoded String:', base64String);
       }, 32000 );
 
       setIsRecording(true);
@@ -74,6 +72,8 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent }: Aud
         const audioBlob = new Blob([arrayBuffer], { type: 'audio/wav' });
         const url = URL.createObjectURL(audioBlob);
         setAudioUrl(url);
+
+        onAudioRecorded(arrayBuffer);
 
         setIsRecording(false);
         if (timerRef.current) {
