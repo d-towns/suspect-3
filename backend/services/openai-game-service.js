@@ -31,8 +31,8 @@ class OpenaiGameService {
     project: process.env.OPENAI_PROJECT_ID,
   });
 
-  static lastAudioMessageDeltas = [];
-  static lastAudioMessageTranscript = [];
+  static lastAudioMessageDeltas = new Map();
+  static lastAudioMessageTranscript = new Map();
   static roomRealtimeSessions = new Map();
 
   static GameStateSchema = z
@@ -60,7 +60,7 @@ class OpenaiGameService {
               .enum(["inactive", "active", "completed"])
               .describe("The status of the round"),
             type: z
-              .enum(["interrogation", "kill"])
+              .enum(["interrogation", "voting"])
               .describe("The type of round"),
             conversation: z.array(
               z
@@ -73,12 +73,12 @@ class OpenaiGameService {
             results: z
               .object({
                 guiltScoreUpdate: z.number(),
-                playerFlipped: z.boolean(),
+                deduction: z.string(),
                 votingResults: z.array(
                   z
                     .object({
-                      player: z.string(),
-                      suspect: z.string(),
+                      playerId: z.string(),
+                      voterId: z.string(),
                     })
                     .strict()
                 ),
@@ -95,6 +95,7 @@ class OpenaiGameService {
             evidence: z.array(z.string()),
             guiltScore: z.number(),
             interrogated: z.boolean(),
+            isCulprit: z.boolean(),
           })
           .strict()
       ),
@@ -102,7 +103,7 @@ class OpenaiGameService {
       interrogationProgress: z.number(),
       outcome: z
         .object({
-          teamWon: z.boolean(),
+          winner: z.enum(["innocents", "culprit", "not_yet_determined"]),
           averageGuiltScore: z.number(),
         })
         .strict(),
@@ -144,15 +145,19 @@ class OpenaiGameService {
     - The interrogator will be an AI acting as a police detective
     - The goal of the interrogation is to determine the guilt of the player
     - The interrogator will use the evidence provided to assess the player's guilt
-    - there will be a message in the conversation about the guilt score updates of each player after each back and forth exchange
-    - use that to update the game state
+    - once the interrogation is complete, the game state should be updated with the results of the interrogation and the guilt score of the player should be updated
+    - guilt score updates should be calculated based on the evidence and the player's responses to the interrogator, disregard if the player is the culprit or not. 
+    - the round object should be updated with the deduction as to why the the guilt score is being updated to a certain value based on the evidence and the player's responses
+    - After the interrogation is complete, the next round should be conducted. If there is no round after the interrogation round, the game is finished and the culprit wins
 
 7. Analyze voting rounds:
     - voting rounds are where all players vote on a suspect who they think is the killer
     - the votes will be placed in the game thread
     - if there is a consensus on someone being the culprit, update the game state accordingly
-    - if the vote was correct, the non-culprit players win the game
-    - if the vote was incorrect, the culprit wins the game
+    - if the vote was correct, the innocent players win the game and the game is finished
+    - if the vote was incorrect, the next interrogation round should be conducted. if there is no round after the voting round, the game is finished and the culprit wins
+    - voting round should have no deduction, but should have the voting results in the round object
+    - After the voting round is complete, the next round should be conducted. If there is no round after the voting round, the outcome of the game should be determined accoridng to the instructions below
 
 7. Assign rounds:
     - Conduct a total of n*2 rounds, where n is the number of players. so the total number of rounds is 2 times the number of players. there should never be more rounds than the number of players multiplied by 2
@@ -167,9 +172,18 @@ class OpenaiGameService {
     - there will be messages for each player and who they voted for
     - place those votes in the game state inside the round object
     - if there is a consensus on someone being the culprit, update the game state accordingly
-    - if the vote was correct, the non-culprit players win the game
+    - if the vote was correct, the innocent players win the game and the game is finished
+    - if the vote was incorrect, the next interrogation round should be conducted. if there is no round after the voting round, the game is finished and the culprit wins
     - Conduct the rounds in sequence, starting with the first player and alternating between interrogation and voting rounds
     - Assign a interregation round for each player
+
+  8. Determine if the game is finished:
+    - The game is finished when either all the rounds are completed or the players correctly vote for the culprit
+    - If the players correctly vote for the culprit, the innocent players win the game
+    - If the players do not correctly vote for the culprit by the time all the rounds are completed, the culprit wins the game
+    - Update the game state with the outcome of the game only when one of these conditions is met
+    - Until a winner has been determined, the game should continue with the next round and the game_state.status should be set to active
+
 
 Remember to be impartial but thorough in your investigation.`,
         model: "gpt-4o-2024-08-06",
@@ -183,10 +197,10 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
-  static addMessageToThread(threadId, content) {
-    console.log(`Adding message to thread: ${threadId} with role: ${role}`);
+  static async addMessageToThread(threadId, content) {
+    console.log(`Adding message to thread: ${threadId} with role: ${content.role}`);
     try {
-      const message = this.client.beta.threads.messages.create(threadId, content);
+      const message = await this.client.beta.threads.messages.create(threadId, content);
       console.log("Message added to thread:", message);
       return message;
     } catch (error) {
@@ -194,7 +208,6 @@ Remember to be impartial but thorough in your investigation.`,
       throw error;
     }
   }
-
   static async createGameThread(players) {
     console.log(`Creating game thread for ${players.length} players...`);
     try {
@@ -213,6 +226,43 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
+  static async endInterrogationRound(threadId, gameState) {
+    const activeRound = gameState.rounds.find(
+      (round) => round.status === "active"
+    );
+
+    const playerInInterrogation = gameState.players.find(
+      (player) => player.id === activeRound.player
+    );
+    this.addMessageToThread(threadId, {
+      role: "user",
+      content: `The interrogation of ${playerInInterrogation.identity} has concluded. The detective has left the room. Update the guilt score of ${playerInInterrogation.id} based on the interrogation. Start the next voting round of the game `,
+    });
+    console.log("Interrogation round end message sent \n");
+  }
+
+  static async endVotingRound(threadId) {
+    this.addMessageToThread(threadId, {
+      role: "user",
+      content: `The voting round has ended. Tally the votes and determine the outcome of the game. If there is not a majority vote for the culprit, the game will continue to the next round. set this voting round to be completed and the next Interrogation round to be active`,
+    });
+    console.log("Interrogation round end message sent \n");
+}
+
+static async addVotingRoundVote(roomId, vote) {
+  // get the game room from the db and its thread id
+  const {voterId, playerId} = vote;
+  const game = await GameRoomService.getGameRoom(roomId);
+  const threadId = game.thread_id;
+  // get the most recent message in the thread
+  // add a message in the thread with the vote for this player
+  this.addMessageToThread(threadId, {
+    role: "user",
+    content: `Player ${voterId} voted for player ${playerId} as the culprit.`,
+  });
+}
+
+
   static createCrime(players) {
     console.log(`Creating crime scenario for ${players.length} players`);
     const playerInfo = players
@@ -223,7 +273,7 @@ Remember to be impartial but thorough in your investigation.`,
     return crime;
   }
 
-  static async runThreadAndProcess(threadId, roomId) {
+  static async runThreadAndProcess(threadId, roomId, simulated = false) {
     console.log(
       `Running thread: ${threadId} with Game Master assistant: ${process.env.OPENAI_GAMEMASTER_ASSISTANT_ID}`
     );
@@ -237,6 +287,9 @@ Remember to be impartial but thorough in your investigation.`,
         assistant_id: process.env.OPENAI_GAMEMASTER_ASSISTANT_ID,
       });
       console.log("Run created:", run.id);
+      const socketServer = GameRoomSocketServer.getInstance();
+      socketServer.emitToRoom(roomId, "game-state-updating");
+      
 
       const gameState = await this.waitForRunCompletion(threadId, run.id);
 
@@ -246,13 +299,14 @@ Remember to be impartial but thorough in your investigation.`,
         // Save the encrypted game state to the database
         await GameRoomService.saveGameState(roomId, gameState);
         // TODO: this may be redundant since we can setup listeners using supabase on the game_rooms table
-        const socketServer = GameRoomSocketServer.getInstance();
-        socketServer.emitToRoom(roomId, "game-state-update", gameState);
-        console.log("Game state update emitted to room:", roomId);
+        if(!simulated) {
+          
+          socketServer.emitToRoom(roomId, "game-state-update", gameState);
+        }
       }
 
       console.log("Thread run completed");
-      return run;
+      return gameState
     } catch (error) {
       console.error("Error running thread and processing:", error);
       throw error;
@@ -263,33 +317,6 @@ Remember to be impartial but thorough in your investigation.`,
    * @param {*} threadId
    * @param {*} runId
    * @returns gameState Object -> to be saved in encrytped format in the db
-   *
-   * Remember: the OpenAI Aissistant is tring the conversation threah into the strctured output using the function call
-   *
-   * control the flow of the game with user messages
-   * they will come in the form of audio or text
-   * audio for the interregations
-   * text for the voting rounds and game management
-   * how do i know when it is safe to start the game?
-   * when all of the players are in the started game ( at the game/{game_id} page )
-   * once that is the case i can start the first round
-   * there are teo types of rounds
-   * iterregation roudns or voting rounds
-   * There are a total of n*2 rounds in a game where n is the number of total players
-   * so the game state needs to have rounds object,
-   * an array with a round object in each with their type, conversation (i rounds), and results ( guilt socre update, if the player flipped, who was voted as a rat,)
-   * if the first game state update comes with a rounds object, we can take the first i round player and put then into the room, and start the interregation
-   * client needs to have its socket ready to receive the first audio from the realtime API
-   * I rounds are
-   * - for a specific player
-   * - last 2 minutes
-   * - have guilt score updates after each back and forth exchange which send update-game state events so each player can see the score update
-   * K rounds
-   * - involve every players
-   * - have each player vote on if a player is a rat
-   * - if there is a consensus on someone being a rat
-   * -- if it is true, the player is removed from the game and lose significant rank
-   * -- if it is false, guilt scores are doubled what happened to the suspected rat is now added to the game crime for each player, making the game harder
    *
    *
    */
@@ -321,21 +348,6 @@ Remember to be impartial but thorough in your investigation.`,
       console.log("Most recent game state:", mostRecentGameState);
 
       return JSON.parse(mostRecentGameState);
-    }
-  }
-
-  static async createMessageInThread(threadId, role, content) {
-    console.log(`Creating message in thread: ${threadId} with role: ${role}`);
-    try {
-      const message = await this.client.beta.threads.messages.create(threadId, {
-        role,
-        content,
-      });
-      console.log("Message created:", message);
-      return message;
-    } catch (error) {
-      console.error("Error creating message in thread:", error);
-      throw error;
     }
   }
 
@@ -382,48 +394,6 @@ Remember to be impartial but thorough in your investigation.`,
     }
     ws.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
     console.log("Created response in realtime session for room:", roomId);
-  }
-
-
-  static async deduceGuiltScore(roomId) {
-    return new Promise((resolve, reject) => {
-      try {
-      const ws = this.roomRealtimeSessions.get(roomId);
-      if (!ws) {
-        console.error("Realtime session not found for room:", roomId);
-        return;
-      }
-      // add a conversation item to he realtiem chat to update the guilt score of the player
-      ws.send({
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "assistant",
-          content: [
-            {
-              type: "input_text",
-              text: `This interrogation session is over. Call the function update_guilt_score to update the guilt score of the player based on the evidence and the player's responses.`,
-            }
-          ]
-        },
-      });
-
-      ws.send(JSON.stringify({type: 'response.create'}));
-
-      ws.on("message", async (data) => {
-        const event = JSON.parse(data);
-        if (event.type === "response.function_call_arguments.done") {
-          await this.client.beta.threads.messages.create(threadId, {
-            role: "assistant",
-            content: `Interrogation results: ${JSON.stringify(event.arguments)}`,
-          });
-          resolve(event.arguments);
-        }
-      });
-    } catch {
-      reject("Error updating guilt score");
-    }
-    });
   }
 
 
@@ -489,34 +459,6 @@ Remember to be impartial but thorough in your investigation.`,
                 model: "whisper-1",
               };
               session.turn_detection = null;
-              session.tools = [
-                {
-                  "type": "function",
-                  "name": "update_guilt_score",
-                  "description": "Update the guilt score of the player based on the evidence and the player's responses",
-                  "parameters": {
-                      "type": "object",
-                      "properties": {
-                          "player": {
-                              "type": "string",
-                              "description": "The player ID to update the guilt score for"
-                          },
-                          "deduction": {
-                              "type": "array",
-                              "items": {
-                                  "type": "string"
-                              },
-                              "description": "Reasons as to why the guilt score is being updated to the new value"
-                          },
-                          "guilt_score": {
-                              "type": "number",
-                              "description": "The new guilt score for the player"
-                          }
-                      },
-                      "required": ["player", "deduction", "guilt_score"]
-                  }
-              }
-              ]
               delete session["id"];
               delete session["object"];
               delete session["expires_at"];
@@ -532,54 +474,37 @@ Remember to be impartial but thorough in your investigation.`,
               console.log("Audio transcription completed", event.transcript);
               const suspectTranscript = event.transcript;
 
+              this.lastAudioMessageDeltas.set(roomId, []);
+
+              const playerConversationItem = {
+                audioTranscript: suspectTranscript,
+              };
+
+
               await this.client.beta.threads.messages.create(threadId, {
                 role: "user",
                 content: suspectTranscript,
               });
               // sedn the transctiption back to the client
-              socketServer.emitToRoom(roomId, "audio-transcript", {
-                transcript: suspectTranscript,
-              });
+              socketServer.emitToRoom(roomId, "user-audio-transcript", playerConversationItem);
               // Once the user's audio transcription is complete, send a response.create event to the realtime API to get the assistant's response
               ws.send(JSON.stringify({ type: "response.create" }));
               break;
-
-            // case "conversation.item.created":
-            //   // add the conversation item to the game thread using the item.role to determine if it is a user or assistant message
-            //   const item = event.item;
-            //   const role = item.role;
-            //   console.log(
-            //     `Conversation item created with role: ${role} and status: ${item.status}`
-            //   );
-            //   let message;
-            //   if (item.status === "completed") {
-            //     console.log("Conversation item is completed", item);
-            //     if (item.content[0].type === "input_text") {
-            //       console.log(
-            //         "Adding user conversation item:",
-            //         item.content[0].text
-            //       );
-            //       message = item.content[0].text;
-            //     } else {
-            //       message = item.content[0].transcript;
-            //     }
-            //     if (message) {
-            //       console.log("Adding conversation item to game thread:", item);
-            //       await this.client.beta.threads.messages.create(threadId, {
-            //         role,
-            //         content: message,
-            //       });
-            //     }
-            //   }
-            //   break;
             case "response.audio.done":
               console.log("Audio response received from OpenAI Realtime API");
+              if(!this.lastAudioMessageDeltas.has(roomId)) {
+                this.lastAudioMessageDeltas.set(roomId, []);
+              }
+              if(!this.lastAudioMessageTranscript.has(roomId)) {
+                this.lastAudioMessageTranscript.set(roomId, []);
+              }
               const audioBuffer = await convertAudioMessageDeltasToAudio([
-                ...this.lastAudioMessageDeltas,
+                ...this.lastAudioMessageDeltas.get(roomId),
               ]);
+
               const conversationItem = {
                 audioBuffer,
-                audioTranscript: this.lastAudioMessageTranscript.join(" "),
+                audioTranscript: this.lastAudioMessageTranscript.get(roomId).join(" "),
               };
 
               // write the audio buffer to the file system
@@ -590,7 +515,7 @@ Remember to be impartial but thorough in your investigation.`,
               );
               fs.writeFileSync(
                 `./test_response_data/${event.response_id}_audio_transcript.txt`,
-                this.lastAudioMessageTranscript.join(" ")
+                this.lastAudioMessageTranscript.get(roomId).join(" ")
               );
               const game = await GameRoomService.getGameRoom(roomId);
               const game_state = GameRoomService.decryptGameState(
@@ -606,11 +531,11 @@ Remember to be impartial but thorough in your investigation.`,
                 "realtime-audio-message",
                 conversationItem
               );
-              this.lastAudioMessageDeltas = [];
-              this.lastAudioMessageTranscript = [];
+              this.lastAudioMessageDeltas.set(roomId, []);
+              this.lastAudioMessageTranscript.set(roomId, []);
               break;
             case 'response.done':
-              console.log("Response done", event);
+              console.log("Response done:", event);
 
               break;
             case "response.audio_transcript.done":
@@ -620,17 +545,19 @@ Remember to be impartial but thorough in your investigation.`,
                 content: `Interrogator: ${interrogatorTranscript}`,
               });
               break;
-            // case "input_audio_buffer.committed":
-            //     console.log("Audio buffer committed, sending response.create");
-            //     ws.send(JSON.stringify({type: 'response.create'}));
-            // break;
             case "response.audio.delta":
-              this.lastAudioMessageDeltas.push(event.delta);
+              if(!this.lastAudioMessageDeltas.has(roomId)) {
+                this.lastAudioMessageDeltas.set(roomId, []);
+              }
+              this.lastAudioMessageDeltas.get(roomId).push(event.delta);
               break;
 
             case "response.audio_transcript.delta":
               // TODO: emit an event to the client with the transcript delta so that the client can display the transcript in real-time
-              this.lastAudioMessageTranscript.push(event.delta);
+              if(!this.lastAudioMessageTranscript.has(roomId)) {
+                this.lastAudioMessageTranscript.set(roomId, []);
+              }
+              this.lastAudioMessageTranscript.get(roomId).push(event.delta);
               break;
             default:
               console.warn("Unhandled event type:", event.type);
@@ -673,6 +600,8 @@ Remember to be impartial but thorough in your investigation.`,
     );
   }
 
+
+
   /**
    * send a message in the realtime session that the user is entering the room and ask for a response from the realtime API
    * return a promise that resolves to the listener function that will be used to listen for the response from the realtime API
@@ -693,7 +622,6 @@ Remember to be impartial but thorough in your investigation.`,
       const ws = this.roomRealtimeSessions.get(roomId);
 
       const user = gameState.players.find((player) => player.id === userId);
-      console.log("user and players", userId, gameState.players);
       /**
        * i need to add a param to this function of the previous listener function
        * for the message event that sends the audio to the client
@@ -724,6 +652,12 @@ Remember to be impartial but thorough in your investigation.`,
           ],
         },
       };
+      const responseListener = (data) => {
+        resolve(data);
+        ws.off("message", responseListener);
+      }
+
+      ws.on("message", responseListener);
 
       ws.send(JSON.stringify(event));
       ws.send(JSON.stringify({ type: "response.create" }));
