@@ -29,6 +29,7 @@ const Game = () => {
 
   useEffect(() => {
     if (socket) {
+      console.log('Adding listeners');
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
@@ -96,6 +97,7 @@ const Game = () => {
 
     return () => {
       if (socket) {
+        console.log('Removing listeners');
         socket.off('game-state-update');
         socket.off('realtime-audio-message');
         socket.off('round-timer-tick'); 
@@ -251,7 +253,7 @@ const Game = () => {
                   <div>
                     <p className='text-xl font-bold mb-4 text-center'> Interrogator's Deduction</p>
                     <div>
-                      <p className='text-lg p-4'> {gameState.rounds?.reverse().find(round => round.status === 'completed')?.results?.deduction}</p>
+                      <p className='text-lg p-4'> {gameState.rounds?.slice().reverse().find(round => round.status === 'completed')?.results?.deduction}</p>
                       </div>
                     </div>
                   <div className="grid grid-cols-2 gap-4">

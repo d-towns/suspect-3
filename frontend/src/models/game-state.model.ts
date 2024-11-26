@@ -42,7 +42,7 @@ export interface Crime {
 }
 
 export interface GameState {
-    status: 'setup' | 'interrogation' | 'finished';
+    status: 'setup' | 'active' | 'finished';
     crime?: Crime;
     rounds: Round[];
     players: Player[];

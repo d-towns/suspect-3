@@ -17,11 +17,18 @@ const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <span className="text-white font-bold text-lg">Suspect 3</span>
+            <Link to="/home" className="text-white font-bold hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm">
+                Suspect 3
+            </Link>
             </div>
             <div className="ml-10 flex items-baseline space-x-4">
-              <Link to="/rooms" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                Rooms
+              <Link to="/play" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                Play
+              </Link>
+            </div>
+            <div className="ml-10 flex items-baseline space-x-4">
+              <Link to="/faq" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                How To Play
               </Link>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { GameState } from '../models/game-state.model';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { Player, ChatMessage, GameRoom } from '../models';
@@ -59,8 +60,8 @@ export const Lobby: React.FC = () => {
       if (!user || !roomId) return;
       console.log('Initializing lobby for room:', roomId);
       try {
-        await joinRoom();
-        console.log('Joined room:', roomId);
+
+        // TODO: add the players ready status to this call, store it on the socket 
         const players = await getPlayersInRoom();
         console.log('Players in room:', players);
         updatePlayerList(players);
@@ -79,9 +80,16 @@ export const Lobby: React.FC = () => {
         console.error('Error initializing lobby:', error);
       }
     };
+    console.log(`socket: ${socket} socket.connected: ${socket?.connected}`)
+    if(socket && socket.connected) initializeLobby();
+  }, [socket, isConnected]);
 
-    initializeLobby();
-  }, [user, roomId, joinRoom, getPlayersInRoom]);
+
+  useEffect(() => {
+    if (lobbyState.room && typeof lobbyState.room.game_state !== 'string' && lobbyState.room.game_state?.status == 'active') {
+      navigate(`/game/${roomId}`);
+    }
+  }, [lobbyState.room, navigate, roomId]);
 
   useEffect(() => {
     if (socket && isConnected) {
@@ -147,6 +155,7 @@ export const Lobby: React.FC = () => {
       newPlayers.forEach(player => {
         updatedPlayers.set(player.email, player);
       });
+      console.log('Updated players:', Array.from(updatedPlayers.values()));
       return { ...prevState, players: updatedPlayers };
     });
   };
@@ -160,6 +169,7 @@ export const Lobby: React.FC = () => {
         updatedPlayers.set(data.email, { ...player, isReady: data.isReady });
       }
       const allPlayersReady = Array.from(updatedPlayers.values()).every(player => player.isReady);
+      console.log('Updated players:', Array.from(updatedPlayers.values()));
       return { ...prevState, players: updatedPlayers, 
         gameStatus: { ...prevState.gameStatus, allPlayersReady } };
     });

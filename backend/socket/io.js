@@ -77,6 +77,10 @@ export class GameRoomSocketServer {
         "realtime-audio-response",
         this.handleRealtimeAudioResponse.bind(this, socket)
       );
+      socket.on(
+        "realtime-audio-response-end",
+        this.handleRealtimeAudioResponseEnd.bind(this, socket)
+      );
       socket.on('voting-round-vote', this.handleVotingRoundVote.bind(this, socket));
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
       socket.on("start-game", this.handleStartGame.bind(this, socket));
@@ -108,13 +112,15 @@ export class GameRoomSocketServer {
         email: socket.userEmail,
         id: socket.userId,
       };
-      socket.to(room).emit("player-left", playerLeftData);
+      socket.to(socket.roomId).emit("player-left", playerLeftData);
+      socket.leave(socket.roomId);
       console.log(`Player left event sent to room ${JSON.stringify(room)}`);
     }
   }
 
   handleJoinRoom(socket, params, callback) {
     console.log("join-room called with params:", params);
+    console.log("Socket:", socket.id + '\n\n');
     const { roomId, userId, userEmail } = params;
     if (!socket.rooms.has(roomId)) {
       socket.join(roomId);
@@ -169,6 +175,10 @@ export class GameRoomSocketServer {
     );
   }
 
+  async handleRealtimeAudioResponseEnd(socket) {
+    await OpenaiGameService.createInterrogationResponse(socket.roomId);
+  }
+
   handleChatMessage(socket, roomId, userEmail, message) {
     console.log(`New message in room ${roomId}: ${message}`);
     const room = this.io.sockets.adapter.rooms.get(roomId);
@@ -182,6 +192,7 @@ export class GameRoomSocketServer {
     const room = this.io.sockets.adapter.rooms.get(roomId);
     if (room) {
       const connectedSockets = Array.from(room);
+      console.log("Connected sockets:", connectedSockets);
       const playerData = connectedSockets
         .map((socketId) => {
           const playerSocket = this.io.sockets.sockets.get(socketId);
@@ -192,6 +203,7 @@ export class GameRoomSocketServer {
           };
         })
         .filter(Boolean);
+        console.log("players in room" + JSON.stringify(playerData) + '\n');
 
       console.log(`Room ${roomId} has ${playerData.length} players online`);
       if (callback) callback({ success: true, players: playerData });

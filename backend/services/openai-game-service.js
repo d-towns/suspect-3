@@ -150,6 +150,7 @@ class OpenaiGameService {
     - the round object should be updated with the deduction as to why the the guilt score is being updated to a certain value based on the evidence and the player's responses
     - After the interrogation is complete, the next round should be conducted. If there is no round after the interrogation round, the game is finished and the culprit wins
 
+
 7. Analyze voting rounds:
     - voting rounds are where all players vote on a suspect who they think is the killer
     - the votes will be placed in the game thread
@@ -185,6 +186,9 @@ class OpenaiGameService {
     - Until a winner has been determined, the game should continue with the next round and the game_state.status should be set to active
 
 
+    IMPORTANT NOTE:
+    NEVER ADD MORE ROUNDS TO THE GAME THAN THE NUMBER OF PLAYERS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.
+
 Remember to be impartial but thorough in your investigation.`,
         model: "gpt-4o-2024-08-06",
         response_format: zodResponseFormat(this.GameStateSchema, "game_state"),
@@ -209,7 +213,7 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
   static async createGameThread(players) {
-    console.log(`Creating game thread for ${players.length} players...`);
+    console.log(`Creating game thread for ${players.length} players...\n`);
     try {
       const thread = await this.client.beta.threads.create();
       console.log("Game thread created:", thread.id);
@@ -526,8 +530,8 @@ static async addVotingRoundVote(roomId, vote) {
               ).player;
               console.log("Active player:", activePlayer);
               const userSocket = socketServer.getSocketForUser(activePlayer);
-              socketServer.emitToSocket(
-                userSocket.id,
+              socketServer.emitToRoom(
+                roomId,
                 "realtime-audio-message",
                 conversationItem
               );

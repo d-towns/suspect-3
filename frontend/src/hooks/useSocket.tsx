@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/auth.context';
-import { Player, ChatMessage } from '../models';
+import { Player } from '../models';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_URL;
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
@@ -14,6 +14,7 @@ export const useSocket = () => {
   const { user } = useAuth();
 
   const connectSocket = useCallback(() => {
+    console.warn('Connecting socket');
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
@@ -32,8 +33,9 @@ export const useSocket = () => {
     setSocket(newSocket);
 
     return () => {
-      
+      console.warn('Disconnecting socket');
       newSocket.disconnect();
+
     };
   }, []);
 
@@ -44,15 +46,17 @@ export const useSocket = () => {
     }
   } , [socket, isConnected]);
 
-  const joinRoom = useCallback(() => {
-    if (socket && isConnected && roomId && user) {
-      socket.emit('join-room', { roomId, userId: user.id, userEmail: user.email }, (response: { success: boolean; error?: string }) => {
+  const joinRoom = useCallback((gameRoomId : string | null = null) => {
+    console.log('join room called')
+    if (socket && isConnected && (roomId || gameRoomId) && user) {
+      socket.emit('join-room', { roomId: (roomId || gameRoomId), userId: user.id, userEmail: user.email }, (response: { success: boolean; error?: string }) => {
         if (response.success) {
-          console.log(`Joined room: ${roomId}`);
+          console.warn(`Joined room: ${JSON.stringify(response)}`);
           // if we are in a game room, we should send a joined-game event
           // check if game is in the url using navigator
           if (window.location.pathname.includes('game')) {
             socket.emit('joined-game');
+
           }
         } else {
           console.error(`Failed to join room: ${response.error}`);
@@ -67,7 +71,10 @@ export const useSocket = () => {
         socket.emit('heartbeat', roomId || 'global');
       }, HEARTBEAT_INTERVAL);
 
-      return () => clearInterval(interval);
+      return () => {
+        console.warn('Clearing heartbeat interval');
+        clearInterval(interval)
+      };
     }
   }, [socket, isConnected, roomId]);
 
@@ -76,6 +83,7 @@ export const useSocket = () => {
       if (socket && isConnected && roomId) {
         socket.emit('online-players-list', roomId, (response: { success: boolean; players?: Player[]; error?: string }) => {
           if (response.success && response.players) {
+            console.log(`Got players: ${JSON.stringify(response.players)}`);
             resolve(response.players);
           } else {
             reject(new Error(response.error || 'Failed to get players'));
@@ -108,7 +116,7 @@ export const useSocket = () => {
   useEffect(() => {
     const cleanup = connectSocket();
     return cleanup;
-  }, [connectSocket]);
+  }, []);
 
   useEffect(() => {
     if (roomId) {
@@ -116,7 +124,7 @@ export const useSocket = () => {
     }
     const stopHeartbeat = startHeartbeat();
     return stopHeartbeat;
-  }, [roomId, joinRoom, startHeartbeat]);
+  }, [roomId, startHeartbeat]);
 
   return { 
     socket, 

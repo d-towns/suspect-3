@@ -1,9 +1,9 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from './App';
-import Login from './routes/login';
-import Rooms from './routes/rooms';
-import Lobby from './routes/lobby';
-import Game from './routes/game';
+import Login from './pages/login';
+import PlayMenu from './pages/playMenu';
+import Lobby from './pages/lobby';
+import Game from './pages/game';
 import ProtectedRoute from './routing/protected-route';
 
 const router = createBrowserRouter([
@@ -20,7 +20,7 @@ const router = createBrowserRouter([
         children: [
           {
             path: 'rooms',
-            element: <Rooms />,
+            element: <PlayMenu />,
           },
           {
             path: 'lobby/:roomId',

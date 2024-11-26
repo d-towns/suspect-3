@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth.context';
 
+/**
+ * Refactor Notes:
+ * 
+ * the login and signup forms can be seperated into their own components,
+ *  and the signup form will use the login form as a base and add the name field
+ * 
+ */
+
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +22,7 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/rooms');
+      navigate('/home');
     }
   }, [user, navigate]);
 
@@ -27,8 +35,9 @@ const Login: React.FC = () => {
         await signup(email, password, name);
         setSignupSuccess(true);
       } else {
+        console.log('logging in');
         await login(email, password);
-        navigate('/rooms');
+        console.log('logged in');
       }
     } catch (err) {
       setError(`An error occurred. Please try again. ${err instanceof Error ? err.message : ''}`);

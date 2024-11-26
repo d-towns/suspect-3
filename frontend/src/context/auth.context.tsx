@@ -39,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check authentication status on component mount
   useEffect(() => {
     checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Function to check if the user is authenticated
@@ -57,12 +56,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Function to handle user login
   const login = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      const response: AxiosResponse<{ user: User }> = await api.post('users/login', { email, password });
-      setUser(response.data.user);
+      const response = await api.post('users/login', { email, password });
+      console.log('Login response:', response);
+      setUser(response.data.session.user);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
