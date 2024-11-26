@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { GameState } from '../models/game-state.model';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { Player, ChatMessage, GameRoom } from '../models';
@@ -30,8 +29,7 @@ export const Lobby: React.FC = () => {
   const chatMessagesRef = useRef<HTMLDivElement>(null);
   const { 
     socket, 
-    isConnected, 
-    joinRoom, 
+    isConnected,
     getPlayersInRoom, 
     sendChatMessage, 
     startGame, 
@@ -61,7 +59,6 @@ export const Lobby: React.FC = () => {
       console.log('Initializing lobby for room:', roomId);
       try {
 
-        // TODO: add the players ready status to this call, store it on the socket 
         const players = await getPlayersInRoom();
         console.log('Players in room:', players);
         updatePlayerList(players);
@@ -80,52 +77,59 @@ export const Lobby: React.FC = () => {
         console.error('Error initializing lobby:', error);
       }
     };
-    console.log(`socket: ${socket} socket.connected: ${socket?.connected}`)
-    if(socket && socket.connected) initializeLobby();
-  }, [socket, isConnected]);
 
+
+    const setupListeners = () => {
+      if (socket && isConnected) {
+        socket.on('player-list', updatePlayerList);
+        socket.on('chat-message', addChatMessage);
+        socket.on('player-ready', updatePlayerReadyStatus);
+        socket.on('all-players-ready', () =>
+          setLobbyState(prevState => ({
+            ...prevState,
+            gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
+          }))
+        );
+        socket.on('game-creating', () => {
+          setLobbyState(prevState => ({
+            ...prevState,
+            gameStarting: true
+          }));
+        });
+        socket.on('game-created', () => navigate(`/game/${roomId}`));
+        
+        socket.on('player-left', removePlayer);
+        socket.on('player-joined', addPlayer);
+      }
+  
+      return () => {
+        if (socket) {
+          socket.off('player-list');
+          socket.off('chat-message');
+          socket.off('player-ready');
+          socket.off('all-players-ready');
+          socket.off('game-created');
+          socket.off('player-left');
+          socket.off('player-joined');
+        }
+      };
+    }
+    let cleanupListeners : Function;
+    if(socket && socket.connected){
+        initializeLobby();
+        cleanupListeners = setupListeners();
+    }
+
+    return () => {
+      if(cleanupListeners) cleanupListeners();
+    }
+  }, [socket, isConnected]);
 
   useEffect(() => {
     if (lobbyState.room && typeof lobbyState.room.game_state !== 'string' && lobbyState.room.game_state?.status == 'active') {
       navigate(`/game/${roomId}`);
     }
   }, [lobbyState.room, navigate, roomId]);
-
-  useEffect(() => {
-    if (socket && isConnected) {
-      socket.on('player-list', updatePlayerList);
-      socket.on('chat-message', addChatMessage);
-      socket.on('player-ready', updatePlayerReadyStatus);
-      socket.on('all-players-ready', () =>
-        setLobbyState(prevState => ({
-          ...prevState,
-          gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
-        }))
-      );
-      socket.on('game-creating', () => {
-        setLobbyState(prevState => ({
-          ...prevState,
-          gameStarting: true
-        }));
-      });
-      socket.on('game-created', () => navigate(`/game/${roomId}`));
-      
-      socket.on('player-left', removePlayer);
-      socket.on('player-joined', addPlayer);
-    }
-
-    return () => {
-      if (socket) {
-        socket.off('player-list');
-        socket.off('chat-message');
-        socket.off('player-ready');
-        socket.off('all-players-ready');
-        socket.off('game-created');
-        socket.off('player-left');
-        socket.off('player-joined');
-      }
-    };
-  }, [socket, isConnected]);
 
   const removePlayer = (player: Player) => {
     console.log('Player left:', player);
@@ -190,6 +194,7 @@ export const Lobby: React.FC = () => {
   };
 
   const handleSendMessage = () => {
+    console.log('Sending message:', lobbyState.chat.inputMessage, user);
     if (lobbyState.chat.inputMessage && user) {
       sendChatMessage(lobbyState.chat.inputMessage);
       setLobbyState(prevState => ({
@@ -229,6 +234,12 @@ export const Lobby: React.FC = () => {
         gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus },
       };
     });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
   };
 
   return (
@@ -319,6 +330,7 @@ export const Lobby: React.FC = () => {
                       chat: { ...prevState.chat, inputMessage: e.target.value },
                     }))
                   }
+                  onKeyDown={handleKeyDown}
                   placeholder="Type your message..."
                   className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
                 />
