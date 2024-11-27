@@ -411,7 +411,6 @@ export class GameRoomSocketServer {
           return s.inGame;
         });
         const gameRoom = await GameRoomService.getGameRoom(socket.roomId);
-        const game = GameRoomService.decryptGameState(gameRoom.game_state);
         if (
           allInGame &&
           gameRoom.host_id === socket.userId &&
