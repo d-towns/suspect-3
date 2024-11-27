@@ -3,54 +3,41 @@ import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 
-const PlayMenu: React.FC = () => {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  // const [rooms, setRooms] = useState<GameRoom[]>([]);
-  const [roomToJoinId, setRoomToJoinId] = useState<string>('');
+type Mode = 'single' | 'multi' | null;
 
-  const createRoom = async () => {
-    if (!user) return;
-    try {
-      const roomId = await roomsService.createRoom(user.id);
-      navigate(`/lobby/${roomId}`);
-    } catch (error) {
-      console.error('Error creating room:', error);
-      alert('Error creating room: ' + (error as Error).message);
-    }
-  };
+interface ChooseGameProps {
+  createRoom: () => void;
+  roomToJoinId: string;
+  setRoomToJoinId: React.Dispatch<React.SetStateAction<string>>;
+  navigateToRoom: (roomId: string) => void;
+}
 
-  const navigateToRoom = async (roomId: string) => {
-    const room = await roomsService.getRoom(roomId);
-    if(room) navigate(`/lobby/${roomId}`);
-    else {
-      alert('Room not found');
-    }
-  }
-
+const ChooseGame: React.FC<ChooseGameProps> = ({
+  createRoom,
+  roomToJoinId,
+  setRoomToJoinId,
+  navigateToRoom,
+}: ChooseGameProps) => {
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl min-h-screen  mx-auto">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900 mb-8">Play</h1>
-        <div className="flex justify-evenly h-full items-center gap-6">
-          <div className="mb-6 h-full">
-            <div
-              onClick={createRoom}
-              className="w-full h-full flex flex-col gap-12 justify-center p-9 bg-gray-100 border-gray-400 shadow-lg transition ease-in-out border border-transparent rounded-md shadow-sm text-sm font-medium text-black hover:bg-focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <p className='pb-4 text-center text-3xl'> Create Game Room</p>
-              <p className='pb-24 text-center'> Create a new game with a unique scenario and player identies!</p>
-            </div>
+    <div className="z-20 bg-transparent p-6 rounded-lg shadow-lg w-2/3 max-w-md">
+      <div className="flex flex-col justify-evenly h-full items-center gap-6">
+        <div className="mb-6 h-full">
+          <div
+            onClick={createRoom}
+            className="w-full h-full flex flex-col gap-12 justify-center p-9 bg-gray-200 transition ease-in-out duration-200 border-gray-400 shadow-lg transition ease-in-out border border-transparent rounded-md shadow-sm text-sm font-medium text-black hover:bg-focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <p className=' text-center text-3xl'> Create New Game Room</p>
+            
           </div>
-          <p className='font-bold'> OR </p>
-          <div className="overflow-hidden sm:rounded-md">
+        </div>
+        <div className="overflow-hidden sm:rounded-md">
 
-            <div className="mb-6">
+          <div className="mb-6">
             <div
-              className="w-full h-full flex flex-col justify-center p-9 bg-gray-100 border-gray-400 shadow-lg transition ease-in-out border border-transparent rounded-md shadow-sm text-sm font-medium text-black hover:bg-focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full h-full flex flex-col justify-center p-9 bg-gray-200 transition ease-in-out duration-200  border-gray-400 shadow-lg transition ease-in-out border border-transparent rounded-md shadow-sm text-sm font-medium text-black hover:bg-focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-                            <p className='pb-4 text-center text-3xl'> Join Room</p>
-                            <p className='pb-12 text-center'>Enter the Game room ID and join your friends for a game</p>
+              <p className='pb-4 text-center text-3xl'> Join Room</p>
+
               <input
                 type="text"
                 placeholder="Enter Room ID"
@@ -65,12 +52,96 @@ const PlayMenu: React.FC = () => {
                 Join Room
               </button>
             </div>
-              
-            </div>
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+interface ModeCardProps {
+  setMode: (mode: Mode) => void;
+  mode: Mode;
+  chooseGameProps: ChooseGameProps;
+}
+
+const SinglePlayerCard: React.FC<ModeCardProps> = ({ setMode, mode, chooseGameProps }) => {
+  return (
+    <div
+      className="relative w-1/2 h-screen flex-shrink-0 cursor-pointer"
+      onClick={() => setMode('single')}
+    >
+      <img
+        src="single-player-splash-2.webp"
+        alt="Single Player"
+        className={`absolute top-0 left-0 w-full h-full object-cover hover:opacity-100 opacity-60 ${mode === 'single' && 'opacity-100'}`}
+      />
+      {mode === 'single' && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ChooseGame {...chooseGameProps} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MultiplayerCard: React.FC<ModeCardProps> = ({ setMode, mode, chooseGameProps }) => {
+  return (
+    <div
+      className="relative w-1/2 h-screen flex-shrink-0 cursor-pointer"
+      onClick={() => setMode('multi')}
+    >
+      <img
+        src="multi-player-splash.webp"
+        alt="Multiplayer"
+        className={`absolute top-0 left-0 w-full h-full object-cover hover:opacity-100 opacity-60 ${mode === 'multi' && 'opacity-100'} `}
+      />
+      {mode === 'multi' && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ChooseGame {...chooseGameProps} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PlayMenu: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [roomToJoinId, setRoomToJoinId] = useState<string>('');
+  const [mode, setMode] = useState<Mode>(null);
+
+  const createRoom = async () => {
+    if (!user) return;
+    try {
+      const roomId = await roomsService.createRoom(user.id);
+      navigate(`/lobby/${roomId}`);
+    } catch (error) {
+      console.error('Error creating room:', error);
+      alert('Error creating room: ' + (error as Error).message);
+    }
+  };
+
+  const navigateToRoom = async (roomId: string) => {
+    const room = await roomsService.getRoom(roomId);
+    if (room) navigate(`/lobby/${roomId}`);
+    else {
+      alert('Room not found');
+    }
+  };
+
+  const cardProps = {
+    roomToJoinId,
+    setRoomToJoinId,
+    navigateToRoom,
+    createRoom,
+  };
+
+  return (
+    <section className="flex h-screen">
+      <SinglePlayerCard setMode={setMode} mode={mode} chooseGameProps={cardProps} />
+      <MultiplayerCard setMode={setMode} mode={mode} chooseGameProps={cardProps} />
+    </section>
   );
 };
 
