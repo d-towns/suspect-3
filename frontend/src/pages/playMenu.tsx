@@ -19,7 +19,7 @@ const ChooseGame: React.FC<ChooseGameProps> = ({
   navigateToRoom,
 }: ChooseGameProps) => {
   return (
-    <div className="z-20 bg-transparent p-6 rounded-lg shadow-lg w-2/3 max-w-md">
+    <div className="z-20 bg-gray-100 p-6 rounded-lg shadow-lg w-2/3 max-w-md">
       <div className="flex flex-col justify-evenly h-full items-center gap-6">
         <div className="mb-6 h-full">
           <div

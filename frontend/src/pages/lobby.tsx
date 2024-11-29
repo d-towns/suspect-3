@@ -245,7 +245,7 @@ export const Lobby: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900 mb-8">Game Room</h1>
+        <h1 className="text-center text-2xl font-extrabold text-gray-900 mb-8">Lobby</h1>
         <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
           <div className="px-4 py-5 sm:px-6">
             <h2 className="text-lg leading-6 font-medium text-gray-900">Connected Players</h2>
