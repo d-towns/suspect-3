@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
+import { useSocket } from '../hooks/useSocket';
 
 type Mode = 'single' | 'multi' | null;
 
@@ -110,6 +111,7 @@ const PlayMenu: React.FC = () => {
   const navigate = useNavigate();
   const [roomToJoinId, setRoomToJoinId] = useState<string>('');
   const [mode, setMode] = useState<Mode>(null);
+  const {socket} = useSocket();
 
   const createRoom = async () => {
     if (!user) return;

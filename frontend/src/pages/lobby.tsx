@@ -2,10 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { Player, ChatMessage, GameRoom } from '../models';
+import { User, ChatMessage, GameRoom } from '../models';
 import { useSocket } from '../hooks/useSocket';
+import { useToast } from '../context/ToastContext/toast.context';
+import { invitesService } from '../services/invites.service';
 
-type PlayersMap = Map<string, Player>;
+type PlayersMap = Map<string, User>;
 
 interface LobbyState {
   room: GameRoom | null;
@@ -35,6 +37,7 @@ export const Lobby: React.FC = () => {
     startGame, 
     sendReadyStatus 
   } = useSocket();
+  const { addToast } = useToast();
 
   const [lobbyState, setLobbyState] = useState<LobbyState>({
     room: null,
@@ -50,6 +53,8 @@ export const Lobby: React.FC = () => {
       isReady: false
     },
   });
+
+  const [inviteEmail, setInviteEmail] = useState('');
 
   useEffect(() => {
     const initializeLobby = async () => {
@@ -131,8 +136,8 @@ export const Lobby: React.FC = () => {
     }
   }, [lobbyState.room, navigate, roomId]);
 
-  const removePlayer = (player: Player) => {
-    console.log('Player left:', player);
+  const removePlayer = (player: User) => {
+    console.log('User left:', player);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
       updatedPlayers.delete(player.email);
@@ -141,8 +146,8 @@ export const Lobby: React.FC = () => {
     });
   };
 
-  const addPlayer = (player: Player) => {
-    console.log('Player joined:', player);
+  const addPlayer = (player: User) => {
+    console.log('User joined:', player);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
       updatedPlayers.set(player.email, player);
@@ -152,10 +157,10 @@ export const Lobby: React.FC = () => {
     });
   };
 
-  const updatePlayerList = (newPlayers: Player[]) => {
+  const updatePlayerList = (newPlayers: User[]) => {
     console.log('Updating player list:', newPlayers);
     setLobbyState(prevState => {
-      const updatedPlayers = new Map<string, Player>();
+      const updatedPlayers = new Map<string, User>();
       newPlayers.forEach(player => {
         updatedPlayers.set(player.email, player);
       });
@@ -234,6 +239,24 @@ export const Lobby: React.FC = () => {
         gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus },
       };
     });
+  };
+
+  const handleSendInvite = async () => {
+    try {
+      if (!user || !user.id || !roomId) {
+        addToast('User not authenticated', undefined);
+        return;
+      }
+      // Replace 'currentGameId' with the actual game ID from your state
+      const toGame = roomId; // Assuming `roomId` is available from props or context
+      const fromUser = user.id;
+      await invitesService.createInvite(fromUser, inviteEmail, toGame);
+      addToast('Invite sent');
+      setInviteEmail('');
+    } catch (error) {
+      console.error('Failed to send invite:', error);
+      addToast('Failed to send invite');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -341,6 +364,29 @@ export const Lobby: React.FC = () => {
                   Send
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+          <div className="px-4 py-5 sm:px-6">
+            <h2 className="text-lg leading-6 font-medium text-gray-900">Invite Players</h2>
+          </div>
+          <div className="px-4 py-4 sm:px-6 border-t border-gray-200">
+            <div className="flex rounded-md shadow-sm">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Enter email to invite..."
+                className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
+              />
+              <button
+                onClick={handleSendInvite}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Send Invite
+              </button>
             </div>
           </div>
         </div>

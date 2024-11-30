@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth.context';
-import { Player } from '../models';
+import { User, Invite } from '../models';
+import { useToast } from '../context/ToastContext/toast.context';
 
 const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_URL;
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
@@ -12,6 +13,8 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const { roomId } = useParams<{ roomId?: string }>();
   const { user } = useAuth();
+  const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const connectSocket = useCallback(() => {
     console.warn('Connecting socket');
@@ -22,6 +25,7 @@ export const useSocket = () => {
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
+      
       setIsConnected(true);
     });
 
@@ -68,7 +72,10 @@ export const useSocket = () => {
   const startHeartbeat = useCallback(() => {
     if (socket && isConnected) {
       const interval = setInterval(() => {
+        if (user) {
+          socket.emit('set-user', user.email, user.id);
         socket.emit('heartbeat', roomId || 'global');
+        }
       }, HEARTBEAT_INTERVAL);
 
       return () => {
@@ -76,12 +83,12 @@ export const useSocket = () => {
         clearInterval(interval)
       };
     }
-  }, [socket, isConnected, roomId]);
+  }, [socket, isConnected, roomId, user]);
 
   const getPlayersInRoom = useCallback(() => {
-    return new Promise<Player[]>((resolve, reject) => {
+    return new Promise<User[]>((resolve, reject) => {
       if (socket && isConnected && roomId) {
-        socket.emit('online-players-list', roomId, (response: { success: boolean; players?: Player[]; error?: string }) => {
+        socket.emit('online-players-list', roomId, (response: { success: boolean; players?: User[]; error?: string }) => {
           if (response.success && response.players) {
             console.log(`Got players: ${JSON.stringify(response.players)}`);
             resolve(response.players);
@@ -113,6 +120,13 @@ export const useSocket = () => {
     }
   }, [socket, isConnected, roomId, user]);
 
+  const handleInviteReceived = useCallback((invite: Invite) => {
+    console.log(`Invite received: ${JSON.stringify(invite)}`);
+    addToast(`Invite received ${invite.invite_code}`, () => {
+      navigate(`/lobby/${invite.game_id}`);
+    });
+  }, [addToast, navigate]);
+
   useEffect(() => {
     const cleanup = connectSocket();
     return cleanup;
@@ -126,13 +140,24 @@ export const useSocket = () => {
     return stopHeartbeat;
   }, [roomId, startHeartbeat]);
 
-  return { 
-    socket, 
-    isConnected, 
-    joinRoom, 
-    getPlayersInRoom, 
-    sendChatMessage, 
-    startGame, 
+  useEffect(() => {
+    if (socket) {
+      socket.on('invite-received', handleInviteReceived);
+    }
+    return () => {
+      if (socket) {
+        socket.off('invite-received', handleInviteReceived);
+      }
+    };
+  }, [socket, isConnected, handleInviteReceived]);
+
+  return {
+    socket,
+    isConnected,
+    joinRoom,
+    getPlayersInRoom,
+    sendChatMessage,
+    startGame,
     sendReadyStatus,
     emitEvent
   };

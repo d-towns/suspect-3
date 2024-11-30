@@ -1,6 +1,5 @@
-
-  export interface Player {
+export interface User {
     email: string;
     id: string;
     isReady: boolean;
-  }
+}
