@@ -40,6 +40,8 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
   };
 }
 
+
+
 export class GameRoomSocketServer {
   static instance = null;
 
@@ -55,12 +57,32 @@ export class GameRoomSocketServer {
       },
     });
 
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+    this.inviteChannel = supabase
+    .channel('table-db-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'invites',
+      },
+      (payload) => this.sendInvitePayload(payload)
+    )
+    .subscribe();
+
     this.roomRoundTimers = new Map();
 
     this.io.on("connection", (socket) => {
+
+
       console.log("A user connected");
 
-      socket.on("set-user-email", this.handleSetUserEmail.bind(this, socket));
+      socket.on("set-user", this.handleSetUserDetails.bind(this, socket));
       socket.on("disconnect", this.handleDisconnect.bind(this, socket));
       socket.on("join-room", this.handleJoinRoom.bind(this, socket));
       socket.on("leave-room", this.handleLeaveRoom.bind(this, socket));
@@ -92,13 +114,27 @@ export class GameRoomSocketServer {
 
       // Start the heartbeat check interval
       setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
+      this.setupInviteListener();
+
     });
 
     GameRoomSocketServer.instance = this;
   }
 
-  handleSetUserEmail(socket, userEmail) {
+  setupInviteListener = () => {
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+
+
+  }
+
+  handleSetUserDetails(socket, userEmail, userId) {
     socket.userEmail = userEmail;
+    socket.isReady = false;
+    socket.userId = userId;
   }
 
   handleDisconnect(socket) {
@@ -216,6 +252,23 @@ export class GameRoomSocketServer {
   handleHeartbeat(socket, roomId) {
     console.log(`Heartbeat from user ${socket.userEmail} in room ${roomId}`);
     socket.lastHeartbeat = Date.now();
+  }
+
+  sendInvitePayload (payload) { 
+    console.log("Invite Payload Received \n", payload);  
+    const {new: invite} = payload;
+    const {recipient_user_email, game_id, invite_code} = invite;
+    // get the socket of the recipient user email
+    const recipientSocket = this.getSocketForUser(recipient_user_email);
+    
+    if (recipientSocket) {
+      console.log("Recipient Socket:", recipientSocket.id);
+      console.log("Emitting invite to recipient");
+      // emit to the recipient socket
+
+      this.io.to(recipientSocket.id).emit("invite-received", {recipient_user_email, game_id, invite_code});
+    }
+
   }
 
   async handleStartGame(socket, roomId) {
@@ -517,7 +570,7 @@ export class GameRoomSocketServer {
 
   getSocketForUser(userId) {
     const userSocket = Array.from(this.io.sockets.sockets.values()).find(
-      (s) => s.userId === userId
+      (s) => s.userId === userId || s.userEmail === userId
     );
     return userSocket;
   }
