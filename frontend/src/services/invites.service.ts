@@ -29,12 +29,15 @@ export const invitesService = {
   },
 
   /**
-   * Retrieves all invites for the authenticated user.
+   * Retrieves invites for the authenticated user.
+   * @param userEmail - The email of the authenticated user.
    * @returns An array of invites.
    */
-  getInvites: async (): Promise<Invite[]> => {
+  getInvites: async (userEmail: string): Promise<Invite[]> => {
     try {
-      const response = await axiosInstance.get('/invites/get-invites');
+      const response = await axiosInstance.get('/invites/get-invites', {
+        params: { recipient_user_email: userEmail },
+      });
       if (response.data.success) {
         return response.data.invites;
       }

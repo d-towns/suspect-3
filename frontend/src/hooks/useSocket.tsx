@@ -18,6 +18,7 @@ export const useSocket = () => {
 
   const connectSocket = useCallback(() => {
     console.warn('Connecting socket');
+    if(!socket && !isConnected) {
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
@@ -41,6 +42,7 @@ export const useSocket = () => {
       newSocket.disconnect();
 
     };
+  }
   }, []);
 
   const emitEvent = useCallback((event: string, data: any) => {
@@ -121,7 +123,6 @@ export const useSocket = () => {
   }, [socket, isConnected, roomId, user]);
 
   const handleInviteReceived = useCallback((invite: Invite) => {
-    console.log(`Invite received: ${JSON.stringify(invite)}`);
     addToast(`Invite received ${invite.invite_code}`, () => {
       navigate(`/lobby/${invite.game_id}`);
     });
