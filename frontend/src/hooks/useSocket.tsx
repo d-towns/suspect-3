@@ -18,7 +18,6 @@ export const useSocket = () => {
 
   const connectSocket = useCallback(() => {
     console.warn('Connecting socket');
-    if(!socket && !isConnected) {
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
@@ -42,7 +41,6 @@ export const useSocket = () => {
       newSocket.disconnect();
 
     };
-  }
   }, []);
 
   const emitEvent = useCallback((event: string, data: any) => {
@@ -91,6 +89,7 @@ export const useSocket = () => {
     return new Promise<User[]>((resolve, reject) => {
       if (socket && isConnected && roomId) {
         socket.emit('online-players-list', roomId, (response: { success: boolean; players?: User[]; error?: string }) => {
+          console.log(`Got players response: ${JSON.stringify(response)}`);
           if (response.success && response.players) {
             console.log(`Got players: ${JSON.stringify(response.players)}`);
             resolve(response.players);
@@ -130,16 +129,14 @@ export const useSocket = () => {
 
   useEffect(() => {
     const cleanup = connectSocket();
+
     return cleanup;
   }, []);
 
   useEffect(() => {
-    if (roomId) {
-      joinRoom();
-    }
     const stopHeartbeat = startHeartbeat();
     return stopHeartbeat;
-  }, [roomId, startHeartbeat]);
+  }, [startHeartbeat]);
 
   useEffect(() => {
     if (socket) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSocket } from '../hooks/useSocket';
+import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
 import { useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
@@ -12,7 +12,7 @@ import ResponseLoading from '../components/responseLoading';
 
 
 const Game = () => {
-  const { socket, emitEvent } = useSocket();
+  const { socket, emitEvent } = useSocketContext();
   const { user } = useAuth();
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const { roomId } = useParams<{ roomId: string }>();

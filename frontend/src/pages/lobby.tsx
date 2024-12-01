@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { User, ChatMessage, GameRoom } from '../models';
-import { useSocket } from '../hooks/useSocket';
+import { useSocketContext } from '../context/SocketContext/socket.context';
 import { useToast } from '../context/ToastContext/toast.context';
 import { invitesService } from '../services/invites.service';
 
@@ -32,11 +32,12 @@ export const Lobby: React.FC = () => {
   const { 
     socket, 
     isConnected,
+    joinRoom,
     getPlayersInRoom, 
     sendChatMessage, 
     startGame, 
     sendReadyStatus 
-  } = useSocket();
+  } = useSocketContext();
   const { addToast } = useToast();
 
   const [lobbyState, setLobbyState] = useState<LobbyState>({
@@ -63,7 +64,7 @@ export const Lobby: React.FC = () => {
       if (!user || !roomId) return;
       console.log('Initializing lobby for room:', roomId);
       try {
-
+        joinRoom(roomId);
         const players = await getPlayersInRoom();
         console.log('Players in room:', players);
         updatePlayerList(players);

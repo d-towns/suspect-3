@@ -4,7 +4,7 @@ import { FaEnvelope } from "react-icons/fa";
 import { Invite } from '../models/invite.model';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
-import { useSocket } from '../hooks/useSocket'; // Import the useSocket hook
+import { useSocketContext } from '../context/SocketContext/socket.context';
 
 interface InvitesDropdownProps {
   invites: Invite[];
@@ -12,7 +12,7 @@ interface InvitesDropdownProps {
 
 const InvitesDropdown: React.FC<InvitesDropdownProps> = ({ invites }) => {
     const navigate = useNavigate();
-    const { socket } = useSocket(); // Destructure socket from useSocket
+    const { socket } = useSocketContext(); // Destructure socket from useSocket
     const [newInvites, setNewInvites] = useState<number>(0);
 
     useEffect(() => {
