@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createSupabaseClient } from '../db/supabase.js';
 import {z} from 'zod';
+import moment from 'moment'; // Add import
 
 const InviteSchema = z.object({
     created_at: z.date(),
@@ -49,11 +50,13 @@ async function createInvite(req, res) {
         recipient_user_email,
         game_id,
         accepted: false,
-        created_at: new Date(),
+        created_at: moment.utc().toISOString(), // Use moment.utc()
         invite_code: createInviteCode(),
         // expires in 15 minutes
-        expires_at: new Date(Date.now() + 15 * 60 * 1000),
+        expires_at: moment.utc().add(15, 'minutes').toISOString(), // Use moment.utc().add()
     };
+    console.log('Created at:', inviteData.created_at);
+    console.log('Expires at:', inviteData.expires_at);
 
     const { data, error } = await supabase
         .from('invites')
@@ -72,11 +75,11 @@ async function createInvite(req, res) {
 // Function to get all invites
 async function getInvites(req, res) {
     const supabase = createSupabaseClient({ req, res });
-    const { userId } = req.body;
+    const userEmail = req.query.recipient_user_email;
 
     const { data, error } = await supabase
         .from('invites')
-        .select('*').eq('to_user', userId);
+        .select('*').eq('recipient_user_email', userEmail);
 
     if (error) {
         console.error('Error fetching invites:', error);
