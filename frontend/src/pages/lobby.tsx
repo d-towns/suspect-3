@@ -1,11 +1,25 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { User, ChatMessage, GameRoom } from '../models';
+import { roomsService } from '../services/rooms.service';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { useToast } from '../context/ToastContext/toast.context';
 import { invitesService } from '../services/invites.service';
+import {
+  Box,
+  Button,
+  Flex,
+  Text,
+  TextField,
+  Heading,
+  Card,
+  Separator,
+  ScrollArea,
+  Badge,
+} from '@radix-ui/themes';
+import { ChatMessage } from '../models/chat-message.model';
+import { GameRoom } from '../models/room.model';
+import { User } from '../models/user.model';
 
 type PlayersMap = Map<string, User>;
 
@@ -29,14 +43,14 @@ export const Lobby: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const chatMessagesRef = useRef<HTMLDivElement>(null);
-  const { 
-    socket, 
+  const {
+    socket,
     isConnected,
     joinRoom,
-    getPlayersInRoom, 
-    sendChatMessage, 
-    startGame, 
-    sendReadyStatus 
+    getPlayersInRoom,
+    sendChatMessage,
+    startGame,
+    sendReadyStatus,
   } = useSocketContext();
   const { addToast } = useToast();
 
@@ -51,7 +65,7 @@ export const Lobby: React.FC = () => {
     gameStatus: {
       userIsHost: false,
       allPlayersReady: false,
-      isReady: false
+      isReady: false,
     },
   });
 
@@ -234,10 +248,11 @@ export const Lobby: React.FC = () => {
           updatedPlayers.set(user.email, { ...currentPlayer, isReady: newReadyStatus });
         }
       }
+      const allPlayersReady = Array.from(updatedPlayers.values()).every(player => player.isReady);
       return {
         ...prevState,
         players: updatedPlayers,
-        gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus },
+        gameStatus: { ...prevState.gameStatus, isReady: newReadyStatus, allPlayersReady },
       };
     });
   };
@@ -267,144 +282,117 @@ export const Lobby: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-center text-2xl font-extrabold text-gray-900 mb-8">Lobby</h1>
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg leading-6 font-medium text-gray-900">Connected Players</h2>
-          </div>
-          <div className="border-t border-gray-200">
-            <ul className="divide-y divide-gray-200">
-              {Array.from(lobbyState.players.values()).map((player) => (
-                <li key={player.email} className="px-4 py-4 sm:px-6 flex justify-between items-center">
-                  <div className="text-sm font-medium text-indigo-600">{player.email}</div>
-                  <div className="flex items-center">
-                    {lobbyState.room?.host_id === player.id && (
-                      <span className="mr-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        Host
-                      </span>
-                    )}
-                    <div
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${player.isReady ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}
-                    >
-                      {player.isReady ? 'Ready' : 'Not Ready'}
-                    </div>
-                  </div>
-                </li>
-              ))}
-              {lobbyState.players.size === 0 && (
-                <li className="px-4 py-4 sm:px-6 text-center text-gray-500">
-                  No players connected.
-                </li>
-              )}
-            </ul>
-          </div>
-        </div>
+    <Flex direction="column" align="center" px="4" py="4" mt='9'style={{ minHeight: '100vh' }}>
+      <Card size="3" style={{ width: '100%', maxWidth: '800px' }}>
+        <Heading size="6" mb="4" align="center">
+          Lobby - {lobbyState.room?.id.split('-')[0] || 'Room'}
+        </Heading>
+        <Separator size={'4'} />
+        <Flex direction={{ initial: 'column' }} gap="4" mt="4">
+          {/* Player List */}
+          <Box mb='4'>
+            <Heading size="4" mb="2">
+              Players
+            </Heading>
+            <Separator size={'4'} />
+            <Box mt="4">
+              {Array.from(lobbyState.players.values()).map((player, index) => (
 
-        <div className="mb-6 flex gap-4">
-          {lobbyState.gameStatus.userIsHost && (
-            <button
-              onClick={handleStartGameClick}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${lobbyState.gameStatus.allPlayersReady
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-gray-600 cursor-not-allowed'
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-              disabled={!lobbyState.gameStatus.allPlayersReady}
-            >
-              Start Game
-            </button>
-          )}
-          <button
-            onClick={handleReadyClick}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${lobbyState.gameStatus.isReady
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-green-600 hover:bg-green-700'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
-          >
-            {lobbyState.gameStatus.isReady ? 'Cancel Ready' : 'Ready Up'}
-          </button>
-        </div>
-
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg leading-6 font-medium text-gray-900">Lobby Chat</h2>
-          </div>
-          <div className="border-t border-gray-200">
-            <div ref={chatMessagesRef} className="px-4 py-5 sm:p-6 h-64 overflow-y-auto">
-              {lobbyState.chat.messages.map((msg, index) => (
-                <div key={index} className="mb-2">
-                  <span className="font-medium text-indigo-600">{msg.userEmail}: </span>
-                  <span className="text-gray-700">{msg.message}</span>
-                </div>
-              ))}
-              {lobbyState.chat.messages.length === 0 && (
-                <div className="text-center text-gray-500">No messages yet.</div>
-              )}
-            </div>
-            <div className="px-4 py-4 sm:px-6 border-t border-gray-200">
-              <div className="flex rounded-md shadow-sm">
-                <input
-                  type="text"
-                  value={lobbyState.chat.inputMessage}
-                  onChange={(e) =>
-                    setLobbyState(prevState => ({
-                      ...prevState,
-                      chat: { ...prevState.chat, inputMessage: e.target.value },
-                    }))
+                <Flex key={player.email} align="center" gap="2" mt="4">
+                  <Text size={'4'}>{index +1}. </Text>
+                  <Text size={'4'}>{player.email}</Text>
+                  {player.isReady ? <Badge color="green">Ready</Badge> : <Badge color="red">Not Ready</Badge>}
+                  {player.email === user?.email && <Badge color="blue">You</Badge>}
+                  {player?.id === lobbyState.room?.host_id && <Badge color="orange">Host</Badge>}
+                  {lobbyState.gameStatus.userIsHost && player.email !== user?.email && (
+                    <Button onClick={() => console.log('Kick player:', player)}>Kick</Button>)
                   }
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message..."
-                  className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+                </Flex>
+              ))}
+                        <Flex align="center" gap="2" mt='4'>
+            
+            <TextField.Root
+              placeholder="Invite other players by email"
+              value={inviteEmail}
+              style={{ flex: 1 }}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <Button onClick={handleSendInvite}>Send Invite</Button>
+          </Flex>
+            </Box>
+          </Box>
 
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
-          <div className="px-4 py-5 sm:px-6">
-            <h2 className="text-lg leading-6 font-medium text-gray-900">Invite Players</h2>
-          </div>
-          <div className="px-4 py-4 sm:px-6 border-t border-gray-200">
-            <div className="flex rounded-md shadow-sm">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="Enter email to invite..."
-                className="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300"
+          {/* Chat Section */}
+          <Box>
+            <Heading size="4" mb="2">
+              Chat
+            </Heading>
+            <Separator size={'4'} />
+            <ScrollArea style={{ height: '200px', marginTop: '8px' }}>
+              <Box ref={chatMessagesRef} pr="2">
+                {lobbyState.chat.messages.map((message, index) => (
+                  <Text key={index} mt="2">
+                    <strong>{message.userEmail}:</strong> {message.message}
+                  </Text>
+                ))}
+              </Box>
+            </ScrollArea>
+            <Flex mt="2" gap="2">
+              <TextField.Root
+                placeholder="Type a message..."
+                value={lobbyState.chat.inputMessage}
+                onChange={(e) =>
+                  setLobbyState((prevState) => ({
+                    ...prevState,
+                    chat: { ...prevState.chat, inputMessage: e.target.value },
+                  }))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSendMessage();
+                  }
+                }}
+                style={{ flex: 1 }}
               />
-              <button
-                onClick={handleSendInvite}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Send Invite
-              </button>
-            </div>
-          </div>
-        </div>
+              <Button onClick={handleSendMessage}>Send</Button>
+            </Flex>
+          </Box>
+        </Flex>
 
-        {/* Game Starting Splash Screen */}
-        {lobbyState.gameStarting && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white p-8 rounded-lg shadow-xl text-center">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
-              <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
-              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
-            </div>
-          </div>
-        )}
-      </div>
+        {/* Actions */}
+        <Flex mt="4" gap="2" justify="center">
+          {lobbyState.gameStatus.userIsHost && (
+            <Button
+              onClick={handleStartGameClick}
+              style={{ flex: 1 }}
+              disabled={
+                !lobbyState.gameStatus.allPlayersReady || lobbyState.gameStarting
+              }
+            >
+              {lobbyState.gameStarting ? 'Starting Game...' : 'Start Game'}
+            </Button>
+          )}
+            <Button
+            style={{ flex: 1 }}
+              color={lobbyState.gameStatus.isReady ? 'red' : 'green'}
+              onClick={handleReadyClick}
+            >
+              {lobbyState.gameStatus.isReady ? 'Cancel Ready' : 'Ready Up'}
+            </Button>
+          {/* Invite Player */}
+          {lobbyState.gameStarting && (
+  <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div className="bg-white p-8 rounded-lg shadow-xl text-center">
+      <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
+      <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
+      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+      <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
     </div>
+  </div>
+)}
+        </Flex>
+      </Card>
+    </Flex>
   );
 };
 
