@@ -122,6 +122,7 @@ export const useSocket = () => {
   }, [socket, isConnected, roomId, user]);
 
   const handleInviteReceived = useCallback((invite: Invite) => {
+    console.log(`Invite received: ${JSON.stringify(invite)}`);
     addToast(`Invite received ${invite.invite_code}`, () => {
       navigate(`/lobby/${invite.game_id}`);
     });

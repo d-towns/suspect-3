@@ -4,6 +4,7 @@ import { WavRecorder } from 'wavtools';
 import { FaMicrophone } from 'react-icons/fa6';
 import decodeAudio from 'audio-decode';
 import { base64EncodeAudio } from '../utils/audio-helpers';
+import {Box, Text, Button, Flex, IconButton} from '@radix-ui/themes';
 
 interface AudioRecorderParams {
     socket: Socket;
@@ -87,39 +88,23 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
   };
 
   return (
-    <div>
-      <h2>Audio Recorder</h2>
-      <button
+    <Flex direction="column" align="center" gap="4" mt={'5'}>
+      <IconButton
+        style={{width: '108px', height: '48px'}}
+        variant={isRecording ? 'solid' : 'surface'}
         onClick={isRecording ? stopRecording : startRecording}
-        className={`
-          flex
-          flex-row
-          gap-2
-          items-center
-          ${isRecording ? 'bg-red-700 text-white' : 'bg-gray-700 text-white'}
-          p-2
-          rounded-lg
-          hover:bg-gray-600
-          focus:outline-none
-          focus:ring-2
-          focus:ring-blue-500
-          focus:ring-offset-2
-          focus:ring-offset-gray-900
-        `}
+        className="transition-transform duration-200 hover:scale-110"
+        aria-label={isRecording ? 'Stop Recording' : 'Start Recording'}
       >
-        {isRecording ? 'Stop Recording' : 'Start Recording'}
-        <FaMicrophone />
-        <div>
+              {isRecording ?  (
+        <Text color="orange" size="5">
           {recordingTime}s
-        </div>
-      </button>
-      {audioUrl && (
-        <div>
-          <h3>Playback</h3>
-          <audio controls src={audioUrl}></audio>
-        </div>
-      )}
-    </div>
+        </Text>
+      ) : <FaMicrophone size={24}/>}
+        
+      </IconButton>
+
+    </Flex>
   );
 };
 

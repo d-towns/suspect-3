@@ -1,27 +1,86 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef} from 'react';
+import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
 import { useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import decodeAudio, { decoders } from 'audio-decode';
+import { FaChevronDown } from 'react-icons/fa';
+import classNames from 'classnames';
 import AudioPlayer from '../components/audioPlayer';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
+import * as Accordion from '@radix-ui/react-accordion';
+import { Card, Flex, Box, Text, Grid, Button, Container, Avatar, Progress, Separator, RadioCards, Heading } from '@radix-ui/themes';
+import './game.css';
 
 
+const testConversationItems: ConversationItem[] = [
+  {
+    audioBuffer: new ArrayBuffer(380),
+    audioTranscript: "Hello, can you tell me where you were on the night of the crime?",
+    timestamp: 100
+  },
+  {
+    audioBuffer: null,
+    audioTranscript: "I was at home, watching a movie.",
+    timestamp: 200
+  },
+  {
+    audioBuffer: null,
+    audioTranscript: "Did anyone see you there?",
+    timestamp: 300
+  },
+  {
+    audioBuffer: null,
+    audioTranscript: "Yes, my neighbor saw me.",
+    timestamp: 400
+  },
+  {
+    audioBuffer: null,
+    audioTranscript: "Can you provide any evidence to support your alibi?",
+    timestamp: 500
+  },
+  {
+    audioBuffer: null,
+    audioTranscript: "Sure, I have the movie ticket and the receipt from the store.",
+    timestamp: 600
+  },
+];
+
+const PlayerCard = ({ player }: { player: Player }) => {
+  return (
+    <Card variant='ghost' className="list-disc list-inside">
+      <Box key={player.id}>
+        <Flex gap={'2'} align='center' direction={'column'} mb={'5'}>
+          <Avatar fallback={player.identity.split(',')[0].charAt(0)} />
+          <Text as='p' weight={'bold'} size='4'>{player.identity.split(',')[0]}</Text>
+
+          <Box maxWidth="300px" width={'80%'}>
+            <Text as='p' mb={'3'} align={'center'} weight={'medium'}>Guilt</Text>
+            <Progress value={player.guiltScore} max={1} />
+          </Box>
+        </Flex>
+        <Text as='p' align={'center'}> {player.identity.split(',')[1]}</Text>
+      </Box>
+    </Card>
+  )
+}
 
 const Game = () => {
-  const { socket, emitEvent } = useSocketContext();
+  const { socket, emitEvent, joinRoom } = useSocketContext();
   const { user } = useAuth();
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const { roomId } = useParams<{ roomId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
+  const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>(testConversationItems);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
+  const [forceInterrogation, setForceInterrogation] = useState<boolean>(true);
+  const [forceVoting, setForceVoting] = useState<boolean>(false);
   const [responseLoading, setResponseLoading] = useState<boolean>(false);
   const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
   const [killerVote, setKillerVote] = useState<string>();
@@ -49,7 +108,7 @@ const Game = () => {
           const { audioBuffer, audioTranscript } = params;
           const audioWav = await decoders.wav(params.audioBuffer);
 
-          setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript }]);
+          setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript, timestamp: roundTimer }]);
 
           setResponseLoading(false);
           console.log('Playing audio message:', audioWav);
@@ -71,7 +130,7 @@ const Game = () => {
 
       socket.on('user-audio-transcript', (params: any) => {
         console.log('Received audio transcript:', params);
-        setInterrogationTranscript(prev => [...prev, { audioBuffer: null, audioTranscript: params.audioTranscript }]);
+        setInterrogationTranscript(prev => [...prev, { audioBuffer: null, audioTranscript: params.audioTranscript, timestamp: roundTimer }]);
         setAudioTranscribing(false);
       }
       );
@@ -95,6 +154,9 @@ const Game = () => {
       socket.on('game-starting', async (params: any) => {
         console.log('Game is starting');
       });
+
+      joinRoom(roomId);
+
     }
 
     return () => {
@@ -187,140 +249,182 @@ const Game = () => {
   }
 
   return (
-    <div>
+    <Box>
       {gameState?.status !== 'finished' ? (
-        <div className="h-screen bg-gray-900 text-white flex flex-col">
-          {/* HUD-like top bar */}
-          <div className="bg-gray-800 p-4 flex items-center">
-            <div className="flex-1 ml-7">
-              <h2 className="text-4xl font-bold">Suspect 3</h2>
-              <p className="text-lg">
-                Round: {gameState.status ? gameState.status.charAt(0).toUpperCase() + gameState.status.slice(1) : 'Unknown'}
-              </p>
-            </div>
-            {roundTimer > 0 && (
-              <div className="p-4 bg-gray-800 text-white flex-col">
-                <p>Time left in round:</p>
-                <p> {roundTimer} seconds</p>
-              </div>
-            )}
-            <div className="flex-1 text-left">
-              <h3 className="text-xl font-bold">Guilt Meter</h3>
-              <div className="w-full bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="bg-red-600 h-2.5 rounded-full"
-                  style={{ width: `${currentPlayer?.guiltScore ? currentPlayer.guiltScore * 100 : 0}%` }}
-                ></div>
-              </div>
-              <p className="mt-1">Score: {Number(currentPlayer?.guiltScore?.toFixed(2)) * 100 || '0.00'}%</p>
-            </div>
-          </div>
-
+        <Box className="h-screen flex">
           {/* Main game area */}
-          <div className="flex-1 p-6 flex">
+          <Flex px={'5'} py={'5'} gap={'4'} className='w-full'>
             {/* Left panel: Crime and Evidence */}
-            {detailsRevealed ? (
-              <div className="w-1/4 bg-gray-800 p-4 rounded-lg mr-7 overflow-y-auto ">
-                <h2 className="text-2xl font-bold mb-4">Identity</h2>
-                <p className="mb-4">{currentPlayer?.identity || 'Unknown'} </p>
-                <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
-                {gameState.crime && (
-                  <>
-                    <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
-                    <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
-                    <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
-                    <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
-                  </>
-                )}
-                <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
-                <ul className="list-disc list-inside">
-                  {currentPlayer?.evidence?.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  )) || <li>No evidence available</li>}
-                </ul>
-              </div>
-            ) : (
-              <div>
-                <button className='bg-red-800 mr-4 text-white p-2 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900' onClick={() => setDetailsRevealed(true)}>
-                  Reveal Identity and Evidence
-                </button>
-              </div>
-            )}
+            <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '400px' }}>
+              {/* Round Timer */}
+              {roundTimer > 0 && (
+                <Box className="timerBox mb-4 p-4 rounded border">
+                  <Text as='p' size={'5'}>Round Timer</Text>
+                  {/* show th etimer left in minutes and seconds */}
+                  <Text as='p' size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
+                </Box>
+              )}
 
-            {/* Right panel: Interrogation chat */}
-            {!resultsLoading ? (
-              user && activeRound === 'voting' ? (
+              {/* Accordion for Identity, Evidence, and Guilt Scores */}
+              <Accordion.Root
+                type="single"
+                collapsible
+                className="w-full rounded-md shadow-md"
+              >
+                <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
+                  <Accordion.Header>
+                    <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
+                      Identity & Evidence
+                      <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                  <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
 
-                <div>
-                  <div className="flex-1 bg-gray-800 p-4 rounded-lg flex flex-col">
-                    <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
-                    {!voteSubmitted ? (
-                      <>
-                        <div>
-                          <p className='text-xl font-bold mb-4 text-center'> Interrogator's Deduction</p>
-                          <div>
-                            <p className='text-lg p-4'> {gameState.rounds?.slice().reverse().find(round => round.status === 'completed')?.results?.deduction}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          {gameState.players.map((player) => (
-                            <div
-                              key={player.id}
-                              className={`p-12 rounded-lg  cursor-pointer ${killerVote === player.id ? 'bg-green-500' : 'bg-gray-700'}`}
-                              onClick={() => setKillerVote(player.id)}
-                            >
-                              <p className="text-xl font-bold">{player.identity}</p>
-                              <p className="text-lg">Guilt Score: {Number(player.guiltScore.toFixed(2)) * 100}%</p>
+                    <Container p={'5'}>
+                      <h2 className="text-2xl font-bold mb-4">Identity</h2>
+                      <p className="mb-4">{currentPlayer?.identity || 'Unknown'}</p>
+                      <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
+                      {gameState.crime && (
+                        <>
+                          <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
+                          <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
+                          <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
+                          <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
+                        </>
+                      )}
+                      <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
+                      <ul className="list-disc list-inside">
+                        {currentPlayer?.evidence?.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        )) || <li>No evidence available</li>}
+                      </ul>
+                    </Container>
+                  </Accordion.Content>
+                </Accordion.Item>
 
-                            </div>
-                          ))}
-                        </div>
-                      </>) : <>
-                          <p> Vote Submitted</p>
-                    </>}
-                  </div>
-                  <button
-                    className='bg-red-800 text-white p-2 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900'
-                    onClick={handleVoteSubmission}
-                  >
-                    Submit Vote
-                  </button>
-                </div>
-              ) :
-                activeRound === 'interrogation' && gameState.rounds?.find(round => round.status === 'active')?.player == currentPlayer?.id ? (
+                <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
+                  <Accordion.Header>
+                    <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
 
-                  <div className="flex-1 bg-gray-800 p-4 rounded-lg flex flex-col">
-                    <h2 className="text-2xl font-bold mb-4">Interrogation</h2>
-                    <div
-                      ref={chatAreaRef}
-                      className="flex-1 overflow-y-auto mb-4 bg-gray-700 p-4 rounded"
-                    >
-                      {interrogationTranscript.map((conversationItem, index) => (
-                        <div className='flex'>
-                          <AudioPlayer key={index} audioData={conversationItem?.audioBuffer} />
-                          <p>{conversationItem.audioTranscript}</p>
-                        </div>
+                      Player Details
+                      <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                  <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <Flex p={'5'} direction={'column'} gap={'4'}>
+
+                      {gameState.players.map(player => (
+                        <PlayerCard player={player} key={player.id} />
                       ))}
-                      {responseLoading && <ResponseLoading label='Interrogator is responsing' />}
-                      {audioTranscribing && <ResponseLoading label='Transcribing player response' />}
-                    </div>
-                    <div className="flex justify-center">
-                      {/* TODO: use a radix tab to switch between text and audio messages */}
-                      {socket && <AudioRecorder socket={socket} emitEvent={emitEvent} onAudioRecorded={handleAudioRecorded} />}
-                    </div>
-                  </div>) :
-                  <div className="flex w-full flex-col items-center justify-center p-4 bg-gray-800 text-white rounded-bl-lg">
-                    <p className="text-5xl">{gameState.players.find(player => gameState.rounds?.find(round => round.status === 'active')?.player == player.id)?.identity.split(',')[0]} enters the room...</p>
-                  </div>
+
+                    </Flex>
+                  </Accordion.Content>
+                </Accordion.Item>
+              </Accordion.Root>
+            </Card>
+
+            {/* Right panel: Interrogation chat or Voting */}
+            {!resultsLoading ? (
+              (user && activeRound === 'voting' && !forceInterrogation) || forceVoting ? (
+                <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
+                  <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
+                  {!voteSubmitted ? (
+                    <>
+                      <div>
+                        <p className='text-xl font-bold mb-4 text-center'>Interrogator's Deduction</p>
+                        <div>
+                          <p className='text-lg p-4'>{gameState.rounds?.slice().reverse().find(round => round.status === 'completed')?.results?.deduction}</p>
+                        </div>
+                      </div>
+                      <RadioCards.Root className='w-full' value={killerVote} onValueChange={(vote) => setKillerVote(vote)} columns={{ initial: "1", sm: "2" }}>
+                        {gameState.players.map((player) => (
+                          <RadioCards.Item value={player.id}>
+                            <PlayerCard player={player} key={player.id} />
+                          </RadioCards.Item>
+                        ))}
+                      </RadioCards.Root>
+                    </>
+                  ) : (
+                    <p className="text-center text-lg">Vote Submitted</p>
+                  )}
+                  {!voteSubmitted && (
+                    <Flex>
+                      <Button
+                        onClick={handleVoteSubmission}
+                        style={{ width: '40%', margin: ' 20px auto' }}
+                        mt={'4'}
+                      >
+                        Submit Vote
+                      </Button>
+                    </Flex>
+                  )}
+                </Card>
+              ) : ((activeRound === 'interrogation' && !forceVoting) || forceInterrogation) && (
+                <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
+                  {(gameState.rounds?.find(round => round.status === 'active')?.player === currentPlayer?.id || forceInterrogation) ? (
+                    <>
+                      <h2 className="text-2xl font-bold mb-4 w-full">Interrogation</h2>
+                      <Box
+                        ref={chatAreaRef}
+                        as='div'
+                        className="interrogationChat w-full overflow-y-auto p-4 rounded-lg  "
+                        height={'80%'}
+                      >
+<Grid mb={'2'} columns={'8'} flow={'dense'} gap={'5'} >
+  <Box ml={'2'} >
+    <Heading size="5">Time</Heading>
+  </Box>
+  <Box className='col-span-7' >
+    <Heading size="5">Transcript</Heading>
+  </Box>
+  <Separator  className='col-span-8' size={'4'} />
+  {interrogationTranscript.map((conversationItem, index) => (
+    <React.Fragment key={index} >
+      <Box ml={'2'} mb={'4'} >
+        <Text as='p' weight='bold' size={'3'}>
+          {Math.floor(conversationItem.timestamp / 60)}:{conversationItem.timestamp % 60 < 10 ? '0' : ''}{conversationItem.timestamp % 60}
+        </Text>
+        {conversationItem.audioBuffer && (
+          <Flex direction='column' justify='center' align='center'className='col-span-3' >
+            <Separator my={'3'} size={'4'} />
+            <AudioPlayer audioData={conversationItem.audioBuffer} />
+          </Flex>
+        )}
+      </Box>
+      <Box className='col-span-7' >
+      <Text align='left' as='span'>{conversationItem.audioTranscript}</Text>
+      </Box>
+    </React.Fragment>
+  ))}
+  {responseLoading && <ResponseLoading label='Interrogator is thinking...' />}
+  {audioTranscribing && <ResponseLoading label='Transcribing your response...' />}
+</Grid>
+                        {responseLoading && <ResponseLoading label='Interrogator is thinking...' />}
+                        {audioTranscribing && <ResponseLoading label='Transcribing your response...' />}
+                      </Box>
+                      <div className="flex justify-center">
+                        {socket &&
+                          <AudioRecorder socket={socket} emitEvent={emitEvent} onAudioRecorded={handleAudioRecorded} />
+                        }
+                      </div>
+                    </>) : (
+                    <Flex maxHeight={'40%'} align={'center'} direction={'column'}>
+                      <Text size={'8'} className=''>
+                        {gameState.players.find(player => gameState.rounds?.find(round => round.status === 'active')?.player === player.id)?.identity.split(',')[0]} enters the room...
+                      </Text>
+                    </Flex>)}
+
+                </Card>
+              )
             ) : (
-              <div className="w-full bg-gray-800 p-4 rounded-lg ml-7 text-center">
+              <div className="w-full bg-gray-800 p-4 rounded-lg text-center">
                 <h2 className="text-4xl font-bold mb-4">Results</h2>
                 <p className="text-2xl">Results are being calculated...</p>
                 <ResponseLoading label='Calculating Results' />
               </div>
             )}
-          </div>
-        </div>
+          </Flex>
+        </Box>
       ) :
         (
           <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -328,7 +432,7 @@ const Game = () => {
             <div className="text-xl">Team {gameState.outcome?.winner} Won</div>
           </div>
         )}
-    </div>
+    </Box>
   );
 };
 

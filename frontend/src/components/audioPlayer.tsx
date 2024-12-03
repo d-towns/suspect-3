@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause } from 'react-icons/fa6';
-
+import { Box, IconButton, Progress, Text, Button} from '@radix-ui/themes';
 interface AudioPlayerProps {
     audioData: ArrayBuffer | null;
 }
@@ -11,6 +11,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
     const [sourceNode, setSourceNode] = useState<AudioBufferSourceNode | null>(null);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [progress, setProgress] = useState<number>(0);
+    const [audioDuration, setAudioDuration] = useState<number>(0);
     const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
@@ -39,6 +40,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
             }
         } else {
             if (audioContext && audioBuffer) {
+                console.log('Playing audio');
                 const source = audioContext.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(audioContext.destination);
@@ -50,7 +52,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
                     if (audioContext && source.buffer) {
                         const currentTime = audioContext.currentTime;
                         const duration = source.buffer.duration;
-                        setProgress((currentTime / duration) * 100);
+                        setAudioDuration(duration);
+                        setProgress(Math.min((currentTime / duration) * 100, 100));
                         animationFrameId.current = requestAnimationFrame(updateProgress);
                     }
                 };
@@ -70,28 +73,27 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
 
     return (
         <>
-        { audioData && (
-        <div className="audio-player">
-            <div className="progress-circle" style={{ position: 'relative', width: '50px', height: '50px' }}>
-                <svg className="progress-ring" width="50" height="50">
-                    <circle
-                        className="progress-ring__circle"
-                        stroke="black"
-                        strokeWidth="4"
-                        fill="transparent"
-                        r="22"
-                        cx="25"
-                        cy="25"
-                        style={{ strokeDasharray: '138.2', strokeDashoffset: `${138.2 - (138.2 * progress) / 100}` }}
-                    />
-                </svg>
-                <button onClick={handlePlayPause} className="play-pause-button" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'none', border: 'none', padding: '0', cursor: 'pointer' }}>
-                    {isPlaying ? <FaPause size={24} /> : <FaPlay size={24} />}
-                </button>
-            </div>
-        </div>
-    )}
-    </>
+        { true && (
+            <Box
+                onClick={handlePlayPause}
+                className='cursor-pointer'
+            >
+                {isPlaying ? (
+                    <>
+                <IconButton
+                    radius='full'
+                    className='w-10 h-10'
+                >
+                    {isPlaying ? <FaPause size={16} /> : <FaPlay size={16} />}
+                </IconButton>
+                <Progress mt={'2'} value={progress} max={100} />
+                </>
+                ) : (
+                <Button variant='surface'  size='1'>Replay</Button>
+                )}
+            </Box>
+        )}
+        </>
     );
 };
 

@@ -1,0 +1,12 @@
+.interrogationChat {
+    border: 3px solid var(--accent-6);
+}
+
+.timerBox, .accordionTrigger {
+    border: 1px solid var(--accent-6);
+}
+
+.accordionTrigger:hover {
+
+        background-color: var(--accent-6);
+}

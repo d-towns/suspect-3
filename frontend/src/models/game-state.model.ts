@@ -6,6 +6,7 @@ export interface ConversationExhange {
 export interface ConversationItem {
   audioBuffer: ArrayBuffer | null,
   audioTranscript: string
+  timestamp: number
 }
 
 export interface VotingRoundVote {
