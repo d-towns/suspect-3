@@ -33,8 +33,14 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
 
   // Return an object with a clear method
   return {
+    // give the ability to clear the interval on demand and call the doneCallback
+    // ex. All voting round votes are in so we can clear the interval and move on to the next round
+
     clear: () => {
       clearInterval(intervalId);
+      if (doneCallback) {
+        doneCallback();
+      }
       console.log("Interval cleared on demand.");
     }
   };
@@ -359,28 +365,32 @@ export class GameRoomSocketServer {
       if (nextRoundPlayerSocket) {
         // check to see what type of round it is
         if (nextRound.type == "interrogation") {
-          await OpenaiGameService.openRealtimeSession(
-            roomId,
-            gameState,
-            gameRoom.thread_id
-          );
+        // if(true) {
+          // await OpenaiGameService.openRealtimeSession(
+          //   roomId,
+          //   gameState,
+          //   gameRoom.thread_id
+          // );
           // run the game thread to update the round state
           // await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
 
-          await OpenaiGameService.startRealtimeInterregation(
-            roomId,
-            nextRoundPlayerSocket.userId,
-            gameState,
-            listenerFunc
-          );
+          // await OpenaiGameService.startRealtimeInterregation(
+          //   roomId,
+          //   nextRoundPlayerSocket.userId,
+          //   gameState,
+          //   listenerFunc
+          // );
           // console.log("host socket", nextRoundPlayerSocket.userId);
-          // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
-          const {clear} = startInterval(120, emitRoundTick, handleRoundEnd);
+          console.log("Starting interrogation round...");
+          OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
+
+          const {clear} = startInterval(2000, emitRoundTick, handleRoundEnd);
           this.roomRoundTimers.set(socket.roomId, clear);
         }
       } else {
           this.emitToRoom(roomId, "voting-round-start");
-          const {clear} = startInterval(120, emitRoundTick, handleRoundEnd);
+          
+          const {clear} = startInterval(2000, emitRoundTick, handleRoundEnd);
           this.roomRoundTimers.set(socket.roomId, clear);
           
       }
@@ -446,8 +456,13 @@ export class GameRoomSocketServer {
         console.error("Error handling round end:", error);
       }
     };
-    const {clear} = startInterval(20, emitRoundTick, emitRoundStart);
-    this.roomRoundTimers.set(socket.roomId, clear);
+
+    const startFirstRound = (timer) => {
+      const {clear} = startInterval(timer, emitRoundTick, emitRoundStart);
+      this.roomRoundTimers.set(socket.roomId, clear);
+    }
+
+    startFirstRound(2000);
     
   }
 
