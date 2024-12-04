@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import { useSocketContext } from '../context/SocketContext/socket.context';
 import {
   Box,
-  Button,
   Flex,
   Text,
   Separator,
@@ -16,32 +14,10 @@ import {
 
 type Mode = 'single' | 'multi' | null;
 
-interface ChooseGameProps {
-  createRoom: () => void;
-  roomToJoinId: string;
-  setRoomToJoinId: React.Dispatch<React.SetStateAction<string>>;
-  navigateToRoom: (roomId: string) => void;
-}
-
-const ChooseGame: React.FC<ChooseGameProps> = ({
-  createRoom,
-  roomToJoinId,
-  setRoomToJoinId,
-  navigateToRoom,
-}) => {
-  return (
-    <Box>
-      <Flex direction="column" gap="4" mt="4">
-        <Button onClick={createRoom}>Create New Game </Button>
-      </Flex>
-      </Box>
-  );
-};
-
 interface ModeCardProps {
   setMode: (mode: Mode) => void;
   mode: Mode;
-  chooseGameProps: ChooseGameProps;
+  createRoom: () => void;
   imgSrc: string;
   altText: string;
   description?: string;
@@ -50,7 +26,7 @@ interface ModeCardProps {
 const ModeCard: React.FC<ModeCardProps> = ({
   setMode,
   mode,
-  chooseGameProps,
+  createRoom,
   imgSrc,
   altText,
   description
@@ -66,7 +42,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
       }}
       onClick={() => setMode(mode)}
     >
-      <Card size="3">
+      <Card size="3" onClick={() => createRoom()} className='hover:scale-105 hover:border transition ease-in-out duration-200 '>
         <Inset clip="padding-box" side="top" pb="current">
           <img
             src={imgSrc}
@@ -86,7 +62,6 @@ const ModeCard: React.FC<ModeCardProps> = ({
         <Separator my="3" size="4" />
         {description && <Text as="p" size={'4'}>{description}</Text>}
         <Separator my="3" size="4" />
-        <ChooseGame {...chooseGameProps} />
       </Card>
 
           
@@ -97,7 +72,6 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [roomToJoinId, setRoomToJoinId] = useState<string>('');
   const [mode, setMode] = useState<Mode>('single');
 
   const createRoom = async () => {
@@ -111,20 +85,6 @@ const PlayMenu: React.FC = () => {
     }
   };
 
-  const navigateToRoom = async (roomId: string) => {
-    const room = await roomsService.getRoom(roomId);
-    if (room) navigate(`/lobby/${roomId}`);
-    else {
-      alert('Room not found');
-    }
-  };
-
-  const cardProps = {
-    roomToJoinId,
-    setRoomToJoinId,
-    navigateToRoom,
-    createRoom,
-  };
 
   return (
     <Flex justify="center" align="center" style={{ height: '100vh', width:'100%'}}>
@@ -132,7 +92,7 @@ const PlayMenu: React.FC = () => {
         <ModeCard
           setMode={setMode}
           mode="single"
-          chooseGameProps={cardProps}
+          createRoom={createRoom}
           imgSrc="single-player-splash-2.webp"
           altText="Single Player"
           description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
@@ -140,7 +100,7 @@ const PlayMenu: React.FC = () => {
         <ModeCard
           setMode={setMode}
           mode="multi"
-          chooseGameProps={cardProps}
+          createRoom={createRoom}
           imgSrc="multi-player-splash.webp"
           description='Play with friends in a private room. Share the invite code with your friends to join the room. The game will start when all players are ready.'
           altText="Multiplayer"
