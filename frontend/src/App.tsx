@@ -26,6 +26,7 @@ const ThemedApp: React.FC = () => {
   const { theme } = useTheme();
 
   return (
+    <React.StrictMode>
     <Theme accentColor="purple" grayColor="sand" radius="large" scaling="95%" appearance={theme}>
       <div className="flex flex-col min-h-screen">
         <Navbar />
@@ -34,6 +35,7 @@ const ThemedApp: React.FC = () => {
         </main>
       </div>
     </Theme>
+    </React.StrictMode>
   );
 };
 

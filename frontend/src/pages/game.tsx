@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef} from 'react';
+import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
@@ -12,7 +12,8 @@ import AudioPlayer from '../components/audioPlayer';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
-import { Card, Flex, Box, Text, Grid, Button, Container, Avatar, Progress, Separator, RadioCards, Heading } from '@radix-ui/themes';
+import { FaArrowRightLong } from "react-icons/fa6";
+import { Card, Flex, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, Spinner, ScrollArea } from '@radix-ui/themes';
 import './game.css';
 
 
@@ -79,12 +80,13 @@ const Game = () => {
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
-  const [forceInterrogation, setForceInterrogation] = useState<boolean>(true);
+  const [forceInterrogation, setForceInterrogation] = useState<boolean>(false);
   const [forceVoting, setForceVoting] = useState<boolean>(false);
   const [responseLoading, setResponseLoading] = useState<boolean>(false);
   const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
   const [killerVote, setKillerVote] = useState<string>();
   const [detailsRevealed, setDetailsRevealed] = useState<boolean>(false);
+  const [gameIsOver , setGameIsOver] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
 
 
@@ -94,6 +96,9 @@ const Game = () => {
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
+        if(newState.status === 'finished'){
+          setGameIsOver(true);
+        }
         setResultsLoading(false);
 
       });
@@ -250,7 +255,7 @@ const Game = () => {
 
   return (
     <Box>
-      {gameState?.status !== 'finished' ? (
+      
         <Box className="h-screen flex">
           {/* Main game area */}
           <Flex px={'5'} py={'5'} gap={'4'} className='w-full'>
@@ -322,9 +327,8 @@ const Game = () => {
                 </Accordion.Item>
               </Accordion.Root>
             </Card>
-
-            {/* Right panel: Interrogation chat or Voting */}
-            {!resultsLoading ? (
+            {!gameIsOver ? (
+            !resultsLoading ? (
               (user && activeRound === 'voting' && !forceInterrogation) || forceVoting ? (
                 <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
                   <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
@@ -370,35 +374,33 @@ const Game = () => {
                         className="interrogationChat w-full overflow-y-auto p-4 rounded-lg  "
                         height={'80%'}
                       >
-<Grid mb={'2'} columns={'8'} flow={'dense'} gap={'5'} >
-  <Box ml={'2'} >
-    <Heading size="5">Time</Heading>
-  </Box>
-  <Box className='col-span-7' >
-    <Heading size="5">Transcript</Heading>
-  </Box>
-  <Separator  className='col-span-8' size={'4'} />
-  {interrogationTranscript.map((conversationItem, index) => (
-    <React.Fragment key={index} >
-      <Box ml={'2'} mb={'4'} >
-        <Text as='p' weight='bold' size={'3'}>
-          {Math.floor(conversationItem.timestamp / 60)}:{conversationItem.timestamp % 60 < 10 ? '0' : ''}{conversationItem.timestamp % 60}
-        </Text>
-        {conversationItem.audioBuffer && (
-          <Flex direction='column' justify='center' align='center'className='col-span-3' >
-            <Separator my={'3'} size={'4'} />
-            <AudioPlayer audioData={conversationItem.audioBuffer} />
-          </Flex>
-        )}
-      </Box>
-      <Box className='col-span-7' >
-      <Text align='left' as='span'>{conversationItem.audioTranscript}</Text>
-      </Box>
-    </React.Fragment>
-  ))}
-  {responseLoading && <ResponseLoading label='Interrogator is thinking...' />}
-  {audioTranscribing && <ResponseLoading label='Transcribing your response...' />}
-</Grid>
+                        <Grid mb={'2'} columns={'8'} flow={'dense'} gap={'5'} >
+                          <Box ml={'2'} >
+                            <Heading size="5">Time</Heading>
+                          </Box>
+                          <Box className='col-span-7' >
+                            <Heading size="5">Transcript</Heading>
+                          </Box>
+                          <Separator className='col-span-8' size={'4'} />
+                          {interrogationTranscript.map((conversationItem, index) => (
+                            <React.Fragment key={index} >
+                              <Box ml={'2'} mb={'2'} >
+                                <Text as='p' weight='bold' size={'3'} >
+                                  {Math.floor(conversationItem.timestamp / 60)}:{conversationItem.timestamp % 60 < 10 ? '0' : ''}{conversationItem.timestamp % 60}
+                                </Text>
+                                {conversationItem.audioBuffer && (
+                                  <Flex direction='column'  className='col-span-3' >
+                                    <Separator my={'3'} size={'2'} />
+                                    <AudioPlayer audioData={conversationItem.audioBuffer} />
+                                  </Flex>
+                                )}
+                              </Box>
+                              <Box className='col-span-7' >
+                                <Text align='left' as='span' >{conversationItem.audioTranscript}</Text>
+                              </Box>
+                            </React.Fragment>
+                          ))}
+                        </Grid>
                         {responseLoading && <ResponseLoading label='Interrogator is thinking...' />}
                         {audioTranscribing && <ResponseLoading label='Transcribing your response...' />}
                       </Box>
@@ -417,21 +419,154 @@ const Game = () => {
                 </Card>
               )
             ) : (
-              <div className="w-full bg-gray-800 p-4 rounded-lg text-center">
-                <h2 className="text-4xl font-bold mb-4">Results</h2>
-                <p className="text-2xl">Results are being calculated...</p>
-                <ResponseLoading label='Calculating Results' />
-              </div>
+              <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
+                <Flex justify="center" direction={'column'} align="center" gap="2" maxHeight={'90vh'} height={'60%'}>
+                <Heading size="9" align={'center'} >Changing Rounds</Heading>
+                <Flex justify="center" align="center" gap="2" maxHeight={'90vh'} height={'80%'}>
+                  {gameState.rounds.map((round, index) => {
+                    if (round.type === 'interrogation') {
+                      const player = gameState.players.find(p => p.id === round.player);
+                      const initial = player?.identity.split(',')[0].charAt(0) || '?';
+                      const name = player?.identity.split(',')[0] || 'Unknown';
+                      return (
+                        <React.Fragment key={index}>
+                          <Box>
+                          
+                          <Flex align={'center'} gap="2" >
+                            <Flex direction={'column'} align={'center'} gap={'2'}>
+                            
+                          <Avatar  className={`${round.status === 'active' && 'border border-lime-400 animate-bounce'}`} mt={'3'} size={'9'} fallback={initial} />
+                          <Text size={'2'} as='p' align={'center'}> {name} Questioning </Text>
+                          </Flex>
+                          {index < gameState.rounds.length - 1 && <FaArrowRightLong size={24} />}
+                          </Flex>
+                          
+                          </Box>
+                        </React.Fragment>
+                      );
+                    } else if (round.type === 'voting') {
+                      return (
+                        <React.Fragment key={index}>
+                          <Box>
+                                                    <Flex align={'center'} gap="2" >
+                            <Flex direction={'column'} align={'center'} gap={'2'}>
+                            
+                          <Avatar className={`${round.status === 'active' && 'border border-lime-400'}`} mt={'3'} size={'9'} src='https://imgs.search.brave.com/C1lyeB-dN5qaQ5v-MBOOhrKDhRGEYzzTZW3hN74L_pU/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMTE2/NTY4NzMzNS9waG90/by92b3RpbmctYm94/LWFuZC1lbGVjdGlv/bi1pbWFnZS1lbGVj/dGlvbi5qcGc_cz02/MTJ4NjEyJnc9MCZr/PTIwJmM9T3VKdzJU/ajJ2NnNwdGo5c2Jl/eTRycTBNc3dndGQ2/YWZKeEtQTWw4TjAy/bz0' fallback={'V'}/>
+                          <Text size={'2'} as='p' align={'center'}> Culprit Voting</Text>
+                          </Flex>
+                          
+                          {index < gameState.rounds.length - 1 && <FaArrowRightLong size={24}/>}
+                          </Flex>
+                          </Box>
+                        </React.Fragment>
+                      );
+                    }
+                    return null;
+                  })}
+                </Flex>
+                </Flex>
+                  {/* <ResponseLoading label='Calculating Results' /> */}
+              </Card>
+            )  ):    (
+            <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
+              <Flex direction="column" gap="4">
+                <Box mt={'8'}>
+                  <Box className="flex flex-col items-center justify-center h-full animate-bounce">
+                    
+                    {gameState.outcome?.winner == 'innocents' ? ( gameState.players.map(player => {
+                      if(!player.isCulprit){
+                        return (
+                          <><Heading size="5" className="mb-4 text-4xl">Innocents Win!</Heading>
+                          <Flex gap="4">
+                            <Card key={player.id} size="2" variant="surface" className="p-4 flex flex-col items-center">
+                              <Avatar fallback={player.identity.split(',')[0].charAt(0)} size="6" />
+                              <Text className="mt-2 text-xl">{player.identity.split(',')[0]}</Text>
+                            </Card>
+                          </Flex>
+                          </>
+                        )
+                      }
+                    })) : gameState.players.map(player => {
+                      if(player.isCulprit){
+                        return (
+                          <><Heading size="5" className="mb-4 text-4xl">Culprit Wins!</Heading>
+                          <Flex gap="4">
+                            <Card key={player.id} size="2" variant="surface" className="p-4 flex flex-col items-center">
+                              <Avatar fallback={player.identity.split(',')[0].charAt(0)} size="6" />
+                              <Text className="mt-2 text-xl">{player.identity.split(',')[0]}</Text>
+                            </Card>
+                          </Flex>
+                          </>
+                        )
+                      }
+                    } )}
+                  </Box>
+                </Box>
+                <ScrollArea  className="border rounded-lg p-4" type="always" scrollbars="vertical" style={{ height: 500}}>
+                <Heading size="7" mt={'4'}  mb={'7'} align={'left'} >Deductions from Each Round</Heading>
+                <Flex direction="row" gap="2" justify={'center'}>
+                  {gameState.rounds
+                    .filter(round => round.type === 'interrogation')
+                    .map((round, index) => (
+                      <Card key={index} size="2" variant="surface" style={{maxWidth: '400px', width:'400px'}}>
+                        <Flex direction={'column'} align={'center'}>
+                        <Text weight={'bold'} size={'6'}>Round {index + 1}</Text> 
+                        <Separator size={'4'} my={'3'}/>
+                        <Heading weight='bold' size='4' mb={'3'} align={'center'}> Deduction</Heading>
+                        {round.results?.deduction || 'No deduction provided.'}
+                        <Separator size={'4'} my={'3'}/>
+                        <Text as='p' weight='bold' size='3' align={'center'}>
+                          Guilt Score Updates
+                        </Text>
+                        <Flex direction="column" gap="1">
+                          {gameState.players.map(player => (
+                            <Box key={player.id}>
+                              <Text as='p'>{player.identity.split(',')[0]}: {player.guiltScore}</Text>
+                            </Box>
+                          ))}
+                        </Flex>
+                        </Flex>
+                      </Card>
+                    ))}
+                </Flex>
+
+                <Heading align={'left'} mb={'7'}  mt={'7'} size="7">Voting Results</Heading>
+              <Table.Root>
+                <Table.Header>
+                  <Table.Row>
+                  <Table.RowHeaderCell>Player</Table.RowHeaderCell>
+                  {gameState.rounds
+                    .filter(round => round.type === 'voting')
+                    .map((round, idx) => (
+                    <Table.RowHeaderCell key={idx}>Round {idx + 1}</Table.RowHeaderCell>
+                    ))}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {gameState.players.map(player => (
+                  <Table.Row key={player.id}>
+                    <Table.Cell>{player.identity.split(',')[0]}</Table.Cell>
+                    {gameState.rounds
+                    .filter(round => round.type === 'voting')
+                    .map((round, idx) => {
+                      const vote = round.results.votingResults?.find(vote => vote.voterId === player.id);
+                      const votedFor = gameState.players.find(p => p.id === vote?.playerId);
+                      return (
+                      <Table.Cell key={idx}>
+                        {votedFor ? votedFor.identity.split(',')[0] : 'No Vote'}
+                      </Table.Cell>
+                      );
+                    })}
+                  </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+              </ScrollArea>
+              </Flex>
+            </Card>
             )}
           </Flex>
         </Box>
-      ) :
-        (
-          <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
-            <div className="text-2xl font-bold">Game Over</div>
-            <div className="text-xl">Team {gameState.outcome?.winner} Won</div>
-          </div>
-        )}
     </Box>
   );
 };
