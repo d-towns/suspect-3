@@ -739,7 +739,9 @@ const Game = () => {
         return 'loading';
       }
 
-    };
+    } else {
+      return 'gameOver'
+    }
   }
 
 
