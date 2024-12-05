@@ -340,7 +340,7 @@ export class GameRoomSocketServer {
     // this will start the first round and then start the interval for the rest of the rounds
     const emitRoundStart = async () => {
       console.log("Starting round...");
-      this.emitToRoom(roomId, "intermission-start");
+      this.emitToRoom(roomId, "round-end");
 
       // get the room and its game state
       const room = this.io.sockets.adapter.rooms.get(roomId);
@@ -384,13 +384,13 @@ export class GameRoomSocketServer {
           console.log("Starting interrogation round...");
           OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
 
-          const {clear} = startInterval(2000, emitRoundTick, handleRoundEnd);
+          const {clear} = startInterval(20, emitRoundTick, handleRoundEnd);
           this.roomRoundTimers.set(socket.roomId, clear);
         }
       } else {
           this.emitToRoom(roomId, "voting-round-start");
           
-          const {clear} = startInterval(2000, emitRoundTick, handleRoundEnd);
+          const {clear} = startInterval(20, emitRoundTick, handleRoundEnd);
           this.roomRoundTimers.set(socket.roomId, clear);
           
       }
@@ -434,12 +434,12 @@ export class GameRoomSocketServer {
           (round) => round.status === "active"
         );
         if (activeRound.type == "interrogation") {
-          listenerFunc = await OpenaiGameService.startRealtimeInterregation(
-            roomId,
-            activeRound.player,
-            updatedGameState,
-            listenerFunc
-          );
+          // await OpenaiGameService.startRealtimeInterregation(
+          //   roomId,
+          //   activeRound.player,
+          //   updatedGameState,
+          // );
+          OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
           const {clear} = startInterval(120, emitRoundTick, handleRoundEnd);
           this.roomRoundTimers.set(socket.roomId, clear);
         } else if (activeRound.type == "voting") {
@@ -462,7 +462,7 @@ export class GameRoomSocketServer {
       this.roomRoundTimers.set(socket.roomId, clear);
     }
 
-    startFirstRound(2000);
+    startFirstRound(20);
     
   }
 

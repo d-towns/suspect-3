@@ -238,7 +238,7 @@ Remember to be impartial but thorough in your investigation.`,
     const playerInInterrogation = gameState.players.find(
       (player) => player.id === activeRound.player
     );
-    this.addMessageToThread(threadId, {
+   await this.addMessageToThread(threadId, {
       role: "user",
       content: `The interrogation of ${playerInInterrogation.identity} has concluded. The detective has left the room. Update the guilt score of ${playerInInterrogation.id} based on the interrogation. Start the next voting round of the game `,
     });
@@ -246,7 +246,7 @@ Remember to be impartial but thorough in your investigation.`,
   }
 
   static async endVotingRound(threadId) {
-    this.addMessageToThread(threadId, {
+    await this.addMessageToThread(threadId, {
       role: "user",
       content: `The voting round has ended. Tally the votes and determine the outcome of the game. If there is not a majority vote for the culprit, the game will continue to the next round. set this voting round to be completed and the next Interrogation round to be active`,
     });
@@ -624,6 +624,10 @@ static async addVotingRoundVote(roomId, vote) {
   ) {
     new Promise((resolve, reject) => {
       const ws = this.roomRealtimeSessions.get(roomId);
+      if (!ws) {
+        console.error("Realtime session not found for room:", roomId);
+        return;
+      }
 
       const user = gameState.players.find((player) => player.id === userId);
       /**
