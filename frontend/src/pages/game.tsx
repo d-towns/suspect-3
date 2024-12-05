@@ -240,7 +240,7 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
       align="center"
       gap="2"
       maxHeight="90vh"
-      height="60%"
+      height="80%"
     >
       <Heading size="9" align="center">
         Changing Rounds
@@ -251,6 +251,7 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
         gap="2"
         maxHeight="90vh"
         height="80%"
+        mt={'9'}
       >
         {gameState.rounds.map((round, index) => {
           if (round.type === 'interrogation') {
@@ -668,7 +669,7 @@ const Game = () => {
     }
 
     if (resultsLoading) {
-      return null;
+      return <ChangingRounds gameState={gameState} />;
     }
 
     if ((user && activeRound === 'voting' && !forceInterrogation) || forceVoting) {
@@ -734,6 +735,8 @@ const Game = () => {
         } else {
           return 'results';
         }
+      } else {
+        return 'loading';
       }
 
     };
@@ -762,25 +765,14 @@ const Game = () => {
                 <Text as='p' size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
               </Box>
             )}
-            <Button onClick={() => setDetailsRevealed(prev => !prev)}>
-              reveal
-            </Button>
-
-            <CSSTransition
-              in={detailsRevealed}
-              nodeRef={votingCardRef}
-              timeout={500}
-              classNames="fade"
-              unmountOnExit>
-              <div ref={votingCardRef}>TEST</div>
-            </CSSTransition>
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
+            <ScrollArea>
             <Accordion.Root
-              type="single"
-              collapsible
-              className="w-full rounded-md shadow-md"
+              type="multiple"
+              className="w-full rounded-md shadow-md px-4"
             >
+              
               <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
                 <Accordion.Header>
                   <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
@@ -830,7 +822,9 @@ const Game = () => {
                   </Flex>
                 </Accordion.Content>
               </Accordion.Item>
+              
             </Accordion.Root>
+            </ScrollArea>
           </Card>
           <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
             <SwitchTransition mode="out-in">
@@ -841,7 +835,7 @@ const Game = () => {
                 unmountOnExit
                 nodeRef={nodeRef}
               >
-                <div ref={nodeRef}>
+                <div ref={nodeRef} className='h-full'>
                   {renderGameContent()}
                 </div>
               </CSSTransition>
