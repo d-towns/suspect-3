@@ -27,10 +27,10 @@ import { zodResponseFormat } from "openai/helpers/zod";
 dotenv.config({ path: "../.env" });
 
 class OpenaiGameService {
-  static client = new OpenAI({
+  static client = new OpenAI( process.env.NODE_ENV === 'dev' ? {
     organization: process.env.OPENAI_ORGANIZATION_ID,
     project: process.env.OPENAI_PROJECT_ID,
-  });
+  } : {apiKey: process.env.OPENAI_SERVICE_API_KEY_TEST});
 
   static lastAudioMessageDeltas = new Map();
   static lastAudioMessageTranscript = new Map();

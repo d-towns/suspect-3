@@ -19,7 +19,7 @@ const main = async () => {
     const httpServer = createServer(app);
     app.use(express.json());
     app.use(cors({
-        origin: process.env.FRONTEND_URL,
+        origin: process.env.NODE_ENV === 'dev' ?  process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL,
         credentials: true
     }));
 
