@@ -8,12 +8,13 @@ import { useToast } from '../context/ToastContext/toast.context';
 const SOCKET_SERVER_URL = import.meta.env.VITE_NODE_ENV === 'dev' ? import.meta.env.VITE_DEV_SOCKET_URL : import.meta.env.VITE_PROD_SOCKET_URL;
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 
+
 export const useSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { roomId } = useParams<{ roomId?: string }>();
-  const { user } = useAuth();
   const { addToast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const connectSocket = useCallback(() => {
