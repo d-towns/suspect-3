@@ -1,6 +1,6 @@
 import React, { useState, useRef} from 'react';
 import { Socket } from 'socket.io-client';
-import { WavRecorder } from 'wavtools';
+import { WavRecorder } from 'wavtools/dist/index';
 import { FaMicrophone } from 'react-icons/fa6';
 import {Text, Flex, IconButton} from '@radix-ui/themes';
 
