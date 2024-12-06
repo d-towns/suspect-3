@@ -20,7 +20,10 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
     try {
       recorderRef.current = new WavRecorder({sampleRate:24000});
       await recorderRef.current.begin();
-      await recorderRef.current.record(async (data) => {
+      await recorderRef.current.record(async (data : {
+        mono: Int16Array;
+        raw: Int16Array;
+    }) => {
         const { mono } = data;
 
 
