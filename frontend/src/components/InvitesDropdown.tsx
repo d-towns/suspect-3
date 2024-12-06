@@ -3,7 +3,6 @@ import {
   DropdownMenu,
   Button,
   Badge,
-  Text,
   Separator,
 } from '@radix-ui/themes';
 import { FaEnvelope } from 'react-icons/fa';

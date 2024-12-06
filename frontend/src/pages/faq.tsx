@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Heading, Text, Card, Flex, ScrollArea, Grid, Tabs} from '@radix-ui/themes';
+import { Box, Heading, Text, Card, Grid, Tabs} from '@radix-ui/themes';
 
 const FAQ: React.FC = () => {
 

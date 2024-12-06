@@ -1,6 +1,6 @@
 import React from 'react';
 import 'tailwindcss/tailwind.css';
-import { Spinner, Box, Text } from '@radix-ui/themes';
+import { Spinner, Text } from '@radix-ui/themes';
 
 interface ResponseLoadingProps {
     label: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause } from 'react-icons/fa6';
-import { Box, IconButton, Progress, Text, Button} from '@radix-ui/themes';
+import { Box, IconButton, Progress, Button} from '@radix-ui/themes';
 interface AudioPlayerProps {
     audioData: ArrayBuffer | null;
 }
@@ -11,7 +11,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
     const [sourceNode, setSourceNode] = useState<AudioBufferSourceNode | null>(null);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [progress, setProgress] = useState<number>(0);
-    const [audioDuration, setAudioDuration] = useState<number>(0);
     const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
@@ -52,7 +51,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioData }) => {
                     if (audioContext && source.buffer) {
                         const currentTime = audioContext.currentTime;
                         const duration = source.buffer.duration;
-                        setAudioDuration(duration);
                         setProgress(Math.min((currentTime / duration) * 100, 100));
                         animationFrameId.current = requestAnimationFrame(updateProgress);
                     }

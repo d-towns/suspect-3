@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Box, Button, Card, Flex, Heading, Text, Inset } from '@radix-ui/themes';
+import {  Button, Card, Flex, Heading, Text, Inset } from '@radix-ui/themes';
 
 const Home: React.FC = () => {
     return (

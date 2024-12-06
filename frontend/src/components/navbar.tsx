@@ -6,9 +6,9 @@ import { Invite } from '../models/invite.model';
 import moment from 'moment';
 import InvitesDropdown from './InvitesDropdown';
 import ProfileDropdown from './ProfileDropdown';
-import { Box, Flex, Heading, Link } from '@radix-ui/themes';
+import { Box, Flex, Heading } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
-import { FaSun, FaMoon, FaMusic } from 'react-icons/fa';
+import { FaSun, FaMoon } from 'react-icons/fa';
 import { useTheme } from '../context/ThemeContext';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
 
@@ -23,7 +23,7 @@ const Navbar: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/');
   };
 
   useEffect(() => {

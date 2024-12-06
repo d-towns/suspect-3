@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
@@ -12,11 +12,8 @@ import {
   Strong,
 } from '@radix-ui/themes';
 
-type Mode = 'single' | 'multi' | null;
 
 interface ModeCardProps {
-  setMode: (mode: Mode) => void;
-  mode: Mode;
   createRoom: () => void;
   imgSrc: string;
   altText: string;
@@ -24,8 +21,6 @@ interface ModeCardProps {
 }
 
 const ModeCard: React.FC<ModeCardProps> = ({
-  setMode,
-  mode,
   createRoom,
   imgSrc,
   altText,
@@ -40,7 +35,6 @@ const ModeCard: React.FC<ModeCardProps> = ({
         cursor: 'pointer',
         margin: '0 16px',
       }}
-      onClick={() => setMode(mode)}
     >
       <Card size="3" onClick={() => createRoom()} className='hover:scale-105 hover:border transition ease-in-out duration-200 '>
         <Inset clip="padding-box" side="top" pb="current">
@@ -72,7 +66,6 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>('single');
 
   const createRoom = async () => {
     if (!user) return;
@@ -90,16 +83,12 @@ const PlayMenu: React.FC = () => {
     <Flex justify="center" align="center" style={{ height: '100vh', width:'100%'}}>
       <Flex>
         <ModeCard
-          setMode={setMode}
-          mode="single"
           createRoom={createRoom}
           imgSrc="single-player-splash-2.webp"
           altText="Single Player"
           description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
         />
         <ModeCard
-          setMode={setMode}
-          mode="multi"
           createRoom={createRoom}
           imgSrc="multi-player-splash.webp"
           description='Play with friends in a private room. Share the invite code with your friends to join the room. The game will start when all players are ready.'

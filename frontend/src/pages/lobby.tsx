@@ -347,11 +347,7 @@ export const Lobby: React.FC = () => {
                     chat: { ...prevState.chat, inputMessage: e.target.value },
                   }))
                 }
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSendMessage();
-                  }
-                }}
+                onKeyDown={handleKeyDown}
                 style={{ flex: 1 }}
               />
               <Button onClick={handleSendMessage}>Send</Button>

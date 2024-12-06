@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth.context';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
+
   Button,
   Flex,
   Heading,
@@ -92,10 +92,10 @@ const Login: React.FC = () => {
       direction="column"
       align="center"
       justify="center"
-      style={{ minHeight: '100vh' }}
+      style={{ minHeight: '100vh', height: '100%' }}
       px="4"
     >
-      <Card size="3" variant="ghost" style={{ width: '100%', maxWidth: '400px' }}>
+      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px', height:'400px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-evenly' }}>
         <Heading size="6" align="center">
           {isSignup ? 'Create your account' : 'Sign in to your account'}
         </Heading>
@@ -104,7 +104,7 @@ const Login: React.FC = () => {
             {error}
           </Text>
         )}
-        <form onSubmit={handleSubmit} className='mt-6'>
+        <form onSubmit={handleSubmit} className='mt-6 w-full'>
           <Flex direction="column" gap="3">
             <TextField.Root
               placeholder="Email address"

@@ -5,17 +5,15 @@ import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import decodeAudio, { decoders } from 'audio-decode';
 import { FaChevronDown } from 'react-icons/fa';
-import AudioPlayer from '../components/audioPlayer';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
 import { FaArrowRightLong } from "react-icons/fa6";
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, Spinner, ScrollArea } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading,  ScrollArea } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
-import { TransitionGroup, CSSTransition, SwitchTransition } from 'react-transition-group';
+import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
 
 
@@ -161,8 +159,6 @@ interface InterrogationProps {
 }
 
 const Interrogation: React.FC<InterrogationProps> = ({
-  gameState,
-  currentPlayer,
   interrogationTranscript,
   responseLoading,
   audioTranscribing,
@@ -432,7 +428,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
               <Table.RowHeaderCell>Player</Table.RowHeaderCell>
               {gameState.rounds
                 .filter((round) => round.type === 'voting')
-                .map((round, idx) => (
+                .map((_, idx) => (
                   <Table.RowHeaderCell key={idx}>
                     Round {idx + 1}
                   </Table.RowHeaderCell>
@@ -482,15 +478,11 @@ const Game = () => {
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
-  const [forceInterrogation, setForceInterrogation] = useState<boolean>(false);
-  const [forceVoting, setForceVoting] = useState<boolean>(false);
   const [responseLoading, setResponseLoading] = useState<boolean>(false);
   const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
   const [killerVote, setKillerVote] = useState<string>();
   const [gameIsOver, setGameIsOver] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioQueueRef = useRef<Array<AudioBufferSourceNode>>([]);
   const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
   const wavStreamPlayerRef = useRef<WavStreamPlayer>(
     new WavStreamPlayer({ sampleRate: 24000 })
@@ -539,7 +531,7 @@ const Game = () => {
 
   const handleRealtimeAudioDeltaEvent = async (params: {speaker: string, audio: Int16Array}) => {
     console.log('Received audio delta:', params);
-    const { speaker, audio } = params;
+    const { audio } = params;
     // check if params is a int16array
     // if so, add it to the wavStreamPlayer
     if (params instanceof Int16Array) {
@@ -622,9 +614,6 @@ const Game = () => {
        * [] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
        */
 
-      socket.on('game-starting', async (params: any) => {
-        console.log('Game is starting');
-      });
 
       joinRoom(roomId);
 
@@ -698,41 +687,6 @@ const Game = () => {
     setResponseLoading(true);
   }
 
-  const handleIncomingAudioChunk = async (audioChunk: ArrayBuffer) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-    const audioContext = audioContextRef.current;
-
-    // Decode audio data
-    try {
-      const audioBuffer = await audioContext.decodeAudioData(audioChunk);
-
-      // Create a buffer source for playback
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-
-      // If there's an existing queue, delay playback
-      const lastSource = audioQueueRef.current[audioQueueRef.current.length - 1];
-      if (lastSource && lastSource.buffer) {
-        const offset = lastSource.buffer.duration;
-        source.start(audioContext.currentTime + offset);
-      } else {
-        source.start();
-      }
-
-      // Add to the queue
-      audioQueueRef.current.push(source);
-
-      // Cleanup when playback ends
-      source.onended = () => {
-        audioQueueRef.current.shift();
-      };
-    } catch (error) {
-      console.error('Error decoding audio chunk:', error);
-    }
-  };
   /**
    * UI FLow
    * once all players are in the game, ( we receive the game-starting event )
@@ -771,7 +725,7 @@ const Game = () => {
       return <ChangingRounds gameState={gameState} />;
     }
 
-    if ((user && activeRound === 'voting' && !forceInterrogation) || forceVoting) {
+    if ((user && activeRound === 'voting')) {
       return (
         <VotingRound
           gameState={gameState}
@@ -783,11 +737,11 @@ const Game = () => {
       );
     }
 
-    if ((activeRound === 'interrogation' && !forceVoting) || forceInterrogation) {
+    if ((activeRound === 'interrogation')) {
       const isCurrentPlayer =
         gameState.rounds?.find((round) => round.status === 'active')?.player === currentPlayer?.id;
 
-      if (isCurrentPlayer || forceInterrogation) {
+      if (isCurrentPlayer) {
         return (
           <Interrogation
             gameState={gameState}
@@ -822,13 +776,11 @@ const Game = () => {
     if (!gameIsOver) {
       if (!resultsLoading) {
         if (
-          (user && activeRound === 'voting' && !forceInterrogation) ||
-          forceVoting
+          (user && activeRound === 'voting')
         ) {
           return 'voting';
         } else if (
-          (activeRound === 'interrogation' && !forceVoting) ||
-          forceInterrogation
+          (activeRound === 'interrogation')
         ) {
           return 'interrogation';
         } else {

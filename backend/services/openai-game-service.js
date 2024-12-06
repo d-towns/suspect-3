@@ -438,7 +438,7 @@ static async addVotingRoundVote(roomId, vote) {
             case "session.created":
               // take the session object and update its instructions to respond to the user's most previous message in the conversation, and do not respond as the user, but as their interrogator only
               const session = event.session;
-              session.instructions = `You are AI who is acting as a police detective for a co-operative criminal mystery game. 
+              session.instructions = `You are AI who is acting as a police detective for a co-operative criminal mystery game. Remember to always talk as quickly as you possibly can, and to be impartial but thorough in your investigation. try to trip up the players by using their own words against them.
                         You will interrogate a set of suspects for this crime:
                          
                         ${JSON.stringify(gameState.crime.description)}. 
@@ -461,6 +461,7 @@ static async addVotingRoundVote(roomId, vote) {
               session.input_audio_transcription = {
                 model: "whisper-1",
               };
+              session.voice = 'verse';
               session.turn_detection = null;
               delete session["id"];
               delete session["object"];
@@ -540,6 +541,10 @@ static async addVotingRoundVote(roomId, vote) {
               break;
             case 'response.done':
               console.log("Response done:", event);
+              if(event.response.status_details.type == "failed") {
+                console.error("Response failed:", JSON.stringify(event.response.status_details.error));
+              }
+
 
               break;
             case "response.audio_transcript.done":
