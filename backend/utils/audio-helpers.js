@@ -51,6 +51,31 @@ import { exec } from 'child_process';
     console.log(`WAV file saved successfully at ${filePath}`);
   }
 
+  export function base64ToPCM(base64String) {
+    // Step 1: Decode Base64 to raw binary data
+    const binaryString = atob(base64String); // Decode Base64 string to binary string
+    const len = binaryString.length;
+    
+    // Step 2: Create an Uint8Array from the binary string
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+  
+    // Step 3: Create a DataView from Uint8Array
+    const buffer = bytes.buffer; // ArrayBuffer from Uint8Array
+    const dataView = new DataView(buffer);
+  
+    // Step 4: Convert data to 16-bit PCM array
+    const pcmArray = new Int16Array(len / 2); // 2 bytes per 16-bit PCM sample
+    for (let i = 0; i < pcmArray.length; i++) {
+      // Little-endian format assumed; adjust if your data is big-endian
+      pcmArray[i] = dataView.getInt16(i * 2, true);
+    }
+  
+    return pcmArray;
+  }
+
  export function convertAudioMessageDeltasToAudio(audioMessageDeltas) {
     // Convert Base64 encoded string into a Blob
     const audioMessage = audioMessageDeltas.join("");

@@ -19,6 +19,7 @@ import { GameRoomService } from "./game-room.service.js";
 import {
   saveBase64PCM16ToWav,
   convertAudioMessageDeltasToAudio,
+  base64ToPCM,
 } from "../utils/audio-helpers.js";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
@@ -421,7 +422,7 @@ static async addVotingRoundVote(roomId, vote) {
         this.roomRealtimeSessions.delete(roomId);
       });
 
-      ws.on("error", (error) => {å
+      ws.on("error", (error) => {
         console.error("Error with OpenAI Realtime API:", error);
         reject(error);
       });
@@ -456,8 +457,6 @@ static async addVotingRoundVote(roomId, vote) {
                         When a new suspect enters the room, you can assume that the previous one has left. 
                         You are able to play the suspects off of each other, using a previous suspect's statements against them and the other suspects. 
                         When a user enters the room, start the interrogation by asking them about the crime, and their involvement in it. 
-
-                        Once the conversation is over, call the function in order to 
                         `;
               session.input_audio_transcription = {
                 model: "whisper-1",
@@ -482,6 +481,7 @@ static async addVotingRoundVote(roomId, vote) {
 
               const playerConversationItem = {
                 audioTranscript: suspectTranscript,
+                speaker: "user",
               };
 
 
@@ -549,20 +549,22 @@ static async addVotingRoundVote(roomId, vote) {
                 content: `Interrogator: ${interrogatorTranscript}`,
               });
               break;
-            case "response.audio.delta":
-              if(!this.lastAudioMessageDeltas.has(roomId)) {
-                this.lastAudioMessageDeltas.set(roomId, []);
-              }
-              this.lastAudioMessageDeltas.get(roomId).push(event.delta);
-              break;
+            // case "response.audio.delta":
+            //   console.log("Response audio delta received in realtime session");
+            //   if(!this.lastAudioMessageDeltas.has(roomId)) {
+            //     this.lastAudioMessageDeltas.set(roomId, []);
+            //   }
+            //   this.lastAudioMessageDeltas.get(roomId).push(event.delta);
+            //   break;
 
-            case "response.audio_transcript.delta":
-              // TODO: emit an event to the client with the transcript delta so that the client can display the transcript in real-time
-              if(!this.lastAudioMessageTranscript.has(roomId)) {
-                this.lastAudioMessageTranscript.set(roomId, []);
-              }
-              this.lastAudioMessageTranscript.get(roomId).push(event.delta);
-              break;
+            // case "response.audio_transcript.delta":
+            //   console.log("Response audio transcript delta received in realtime session");
+            //   // TODO: emit an event to the client with the transcript delta so that the client can display the transcript in real-time
+            //   if(!this.lastAudioMessageTranscript.has(roomId)) {
+            //     this.lastAudioMessageTranscript.set(roomId, []);
+            //   }
+            //   this.lastAudioMessageTranscript.get(roomId).push(event.delta);
+            //   break;
             default:
               console.warn("Unhandled event type:", event.type);
               break;
@@ -628,6 +630,7 @@ static async addVotingRoundVote(roomId, vote) {
         console.error("Realtime session not found for room:", roomId);
         return;
       }
+      const socketServer = GameRoomSocketServer.getInstance();
 
       const user = gameState.players.find((player) => player.id === userId);
       /**
@@ -660,6 +663,27 @@ static async addVotingRoundVote(roomId, vote) {
           ],
         },
       };
+
+      ws.on('message', (data) => {
+
+        const event = JSON.parse(data);
+        if(event.type === "response.audio.delta") {
+        console.log("Response audio delta received");
+        const userSocket = socketServer.getSocketForUser(userId);
+        socketServer.emitToSocket(userSocket.id, "realtime-audio-delta", {audio: base64ToPCM(event.delta), speaker: 'assistant'});
+        }
+      });  
+
+      ws.on('message', (data) => {
+
+        const event = JSON.parse(data);
+        if(event.type === "response.audio_transcript.delta") {
+        console.log("Response audio transcript delta received");
+        const userSocket = socketServer.getSocketForUser(userId);
+        socketServer.emitToSocket(userSocket.id, "realtime-audio-transcript-delta", {transcript: event.delta, speaker: 'assistant'});
+        } 
+      });
+
       const responseListener = (data) => {
         resolve(data);
         ws.off("message", responseListener);

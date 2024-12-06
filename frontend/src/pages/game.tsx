@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
@@ -12,44 +12,46 @@ import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
 import { FaArrowRightLong } from "react-icons/fa6";
-import { Card, Flex, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, Spinner, ScrollArea } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, Spinner, ScrollArea } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { TransitionGroup, CSSTransition, SwitchTransition } from 'react-transition-group';
+import { WavStreamPlayer } from 'wavtools';
 
 
-const testConversationItems: ConversationItem[] = [
-  {
-    audioBuffer: new ArrayBuffer(380),
-    audioTranscript: "Hello, can you tell me where you were on the night of the crime?",
-    timestamp: 100
-  },
-  {
-    audioBuffer: null,
-    audioTranscript: "I was at home, watching a movie.",
-    timestamp: 200
-  },
-  {
-    audioBuffer: null,
-    audioTranscript: "Did anyone see you there?",
-    timestamp: 300
-  },
-  {
-    audioBuffer: null,
-    audioTranscript: "Yes, my neighbor saw me.",
-    timestamp: 400
-  },
-  {
-    audioBuffer: null,
-    audioTranscript: "Can you provide any evidence to support your alibi?",
-    timestamp: 500
-  },
-  {
-    audioBuffer: null,
-    audioTranscript: "Sure, I have the movie ticket and the receipt from the store.",
-    timestamp: 600
-  },
-];
+interface AllowAutoplayDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onAllow: () => void;
+}
+
+const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose, onAllow }) => {
+  return (
+    <AlertDialog.Root open={open} onOpenChange={onClose}>
+      <AlertDialog.Trigger>
+        <Button>Allow Autoplay</Button>
+      </AlertDialog.Trigger>
+      <AlertDialog.Content size='4'>
+        <Box className="p-4">
+          <Text as="p" size="3" align="center">
+            This game requires audio playback. Please allow autoplay to proceed.
+          </Text>
+          <Flex justify="center" mt="4">
+
+            <AlertDialog.Cancel onClick={() => onClose()}>
+              <Button variant="soft" color="gray">
+                Cancel
+              </Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action onClick={() => onAllow()}>
+              <Button variant="soft">Allow</Button>
+            </AlertDialog.Action>
+          </Flex>
+        </Box>
+      </AlertDialog.Content>
+    </AlertDialog.Root>
+  );
+};
 
 interface PlayerCardProps {
   player: Player;
@@ -192,12 +194,12 @@ const Interrogation: React.FC<InterrogationProps> = ({
                   {conversationItem.timestamp % 60 < 10 ? '0' : ''}
                   {conversationItem.timestamp % 60}
                 </Text>
-                {conversationItem.audioBuffer && (
+                {/* {conversationItem.audioBuffer && (
                   <Flex direction="column" className="col-span-3">
                     <Separator my="3" size="2" />
                     <AudioPlayer audioData={conversationItem.audioBuffer} />
                   </Flex>
-                )}
+                )} */}
               </Box>
               <Box className="col-span-7">
                 <Text align="left" as="span">
@@ -475,12 +477,7 @@ const Game = () => {
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const { roomId } = useParams<{ roomId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>(testConversationItems);
-  const chatAreaRef = useRef<HTMLDivElement>(null);
-  const interrogationCardRef = useRef<HTMLDivElement>(null);
-  const votingCardRef = useRef<HTMLDivElement>(null);
-  const resultsCardRef = useRef<HTMLDivElement>(null);
-  const resultsLoadingRef = useRef<HTMLDivElement>(null);
+  const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
   const nodeRef = useRef(null);
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
@@ -490,9 +487,73 @@ const Game = () => {
   const [responseLoading, setResponseLoading] = useState<boolean>(false);
   const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
   const [killerVote, setKillerVote] = useState<string>();
-  const [detailsRevealed, setDetailsRevealed] = useState<boolean>(false);
   const [gameIsOver, setGameIsOver] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioQueueRef = useRef<Array<AudioBufferSourceNode>>([]);
+  const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
+  const wavStreamPlayerRef = useRef<WavStreamPlayer>(
+    new WavStreamPlayer({ sampleRate: 24000 })
+  );
+
+  // setup a event listener for mouse movement to connect the wavStreamPlayer after a user gesture
+  const connectWaveStreamPlayer = async () => {
+    if (wavStreamPlayerRef.current) {
+      await wavStreamPlayerRef.current.connect();
+    }
+    setAutoplayDialogOpen(false);
+  }
+
+  const closeAutoplayDialog = () => {
+    setAutoplayDialogOpen(false);
+  }
+
+  const handleUserAudioTranscriptEvent = useCallback((params: any) => {
+    console.log('Received audio transcript:', params);
+    const {speaker, audioTranscript} = params;
+    setInterrogationTranscript(prev => [...prev, { audioTranscript , timestamp: roundTimer, speaker}]);
+    setAudioTranscribing(false);
+  }, [roundTimer]);
+
+  const handleRealtimeAudioTranscriptEvent = useCallback( (params: any) => {
+    // append the params.delta to the last element of the interrogationTranscript
+    console.log('Received audio transcript delta:', params);
+    const {speaker, transcript} = params;
+    setInterrogationTranscript(prev => {
+      const lastItem = prev[prev.length - 1];
+      if (!lastItem) {
+        // If there's no last item, create a new one and add the delta as the first text of the transcript
+        return [{ audioTranscript: transcript, timestamp: roundTimer, speaker }];
+      } else if(lastItem.speaker !== speaker) {
+        // If the speaker has changed, create a new item
+        return [...prev, { audioTranscript: transcript, timestamp: roundTimer, speaker }];
+      }
+      const updatedItem = {
+        ...lastItem,
+        audioTranscript: lastItem.audioTranscript + transcript, 
+        speaker
+      };
+      return [...prev.slice(0, prev.length - 1), updatedItem];
+    });
+  }, [roundTimer]);
+
+  const handleRealtimeAudioDeltaEvent = async (params: {speaker: string, audio: Int16Array}) => {
+    console.log('Received audio delta:', params);
+    const { speaker, audio } = params;
+    // check if params is a int16array
+    // if so, add it to the wavStreamPlayer
+    if (params instanceof Int16Array) {
+      console.log('Adding 16 bit PCM to wavStreamPlayer');
+    }
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    if (wavStreamPlayer) {
+
+      wavStreamPlayer.add16BitPCM(new Int16Array(audio));
+    }
+
+
+  }
+    
 
 
   useEffect(() => {
@@ -512,21 +573,25 @@ const Game = () => {
         setResultsLoading(true);
       });
 
-      socket.on('realtime-audio-message', async (params: any) => {
-        try {
-          console.log('Received audio message:', params);
-          const { audioBuffer, audioTranscript } = params;
-          const audioWav = await decoders.wav(params.audioBuffer);
+      // socket.on('realtime-audio-message', async (params: any) => {
+      //   try {
+      //     console.log('Received audio message:', params);
+      //     // const { audioBuffer, audioTranscript } = params;
+      //     const audioWav = await decoders.wav(params.audioBuffer);
 
-          setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript, timestamp: roundTimer }]);
+      //     // setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript, timestamp: roundTimer }]);
 
-          setResponseLoading(false);
-          console.log('Playing audio message:', audioWav);
-        } catch (error) {
-          console.error('Error playing audio message:', error);
-        }
+      //     setResponseLoading(false);
+      //     console.log('Playing audio message:', audioWav);
+      //   } catch (error) {
+      //     console.error('Error playing audio message:', error);
+      //   }
 
-      });
+      // });
+
+      socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
+
+      socket.on('realtime-audio-transcript-delta',handleRealtimeAudioTranscriptEvent);
 
       socket.on('round-timer-tick', (params: any) => {
         setRoundTimer(params.countdown);
@@ -538,12 +603,8 @@ const Game = () => {
       });
 
 
-      socket.on('user-audio-transcript', (params: any) => {
-        console.log('Received audio transcript:', params);
-        setInterrogationTranscript(prev => [...prev, { audioBuffer: null, audioTranscript: params.audioTranscript, timestamp: roundTimer }]);
-        setAudioTranscribing(false);
-      }
-      );
+      socket.on('user-audio-transcript', handleUserAudioTranscriptEvent);
+
 
       /**
        * [*] TODO: Create state object that will keep track of the time left in the round, updates on websocket events from the server
@@ -575,12 +636,14 @@ const Game = () => {
         socket.off('game-state-update');
         socket.off('realtime-audio-message');
         socket.off('round-timer-tick');
+        socket.off('voting-round-start');
+        socket.off('user-audio-transcript');
+        socket.off('realtime-audio-transcript-delta');
+        socket.off('realtime-audio-delta');
         // Remove other listeners
       }
     };
   }, [socket]);
-
-
 
 
   useEffect(() => {
@@ -634,6 +697,42 @@ const Game = () => {
     setAudioTranscribing(true);
     setResponseLoading(true);
   }
+
+  const handleIncomingAudioChunk = async (audioChunk: ArrayBuffer) => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    const audioContext = audioContextRef.current;
+
+    // Decode audio data
+    try {
+      const audioBuffer = await audioContext.decodeAudioData(audioChunk);
+
+      // Create a buffer source for playback
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+
+      // If there's an existing queue, delay playback
+      const lastSource = audioQueueRef.current[audioQueueRef.current.length - 1];
+      if (lastSource && lastSource.buffer) {
+        const offset = lastSource.buffer.duration;
+        source.start(audioContext.currentTime + offset);
+      } else {
+        source.start();
+      }
+
+      // Add to the queue
+      audioQueueRef.current.push(source);
+
+      // Cleanup when playback ends
+      source.onended = () => {
+        audioQueueRef.current.shift();
+      };
+    } catch (error) {
+      console.error('Error decoding audio chunk:', error);
+    }
+  };
   /**
    * UI FLow
    * once all players are in the game, ( we receive the game-starting event )
@@ -753,7 +852,7 @@ const Game = () => {
 
   return (
     <Box>
-
+      <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
       <Box className="h-screen flex">
         {/* Main game area */}
         <Flex px={'5'} py={'5'} gap={'4'} className='w-full'>
@@ -770,62 +869,62 @@ const Game = () => {
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
             <ScrollArea>
-            <Accordion.Root
-              type="multiple"
-              className="w-full rounded-md shadow-md px-4"
-            >
-              
-              <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
-                <Accordion.Header>
-                  <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
-                    Identity & Evidence
-                    <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
-                  </Accordion.Trigger>
-                </Accordion.Header>
-                <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+              <Accordion.Root
+                type="multiple"
+                className="w-full rounded-md shadow-md px-4"
+              >
 
-                  <Container p={'5'}>
-                    <h2 className="text-2xl font-bold mb-4">Identity</h2>
-                    <p className="mb-4">{currentPlayer?.identity || 'Unknown'}</p>
-                    <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
-                    {gameState.crime && (
-                      <>
-                        <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
-                        <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
-                        <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
-                        <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
-                      </>
-                    )}
-                    <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
-                    <ul className="list-disc list-inside">
-                      {currentPlayer?.evidence?.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      )) || <li>No evidence available</li>}
-                    </ul>
-                  </Container>
-                </Accordion.Content>
-              </Accordion.Item>
+                <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
+                  <Accordion.Header>
+                    <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
+                      Identity & Evidence
+                      <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                  <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
 
-              <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
-                <Accordion.Header>
-                  <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
+                    <Container p={'5'}>
+                      <h2 className="text-2xl font-bold mb-4">Identity</h2>
+                      <p className="mb-4">{currentPlayer?.identity || 'Unknown'}</p>
+                      <h2 className="text-2xl font-bold mb-4">Crime Details</h2>
+                      {gameState.crime && (
+                        <>
+                          <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
+                          <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
+                          <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
+                          <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
+                        </>
+                      )}
+                      <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>
+                      <ul className="list-disc list-inside">
+                        {currentPlayer?.evidence?.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        )) || <li>No evidence available</li>}
+                      </ul>
+                    </Container>
+                  </Accordion.Content>
+                </Accordion.Item>
 
-                    Player Details
-                    <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
-                  </Accordion.Trigger>
-                </Accordion.Header>
-                <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
-                  <Flex p={'5'} direction={'column'} gap={'4'}>
+                <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
+                  <Accordion.Header>
+                    <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
 
-                    {gameState.players.map(player => (
-                      <PlayerCard player={player} key={player.id} />
-                    ))}
+                      Player Details
+                      <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                  <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <Flex p={'5'} direction={'column'} gap={'4'}>
 
-                  </Flex>
-                </Accordion.Content>
-              </Accordion.Item>
-              
-            </Accordion.Root>
+                      {gameState.players.map(player => (
+                        <PlayerCard player={player} key={player.id} />
+                      ))}
+
+                    </Flex>
+                  </Accordion.Content>
+                </Accordion.Item>
+
+              </Accordion.Root>
             </ScrollArea>
           </Card>
           <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>

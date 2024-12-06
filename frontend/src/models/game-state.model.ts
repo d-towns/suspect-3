@@ -4,9 +4,10 @@ export interface ConversationExhange {
 }
 
 export interface ConversationItem {
-  audioBuffer: ArrayBuffer | null,
+
   audioTranscript: string
   timestamp: number
+  speaker: 'user' | 'assistant'
 }
 
 export interface VotingRoundVote {
