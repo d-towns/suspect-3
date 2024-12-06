@@ -14,7 +14,7 @@ import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Ava
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
-import { WavStreamPlayer } from 'wavtools/dist';
+import { WavStreamPlayer } from 'wavtools';
 
 
 interface AllowAutoplayDialogProps {
