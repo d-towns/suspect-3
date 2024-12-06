@@ -6,6 +6,12 @@ import autoprefixer from 'autoprefixer'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      // set the wavtools package as external
+      external: ['wavtools'],
+
+  }},
   // tailwindcss
   css: {
     postcss: {
