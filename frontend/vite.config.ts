@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // set the wavtools package as external
-      external: ['wavtools'],
+      external: ['wavtools/dist'],
 
   }},
   // tailwindcss
