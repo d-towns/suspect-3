@@ -19,7 +19,10 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "wavtools": ["./src/wavtools/dist/lib/index.d.ts"]
+    }
   },
   "include": ["src"]
 }

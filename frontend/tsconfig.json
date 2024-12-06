@@ -8,7 +8,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "wavtools": ["./node_modules/wavtools/dist/index.js"]
+      
+
     }
   }
 }
