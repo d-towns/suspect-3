@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "wavtools for recording and playing",
   "main": "index.js",
-  "types": "dist/index.d.ts",
+  "types": "index.d.ts",
   "directories": {
     "lib": "lib"
   },
