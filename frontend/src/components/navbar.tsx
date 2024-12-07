@@ -76,7 +76,7 @@ const Navbar: React.FC = () => {
           {user && (
             <>
               <InvitesDropdown invites={invites} />
-              <ProfileDropdown logout={handleLogout} email={user.email} />
+              <ProfileDropdown logout={handleLogout} username={user.username || user.email} />
               <Switch className='hover:scale-110 transition ease-in-out' checked={theme === 'dark'} onCheckedChange={toggleTheme} aria-label="Toggle Theme">
                 {theme === 'dark' ? <FaMoon /> : <FaSun />}
               </Switch>

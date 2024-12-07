@@ -220,7 +220,7 @@ export const Lobby: React.FC = () => {
       setLobbyState(prevState => ({
         ...prevState,
         chat: {
-          messages: [...prevState.chat.messages, { userEmail: user.email, message: lobbyState.chat.inputMessage }],
+          messages: [...prevState.chat.messages, { userEmail: user.username, message: lobbyState.chat.inputMessage }],
           inputMessage: '',
         },
       }));
@@ -300,7 +300,7 @@ export const Lobby: React.FC = () => {
 
                 <Flex key={player.email} align="center" gap="2" mt="4">
                   <Text size={'4'}>{index +1}. </Text>
-                  <Text size={'4'}>{player.email}</Text>
+                  <Text size={'4'}>{player.username}</Text>
                   {player.isReady ? <Badge color="green">Ready</Badge> : <Badge color="red">Not Ready</Badge>}
                   {player.email === user?.email && <Badge color="blue">You</Badge>}
                   {player?.id === lobbyState.room?.host_id && <Badge color="orange">Host</Badge>}

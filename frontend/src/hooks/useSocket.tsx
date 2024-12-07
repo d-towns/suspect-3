@@ -54,7 +54,7 @@ export const useSocket = () => {
   const joinRoom = useCallback((gameRoomId : string | null = null) => {
     console.log('join room called')
     if (socket && isConnected && (roomId || gameRoomId) && user) {
-      socket.emit('join-room', { roomId: (roomId || gameRoomId), userId: user.id, userEmail: user.email }, (response: { success: boolean; error?: string }) => {
+      socket.emit('join-room', { roomId: (roomId || gameRoomId), userId: user.id, userEmail: user.email, userName: user.username }, (response: { success: boolean; error?: string }) => {
         if (response.success) {
           console.warn(`Joined room: ${JSON.stringify(response)}`);
           // if we are in a game room, we should send a joined-game event

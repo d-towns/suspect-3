@@ -10,10 +10,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface ProfileDropdownProps {
   logout: () => void;
-  email: string;
+  username: string;
 }
 
-const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, email }) => {
+const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: email }) => {
   const navigate = useNavigate();
 
   return (

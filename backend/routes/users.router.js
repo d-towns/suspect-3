@@ -4,15 +4,23 @@ import { createSupabaseClient } from '../db/supabase.js';
 const router = Router();
 
 const signUpUser = async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, username } = req.body;
   const supabase = createSupabaseClient({ req, res });
 
-  if (!email || !password || !name) {
+  if (!email || !password || !username) {
     return res.status(400).json({ message: "Please enter all fields" });
   }
 
   try {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+        },
+      },
+    });
     if (error) throw error;
     return res.status(200).json({ message: `User ${email} signed up successfully` });
   } catch (error) {

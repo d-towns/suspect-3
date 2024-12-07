@@ -15,7 +15,7 @@ import {
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState(false);
@@ -34,7 +34,7 @@ const Login: React.FC = () => {
 
     try {
       if (isSignup) {
-        await signup(email, password, name);
+        await signup(email, password, username);
         setSignupSuccess(true);
       } else {
         await login(email, password);
@@ -60,7 +60,7 @@ const Login: React.FC = () => {
     setSignupSuccess(false);
     setEmail('');
     setPassword('');
-    setName('');
+    setUsername('');
   };
 
   if (signupSuccess) {
@@ -122,11 +122,11 @@ const Login: React.FC = () => {
             />
             {isSignup && (
               <TextField.Root
-                placeholder="Full name"
+                placeholder="Username"
                 type="text"
                 required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             )}
             <Button type="submit"  mt="4">

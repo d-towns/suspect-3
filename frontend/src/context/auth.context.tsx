@@ -8,6 +8,7 @@ import axiosInstance from '../utils/axios-instance';
 interface User {
   id: string;
   email: string;
+  username: string;
 }
 
 // Define the AuthContext type
@@ -45,9 +46,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     setLoading(true);
     try {
-      const response: AxiosResponse<{ user: User }> = await api.get('users/get-user');
+      const response = await api.get('users/get-user');
       console.log('Check auth response:', response);
-      setUser(response.data.user);
+      const userData =  {
+        id: response.data.user.id,
+        email: response.data.user.email,
+        username: response.data.user.user_metadata.username
+      }
+      setUser(userData);
     } catch (error) {
       setUser(null);
     } finally {
@@ -60,8 +66,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const response = await api.post('users/login', { email, password });
-      console.log('Login response:', response);
-      setUser(response.data.session.user);
+      const userData =  {
+        id: response.data.session.user.id,
+        email: response.data.session.user.email,
+        username: response.data.session.user.user_metadata.username
+      }
+      setUser(userData);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -71,9 +81,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Function to handle user signup
-  const signup = async (email: string, password: string, name: string) => {
+  const signup = async (email: string, password: string, username: string) => {
     try {
-      await api.post('users/sign-up', { email, password, name });
+      await api.post('users/sign-up', { email, password, username });
       // After successful signup, log the user in
       await login(email, password);
     } catch (error) {

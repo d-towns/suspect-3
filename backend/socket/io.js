@@ -163,13 +163,14 @@ export class GameRoomSocketServer {
   handleJoinRoom(socket, params, callback) {
     console.log("join-room called with params:", params);
     console.log("Socket:", socket.id + '\n\n');
-    const { roomId, userId, userEmail } = params;
+    const { roomId, userId, userEmail, userName } = params;
     if (!socket.rooms.has(roomId)) {
       socket.join(roomId);
     }
     socket.userEmail = userEmail;
     socket.userId = userId;
     socket.roomId = roomId;
+    socket.userName = userName;
     console.log(`User ${userEmail} joined room ${roomId}`);
     socket.to(roomId).emit("player-joined", { email: userEmail, id: userId });
     if (callback) callback({ success: true });
@@ -241,6 +242,7 @@ export class GameRoomSocketServer {
           return {
             email: playerSocket.userEmail,
             id: playerSocket.userId,
+            username: playerSocket.userName,
             isReady: playerSocket.isReady,
           };
         })
