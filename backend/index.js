@@ -18,8 +18,10 @@ const main = async () => {
     const app = express();
     const httpServer = createServer(app);
     app.use(express.json());
+    const origin = process.env.NODE_ENV === 'dev' ?  process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL;
+    console.log('origin', origin);  
     app.use(cors({
-        origin: process.env.NODE_ENV === 'dev' ?  process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL,
+       origin,
         credentials: true
     }));
 
