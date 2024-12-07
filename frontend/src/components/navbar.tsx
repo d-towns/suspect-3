@@ -6,11 +6,12 @@ import { Invite } from '../models/invite.model';
 import moment from 'moment';
 import InvitesDropdown from './InvitesDropdown';
 import ProfileDropdown from './ProfileDropdown';
-import { Box, Flex, Heading } from '@radix-ui/themes';
+import { Box, Flex, Heading, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { FaSun, FaMoon } from 'react-icons/fa';
 import { useTheme } from '../context/ThemeContext';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
+
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -61,25 +62,25 @@ const Navbar: React.FC = () => {
     <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }}>
       <Flex align="center" justify="between">
         <RouterLink to="/home" style={{ textDecoration: 'none' }}>
-          <Heading size="8">
-            Suspect 3
+          <Heading className=" hover:scale-110 transition ease-in-out main-header" size="8">
+            Suspect
           </Heading>
         </RouterLink>
         <Flex align="center" gap="6">
-          <RouterLink to="/play" color="gray">
-            Play
+          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header text-2xl'  to="/play" color="gray">
+           <Text>Play</Text> 
           </RouterLink>
-          <RouterLink to="/faq" color="gray">
+          <RouterLink className='hover:scale-110 transition ease-in-out main-header text-2xl'  to="/faq" color="gray">
             How To Play
           </RouterLink>
           {user && (
             <>
               <InvitesDropdown invites={invites} />
               <ProfileDropdown logout={handleLogout} email={user.email} />
-              <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme} aria-label="Toggle Theme">
+              <Switch className='hover:scale-110 transition ease-in-out' checked={theme === 'dark'} onCheckedChange={toggleTheme} aria-label="Toggle Theme">
                 {theme === 'dark' ? <FaMoon /> : <FaSun />}
               </Switch>
-              <Switch checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
+              <Switch className='hover:scale-110 transition ease-in-out' checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
                 {playing ? <MdMusicNote size={24} /> : <MdMusicOff size={24}/>}
               </Switch>
             </>

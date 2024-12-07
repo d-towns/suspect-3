@@ -46,6 +46,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       const response: AxiosResponse<{ user: User }> = await api.get('users/get-user');
+      console.log('Check auth response:', response);
       setUser(response.data.user);
     } catch (error) {
       setUser(null);
