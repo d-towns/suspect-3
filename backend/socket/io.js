@@ -489,6 +489,17 @@ export class GameRoomSocketServer {
           this.emitToRoom(roomId, "game-end");
         }
 
+        // if the player in the active round is not connected, skip the round 
+        const playerSocket = Array.from(room).find((socketId) => {
+          const s = this.io.sockets.sockets.get(socketId);
+          return s.userId === activeRound.player;
+        });
+        if (!playerSocket) {
+          await OpenaiGameService.skipInterrogationRound(roomId, activeRound.player);
+          handleRoundEnd();
+          return;
+        }
+
         if (activeRound.type == "interrogation") {
           await OpenaiGameService.startRealtimeInterregation(
             roomId,

@@ -660,6 +660,26 @@ static async addVotingRoundVote(roomId, vote) {
     );
   }
 
+  static async skipInterrogationRound(roomId, userId) {
+    try {
+      // Get the current game state
+      const game = await GameRoomService.getGameRoom(roomId);
+      const gameState = GameRoomService.decryptGameState(game.game_state);
+
+      // Add a message to the thread indicating the player skipped their interrogation
+      await this.addMessageToThread(game.thread_id, {
+        role: "user",
+        content: `${userId} has skipped their interrogation round. Update their guilt score to 1.0 to reflect their unwillingness to cooperate, mark their round as completed, and move to the next round.`
+      });
+
+      // Run the thread to process the skip
+      return await this.runThreadAndProcess(game.thread_id, roomId);
+    } catch (error) {
+      console.error("Error skipping interrogation round:", error);
+      throw error;
+    }
+  }
+
   static async endRealtimeInterrogation(roomId) {
     return new Promise((resolve, reject) => {
       const ws = this.roomRealtimeSessions.get(roomId);
