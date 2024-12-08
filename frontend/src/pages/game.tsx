@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
@@ -235,18 +235,19 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
       align="center"
       gap="2"
       maxHeight="90vh"
-      height="80%"
+      height="100%"
     >
       <Heading size="9" align="center">
         Changing Rounds
       </Heading>
       <Flex
+      direction={{ xs: 'column', md: 'row' }}
         justify="center"
         align="center"
         gap="2"
         maxHeight="90vh"
-        height="80%"
-        mt={'9'}
+        height="100%"
+      
       >
         {gameState.rounds.map((round, index) => {
           if (round.type === 'interrogation') {
@@ -256,23 +257,25 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
             return (
               <React.Fragment key={index}>
                 <Box>
-                  <Flex align="center" gap="2">
-                    <Flex direction="column" align="center" gap="2">
+                  <Flex align="center" direction={{ xs: 'column', md: 'row' }} gap="2">
+                    <Flex direction="column" align="center" gap="2" >
                       <Avatar
                         className={`${round.status === 'active' &&
                           'border border-lime-400 animate-bounce'
                           }`}
                         mt="3"
-                        size="9"
+                        size={{ md: '9', sm: '6',  xs: '4'  }}
                         fallback={initial}
-                      />
-                      <Text size="2" as="p" align="center">
-                        {name} Questioning
+                      /> 
+                      <Text size="2" style={{maxWidth: '100px'}} as="p" align="center">
+                         Questioning
                       </Text>
                     </Flex>
-                    {index < gameState.rounds.length - 1 && (
-                      <FaArrowRightLong size={24} />
+                    <Box width={'30px'}>
+                        {index < gameState.rounds.length - 1 && (
+                      <Separator size="4" my="3" />
                     )}
+                        </Box>
                   </Flex>
                 </Box>
               </React.Fragment>
@@ -281,24 +284,27 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
             return (
               <React.Fragment key={index}>
                 <Box>
-                  <Flex align="center" gap="2">
+                  <Flex align="center" gap="2"       direction={{ xs: 'column', md: 'row' }}>
                     <Flex direction="column" align="center" gap="2">
                       <Avatar
-                        className={`${round.status === 'active' && 'border border-lime-400'
+                        className={`${round.status === 'active' && 'border border-lime-400 animate-bounce'
                           }`}
                         mt="3"
-                        size="9"
+                        size={{ md: '9', sm: '6', xs: '4' }}
                         src="voting-icon-url"
                         fallback="V"
                       />
                       <Text size="2" as="p" align="center">
-                        Culprit Voting
+                        Voting
                       </Text>
                     </Flex>
-                    {index < gameState.rounds.length - 1 && (
-                      <FaArrowRightLong size={24} />
+                        <Box width={'30px'}>
+                        {index < gameState.rounds.length - 1 && (
+                      <Separator size="4" my="3" />
                     )}
+                        </Box>
                   </Flex>
+                  
                 </Box>
               </React.Fragment>
             );
@@ -485,8 +491,9 @@ const Game = () => {
     new WavStreamPlayer({ sampleRate: 24000 })
   );
 
-  const gameIsOver = gameState?.status === 'finished';
-
+  const gameIsOver = useMemo(() => {
+    return gameState?.status == 'setup';
+  }, [gameState])
   // setup a event listener for mouse movement to connect the wavStreamPlayer after a user gesture
   const connectWaveStreamPlayer = async () => {
     if (wavStreamPlayerRef.current) {
