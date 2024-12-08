@@ -484,10 +484,11 @@ export class GameRoomSocketServer {
           return s.inGame;
         });
         const gameRoom = await GameRoomService.getGameRoom(socket.roomId);
+        const game_state = GameRoomService.decryptGameState(gameRoom.game_state);
         if (
           allInGame &&
           gameRoom.host_id === socket.userId &&
-          this.roomRoundTimers.get(socket.roomId) === undefined
+          this.roomRoundTimers.get(socket.roomId) === undefined && game_state.status === "setup"
         ) {
           console.log(
             `All players in room ${socket.roomId} have joined the game. Starting game...`

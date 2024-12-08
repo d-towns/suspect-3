@@ -479,12 +479,13 @@ const Game = () => {
   const [responseLoading, setResponseLoading] = useState<boolean>(false);
   const [activeRound, setActiveRound] = useState<'interrogation' | 'voting'>('interrogation');
   const [killerVote, setKillerVote] = useState<string>();
-  const [gameIsOver, setGameIsOver] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
   const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
   const wavStreamPlayerRef = useRef<WavStreamPlayer>(
     new WavStreamPlayer({ sampleRate: 24000 })
   );
+
+  const gameIsOver = gameState?.status === 'finished';
 
   // setup a event listener for mouse movement to connect the wavStreamPlayer after a user gesture
   const connectWaveStreamPlayer = async () => {
@@ -552,9 +553,6 @@ const Game = () => {
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
-        if (newState.status === 'finished') {
-          setGameIsOver(true);
-        }
         setResultsLoading(false);
 
       });
@@ -694,6 +692,8 @@ const Game = () => {
    * then we send a message to the server to start the first round
    * for the player in the first round, who arent in the round show the interregation transcript and play the audio message
    * for those who arent in the round show the crime details and thier evidence along with the round timer
+   * 
+   * give players who arent in the room the ability to speak to their "lawyer". they get 3 chat completions from laywer 
    */
 
 
@@ -811,19 +811,23 @@ const Game = () => {
           {/* Left panel: Crime and Evidence */}
           <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '400px' }}>
             {/* Round Timer */}
-            {roundTimer > 0 && (
+            
               <Box className="timerBox mb-4 p-4 rounded border">
+                {roundTimer > 0 ? (
+                  <>
                 <Text as='p' size={'5'}>Round Timer</Text>
-                {/* show th etimer left in minutes and seconds */}
                 <Text as='p' size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
+                </>
+                ) : (
+                  <Text as='p' size={'5'}>Game Over</Text>
+                )}
               </Box>
-            )}
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
             <ScrollArea>
               <Accordion.Root
                 type="multiple"
-                className="w-full rounded-md shadow-md px-4"
+                className="w-full rounded-md shadow-md px-2"
               >
 
                 <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
