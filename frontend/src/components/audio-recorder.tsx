@@ -1,8 +1,9 @@
-import React, { useState, useRef} from 'react';
+import React, { useState, useRef, useEffect} from 'react';
 import { Socket } from 'socket.io-client';
 import { WavRecorder } from 'wavtools'
 import { FaMicrophone } from 'react-icons/fa6';
 import {Text, Flex, IconButton} from '@radix-ui/themes';
+import { useSocketContext } from '../context/SocketContext/socket.context';
 
 interface AudioRecorderParams {
     socket: Socket;
@@ -15,6 +16,20 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const recorderRef = useRef<WavRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('round-end', () => {
+        if (isRecording) {
+          stopRecording(true);
+        }
+      });
+
+      return () => {
+        socket.off('round-end');
+      };
+    }
+  }, [socket, isRecording]);
 
   const startRecording = async () => {
     try {
@@ -54,7 +69,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
     }
   };
 
-  const stopRecording = async () => {
+  const stopRecording = async (rejectCallback: boolean = false) => {
     try {
       if (recorderRef.current) {
         await recorderRef.current.pause();
@@ -68,7 +83,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
         }
         
 
-        onAudioRecorded(arrayBuffer);
+        if(!rejectCallback) onAudioRecorded(arrayBuffer);
 
         setIsRecording(false);
         if (timerRef.current) {
@@ -86,7 +101,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
       <IconButton
         style={{width: '108px', height: '48px'}}
         variant={isRecording ? 'solid' : 'surface'}
-        onClick={isRecording ? stopRecording : startRecording}
+        onClick={isRecording ? () =>  stopRecording() : startRecording}
         className="transition-transform duration-200 hover:scale-110"
         aria-label={isRecording ? 'Stop Recording' : 'Start Recording'}
       >

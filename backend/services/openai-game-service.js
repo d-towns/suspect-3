@@ -660,6 +660,46 @@ static async addVotingRoundVote(roomId, vote) {
     );
   }
 
+  static async endRealtimeInterrogation(roomId) {
+    return new Promise((resolve, reject) => {
+      const ws = this.roomRealtimeSessions.get(roomId);
+      if (!ws) {
+        reject(new Error("Realtime session not found for room: " + roomId));
+        return;
+      }
+
+      const event = {
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "End the interrogation now. Tell the suspect they are free to go and send them out of the room.",
+            },
+          ],
+        },
+      };
+
+      const responseListener = (data) => {
+        const event = JSON.parse(data);
+        if(event.type === "response.done") {
+          console.log("Response done event received");
+          resolve();
+          ws.off("message", responseListener);
+        }
+      }
+
+      ws.on("message", responseListener);
+
+
+      ws.send(JSON.stringify(event));
+      ws.send(JSON.stringify({ type: "response.create" }));
+      console.log("Sent end interrogation message to realtime API");
+    });
+  }
+
 
 
   /**
@@ -718,7 +758,7 @@ static async addVotingRoundVote(roomId, vote) {
         },
       };
 
-      ws.on('message', (data) => {
+      const audioDeltaListener =  (data) => {
 
         const event = JSON.parse(data);
         if(event.type === "response.audio.delta") {
@@ -726,9 +766,11 @@ static async addVotingRoundVote(roomId, vote) {
         const userSocket = socketServer.getSocketForUser(userId);
         socketServer.emitToSocket(userSocket.id, "realtime-audio-delta", {audio: base64ToPCM(event.delta), speaker: 'assistant'});
         }
-      });  
+      }
 
-      ws.on('message', (data) => {
+      ws.on('message', audioDeltaListener); 
+
+      const audioTranscriptListener =  (data) => {
 
         const event = JSON.parse(data);
         if(event.type === "response.audio_transcript.delta") {
@@ -736,14 +778,34 @@ static async addVotingRoundVote(roomId, vote) {
         const userSocket = socketServer.getSocketForUser(userId);
         socketServer.emitToSocket(userSocket.id, "realtime-audio-transcript-delta", {transcript: event.delta, speaker: 'assistant'});
         } 
-      });
+      }
+      
+
+      ws.on('message', audioTranscriptListener);
+      // use a timeout to clear the listeners once the round is done
+      setTimeout(() => {
+        console.log(`removing realtime listeres for ${userId} in room ${roomId}`);
+        ws.off("message", audioDeltaListener);
+        ws.off("message", audioTranscriptListener);
+        reject(new Error("Realtime interrogation timed out."));
+      }, 100); 
 
       const responseListener = (data) => {
-        resolve(data);
-        ws.off("message", responseListener);
+        const event = JSON.parse(data);
+        if(event.type === "response.done") {
+          if(event.response.status_details?.type == "failed") {
+            console.error("Response failed:", JSON.stringify(event.response.status_details.error));
+            reject(new Error("Response failed"));
+          }
+          console.log("Response done event received");
+          resolve();
+          ws.off("message", responseListener);
+        }
       }
 
       ws.on("message", responseListener);
+
+
 
       ws.send(JSON.stringify(event));
       ws.send(JSON.stringify({ type: "response.create" }));

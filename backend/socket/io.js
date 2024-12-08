@@ -435,7 +435,7 @@ export class GameRoomSocketServer {
       } else {
         this.emitToRoom(roomId, "voting-round-start");
 
-        const { clear } = startInterval(3000, emitRoundTick, handleRoundEnd);
+        const { clear } = startInterval(30, emitRoundTick, handleRoundEnd);
         this.roomRoundTimers.set(socket.roomId, {
           ...this.roomRoundTimers.get(socket.roomId),
           clearRoundTimer: clear,
@@ -459,10 +459,13 @@ export class GameRoomSocketServer {
         );
 
         if (activeRound.type == "interrogation") {
+
+          await OpenaiGameService.endRealtimeInterrogation(gameRoom.id)
           await OpenaiGameService.endInterrogationRound(
             gameRoom.thread_id,
             gameState
           );
+
         } else if (activeRound.type == "voting") {
           await OpenaiGameService.endVotingRound(gameRoom.thread_id);
         }

@@ -250,7 +250,6 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
           if (round.type === 'interrogation') {
             const player = gameState.players.find((p) => p.id === round.player);
             const initial = player?.identity.split(',')[0].charAt(0) || '?';
-            const name = player?.identity.split(',')[0] || 'Unknown';
             return (
               <React.Fragment key={index}>
                 <Box>
@@ -557,11 +556,13 @@ const Game = () => {
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
+        setInterrogationTranscript([]);
         setResultsLoading(false);
 
       });
       socket.on('game-state-updating', () => {
         console.log('Game state is updating');
+        
         setResultsLoading(true);
       });
 
@@ -652,11 +653,6 @@ const Game = () => {
     }
   }, [roomId, user]);
 
-  useEffect(() => {
-    if (roundTimer === 1) {
-      setInterrogationTranscript([]);
-    }
-  }, [roundTimer]);
 
   useEffect(() => {
     const setCurrentPlayerState = () => {
