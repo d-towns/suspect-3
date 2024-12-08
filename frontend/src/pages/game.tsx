@@ -96,7 +96,6 @@ const VotingRound: React.FC<VotingRoundProps> = ({
   return (
     <>
       <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
-      {!voteSubmitted ? (
         <>
           <div>
             <p className="text-xl font-bold mb-4 text-center">
@@ -117,6 +116,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
             value={killerVote}
             onValueChange={(vote) => setKillerVote(vote)}
             columns={{ initial: '1', sm: '2' }}
+            disabled={voteSubmitted}
           >
             {gameState.players.map((player) => (
               <RadioCards.Item value={player.id} key={player.id}>
@@ -125,20 +125,17 @@ const VotingRound: React.FC<VotingRoundProps> = ({
             ))}
           </RadioCards.Root>
         </>
-      ) : (
-        <p className="text-center text-lg">Vote Submitted</p>
-      )}
-      {!voteSubmitted && (
         <Flex>
           <Button
             onClick={handleVoteSubmission}
+            color={`${killerVote ? 'green' : 'gray'}`}
             style={{ width: '40%', margin: '20px auto' }}
             mt="4"
+            disabled={!killerVote || voteSubmitted}
           >
-            Submit Vote
+            {voteSubmitted ? 'Vote Submitted!' : 'Submit Vote'}
           </Button>
         </Flex>
-      )}
     </>
   );
 };

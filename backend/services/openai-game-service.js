@@ -293,7 +293,17 @@ response_format: zodResponseFormat(this.GameStateSchema, "game_state"),
 static async addVotingRoundVote(roomId, vote) {
   // get the game room from the db and its thread id
   const {voterId, playerId} = vote;
+  if(!roomId) {
+    console.error("Room ID is required to add a vote to the game state");
+    return;
+  }
   const game = await GameRoomService.getGameRoom(roomId);
+  const game_state = GameRoomService.decryptGameState(game.game_state);
+  if (game_state.status === 'finished') {
+    console.error("Game is already finished");
+    return;
+  }
+  
   const threadId = game.thread_id;
   // get the most recent message in the thread
   // add a message in the thread with the vote for this player
