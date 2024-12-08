@@ -309,7 +309,7 @@ static async addVotingRoundVote(roomId, vote) {
       const threadId = game.thread_id;
       await this.addMessageToThread(threadId, {
         role: "user",
-        content: `Player ${voterId} voted for player ${playerId} as the culprit.`,
+        content: `Player ${voterId} voted for player ${playerId} as the culprit in round ${game_state.rounds.findIndex(round => round.status === "active") }`,
       });
       
       resolve(true);
