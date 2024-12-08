@@ -26,15 +26,12 @@ interface AllowAutoplayDialogProps {
 const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose, onAllow }) => {
   return (
     <AlertDialog.Root open={open} onOpenChange={onClose}>
-      <AlertDialog.Trigger>
-        <Button>Allow Autoplay</Button>
-      </AlertDialog.Trigger>
       <AlertDialog.Content size='4'>
         <Box className="p-4">
           <Text as="p" size="3" align="center">
             This game requires audio playback. Please allow autoplay to proceed.
           </Text>
-          <Flex justify="center" mt="4">
+          <Flex justify="center" mt="4" gap={'6'}>
 
             <AlertDialog.Cancel onClick={() => onClose()}>
               <Button variant="soft" color="gray">
@@ -69,7 +66,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
             <Text as="p" mb="3" align="center" weight="medium">
               Guilt
             </Text>
-            <Progress value={player.guiltScore} max={1} />
+            <Progress value={player.guiltScore} max={100} />
           </Box>
         </Flex>
         <Text as="p" align="center">
@@ -374,6 +371,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
           )}
         </Box>
       </Box>
+      <Heading>Game Summary</Heading>
       <ScrollArea
         className="border rounded-lg p-4"
         type="always"
@@ -599,19 +597,21 @@ const Game = () => {
 
 
       /**
+       * I FINISHED THEM ALL MOMMY
+       * 
        * [*] TODO: Create state object that will keep track of the time left in the round, updates on websocket events from the server
        * [*] TODO: Createa startrecording function that cretes a MediaStream and MediaRecorder object and starts recording audio
        * [*] TODO: Stream the audio to the server through websocket events in the MediaRecorder ondataavailable event callback
        * [*] TODO: (moved to useSocket hook) Emit a joined-game event to the server socket to let the server know that the user has joined the game
        * [*] TODO: automatically start recording after the most recent audo message has been played fully
        * [*] TODO: send a 'realtime-audio-response-end' event to the server when the user stops recording ( either by timer ending or manually )
-       * [] TODO: once the round timer ends for all rounds after the first, since it is controlled by the server, we will then move to a loading screen and wait for the game state to update
-       * [] TODO: once we have the update, we can show the new guily score for the player and the new round timer
-       * [] TODO: once the interrogation round is over, we enter the voting round
-       * [] TODO: in the voting round, each player will see each others guilt score and will have to vote on who they think is a rat
-       * [] TODO: Once the voting round voting is over, the players will ahve either voted for a player or not, 
-       * [] TODO: if a player recives at least n // 2 votes where n is the number of players and they did rat out the other players, they will lose the game and leaderboard rank
-       * [] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
+       * [*] TODO: once the round timer ends for all rounds after the first, since it is controlled by the server, we will then move to a loading screen and wait for the game state to update
+       * [*] TODO: once we have the update, we can show the new guily score for the player and the new round timer
+       * [*] TODO: once the interrogation round is over, we enter the voting round
+       * [*] TODO: in the voting round, each player will see each others guilt score and will have to vote on who they think is a rat
+       * [*] TODO: Once the voting round voting is over, the players will ahve either voted for a player or not, 
+       * [*] TODO: if a player recives at least n // 2 votes where n is the number of players and they did rat out the other players, they will lose the game and leaderboard rank
+       * [*] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
        */
 
 

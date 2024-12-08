@@ -28,6 +28,22 @@ const signUpUser = async (req, res) => {
   }
 };
 
+const guestSignIn = async (req, res) => {
+  const supabase = createSupabaseClient({ req, res });
+  const {username} = req.body;
+  const { data, error } = await supabase.auth.signInAnonymously({
+    options: {
+      data: {
+        username,
+      },
+    }
+  })
+  if (error) {
+    return res.status(500).json({ message: `Error signing in user: ${error.message}` });
+  }
+  return res.status(200).json({ message: `User signed in successfully`, session: data.session });
+}
+
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
   const supabase = createSupabaseClient({ req, res });
@@ -86,6 +102,7 @@ router.post("/sign-up", signUpUser);
 router.post("/login", loginUser);
 router.get("/get-user", getUser);
 router.post("/logout", logoutUser);
+router.post("/guest-sign-in", guestSignIn);
 // router.get("/get-session", getSession);
 
 router.get("/auth/confirm", async function (req, res) {

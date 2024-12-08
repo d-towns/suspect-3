@@ -74,7 +74,7 @@ export const useSocket = () => {
     if (socket && isConnected) {
       const interval = setInterval(() => {
         if (user) {
-          socket.emit('set-user', user.email, user.id);
+          socket.emit('set-user', user.email, user.username, user.id);
         socket.emit('heartbeat', roomId || 'global');
         }
       }, HEARTBEAT_INTERVAL);
@@ -106,7 +106,7 @@ export const useSocket = () => {
 
   const sendChatMessage = useCallback((message: string) => {
     if (socket && isConnected && roomId && user) {
-      socket.emit('chat-message', roomId, user.email, message);
+      socket.emit('chat-message', roomId, user.email, user.username, message);
     }
   }, [socket, isConnected, roomId, user]);
 
@@ -118,7 +118,7 @@ export const useSocket = () => {
 
   const sendReadyStatus = useCallback((isReady: boolean) => {
     if (socket && isConnected && roomId && user) {
-      socket.emit('player-ready', roomId, user.email, isReady);
+      socket.emit('player-ready', roomId, user.email, user.username, isReady);
     }
   }, [socket, isConnected, roomId, user]);
 

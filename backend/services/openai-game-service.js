@@ -111,7 +111,7 @@ class OpenaiGameService {
     })
     .strict();
 
-  static async createGameMasterAssistant() {
+  static async createMultiPlayerGameMasterAssistant() {
     console.log("Creating Game Master Assistant...");
     try {
       const assistant = await this.client.beta.assistants.create({
@@ -202,6 +202,42 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
+  static async createSinglePlayerGameMasterAssistant() {
+    console.log("Creating Game Master Assistant...");
+    try {
+      const assistant = await this.client.beta.assistants.create({
+        name: "Game Master",
+        instructions: `
+        You will act as the suspect who is currently in the room, and try to maintain their innocence as the player (user) asks them questions.
+
+1. Create a crime scenario with the following details:
+    Type of crime
+    Location
+    Time of occurrence
+    Brief description of what happened
+
+2. Generate evidence pieces:
+- Create 6 evidence pieces related to the crime
+3. Assign identities and evidence to suspects:
+- Assign 4 unique suspect identities, each with a background that could potentially make them seem guilty or innocent
+4. Participate in interrogations:
+The user (player) will question you using text input
+You should respond in a way that maintains your innocence and provides plausible deniability when necessary
+Determine the game outcome:
+After all questions have been asked, the user will make one vote for who they believe is the culprit
+If the user's vote matches the true identity of the culprit, they win the game
+If the user's vote does not match the true identity of the culprit, they lose the game`,
+model: "gpt-4o-2024-08-06",
+response_format: zodResponseFormat(this.GameStateSchema, "game_state"),
+});
+    } catch (error) {
+      console.error("Error creating Game Master Assistant:", error);
+      throw error;
+    }
+  }
+  
+
+
   static async addMessageToThread(threadId, content) {
     console.log(`Adding message to thread: ${threadId} with role: ${content.role}`);
     try {
@@ -271,10 +307,9 @@ static async addVotingRoundVote(roomId, vote) {
   static createCrime(players) {
     console.log(`Creating crime scenario for ${players.length} players`);
     const playerInfo = players
-      .map((player) => `{id: "${player.id}", email: "${player.email}"}`)
+      .map((player) => `{id: "${player.id}", email: "${player.email || 'guest'}" username: "${player.username}"}`)
       .join(", ");
     const crime = `Create a crime scenario for a game with the following ${players.length} players: [${playerInfo}]. Assign identities and distribute evidence to each player using their provided ids as the id field.`;
-    console.log("Crime scenario created:", crime);
     return crime;
   }
 
@@ -541,11 +576,9 @@ static async addVotingRoundVote(roomId, vote) {
               break;
             case 'response.done':
               console.log("Response done:", event);
-              if(event.response.status_details.type == "failed") {
+              if(event.response.status_details?.type == "failed") {
                 console.error("Response failed:", JSON.stringify(event.response.status_details.error));
               }
-
-
               break;
             case "response.audio_transcript.done":
               const interrogatorTranscript = event.transcript;

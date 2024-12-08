@@ -17,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
+  guestSignIn: (username: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -80,6 +81,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const guestSignIn = async (username: string) => {
+    setLoading(true);
+    try {
+      const response = await api.post('users/guest-sign-in', {username});
+      const userData =  {
+        id: response.data.session.user.id,
+        email: response.data.session.user.email,
+        username: response.data.session.user.user_metadata.username
+      }
+      setUser(userData);
+    } catch (error) {
+      console.error('Guest sign in error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Function to handle user signup
   const signup = async (email: string, password: string, username: string) => {
     try {
@@ -110,6 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     logout,
+    guestSignIn,
     checkAuth,
   };
 

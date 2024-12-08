@@ -155,7 +155,7 @@ export const Lobby: React.FC = () => {
     console.log('User left:', player);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
-      updatedPlayers.delete(player.email);
+      updatedPlayers.delete(player.username);
       console.log('Updated players:', Array.from(updatedPlayers.values()));
       return { ...prevState, players: updatedPlayers };
     });
@@ -165,7 +165,7 @@ export const Lobby: React.FC = () => {
     console.log('User joined:', player);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
-      updatedPlayers.set(player.email, player);
+      updatedPlayers.set(player.username, player);
       console.log('Updated players:', Array.from(updatedPlayers.values()));
       return { ...prevState, players: updatedPlayers, 
         gameStatus: { ...prevState.gameStatus, allPlayersReady: false } };
@@ -177,20 +177,20 @@ export const Lobby: React.FC = () => {
     setLobbyState(prevState => {
       const updatedPlayers = new Map<string, User>();
       newPlayers.forEach(player => {
-        updatedPlayers.set(player.email, player);
+        updatedPlayers.set(player.username, player);
       });
       console.log('Updated players:', Array.from(updatedPlayers.values()));
       return { ...prevState, players: updatedPlayers };
     });
   };
 
-  const updatePlayerReadyStatus = (data: { email: string; isReady: boolean }) => {
+  const updatePlayerReadyStatus = (data: { email: string; username: string,  isReady: boolean }) => {
     console.log('Updating player ready status:', data);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
-      const player = updatedPlayers.get(data.email);
+      const player = updatedPlayers.get(data.username);
       if (player) {
-        updatedPlayers.set(data.email, { ...player, isReady: data.isReady });
+        updatedPlayers.set(data.username, { ...player, isReady: data.isReady });
       }
       const allPlayersReady = Array.from(updatedPlayers.values()).every(player => player.isReady);
       console.log('Updated players:', Array.from(updatedPlayers.values()));
@@ -243,9 +243,9 @@ export const Lobby: React.FC = () => {
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
       if (user) {
-        const currentPlayer = updatedPlayers.get(user.email);
+        const currentPlayer = updatedPlayers.get(user.username);
         if (currentPlayer) {
-          updatedPlayers.set(user.email, { ...currentPlayer, isReady: newReadyStatus });
+          updatedPlayers.set(user.username, { ...currentPlayer, isReady: newReadyStatus });
         }
       }
       const allPlayersReady = Array.from(updatedPlayers.values()).every(player => player.isReady);
@@ -298,13 +298,13 @@ export const Lobby: React.FC = () => {
             <Box mt="4">
               {Array.from(lobbyState.players.values()).map((player, index) => (
 
-                <Flex key={player.email} align="center" gap="2" mt="4">
+                <Flex key={player.username} align="center" gap="2" mt="4">
                   <Text size={'4'}>{index +1}. </Text>
                   <Text size={'4'}>{player.username}</Text>
                   {player.isReady ? <Badge color="green">Ready</Badge> : <Badge color="red">Not Ready</Badge>}
-                  {player.email === user?.email && <Badge color="blue">You</Badge>}
+                  {player.username === user?.username && <Badge color="blue">You</Badge>}
                   {player?.id === lobbyState.room?.host_id && <Badge color="orange">Host</Badge>}
-                  {lobbyState.gameStatus.userIsHost && player.email !== user?.email && (
+                  {lobbyState.gameStatus.userIsHost && player.username !== user?.username && (
                     <Button onClick={() => console.log('Kick player:', player)}>Kick</Button>)
                   }
                 </Flex>
