@@ -489,7 +489,7 @@ const Game = () => {
   );
 
   const gameIsOver = useMemo(() => {
-    return gameState?.status == 'setup';
+    return gameState?.status == 'finished';
   }, [gameState])
   // setup a event listener for mouse movement to connect the wavStreamPlayer after a user gesture
   const connectWaveStreamPlayer = async () => {
