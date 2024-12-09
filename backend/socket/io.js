@@ -5,6 +5,7 @@ const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
 import OpenaiGameService from "../services/openai-game-service.js";
 import { GameRoomService } from "../services/game-room.service.js";
+import NodeCache from 'node-cache';
 
 function startInterval(initialNumber, tickCallback, doneCallback) {
   let intervalId;
@@ -377,6 +378,10 @@ export class GameRoomSocketServer {
     const initialGameRoom = await GameRoomService.getGameRoom(roomId);
     const emitRoundTick = (number) => {
       this.emitToRoom(roomId, "round-timer-tick", { countdown: number });
+      this.roomRoundTimers.set(socket.roomId, {
+        ...this.roomRoundTimers.get(socket.roomId),
+        currentRoundTime: number,
+      });
     };
     // function to start the first round, this will be called after the first round timer ends
     // this will start the first round and then start the interval for the rest of the rounds
@@ -386,6 +391,9 @@ export class GameRoomSocketServer {
 
       // get the room and its game state
       const room = this.io.sockets.adapter.rooms.get(roomId);
+      if(!room) {
+        return;
+      }
       const gameRoom = await GameRoomService.getGameRoom(roomId);
       const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
       console.log("Game state:", gameState);
@@ -513,12 +521,12 @@ export class GameRoomSocketServer {
             clearRoundTimer: clear,
           });
         } else if (activeRound.type == "voting") {
-          this.emitToRoom(roomId, "voting-round-start");
-          const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
-          this.roomRoundTimers.set(socket.roomId, {
-            ...this.roomRoundTimers.get(socket.roomId),
-            clearRoundTimer: clear,
-          });
+            this.emitToRoom(roomId, "voting-round-start");
+            const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
+            this.roomRoundTimers.set(socket.roomId, {
+              ...this.roomRoundTimers.get(socket.roomId),
+              clearRoundTimer: clear,
+            });
         }
       } catch (error) {
         console.error("Error handling round end:", error);

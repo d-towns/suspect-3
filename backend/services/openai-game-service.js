@@ -531,9 +531,11 @@ static async addVotingRoundVote(roomId, vote) {
 
               this.lastAudioMessageDeltas.set(roomId, []);
 
+
               const playerConversationItem = {
                 audioTranscript: suspectTranscript,
                 speaker: "user",
+                currentRoundTime : socketServer.roomRoundTimers.get(roomId).currentRoundTime
               };
 
 
@@ -784,7 +786,7 @@ static async addVotingRoundVote(roomId, vote) {
         if(event.type === "response.audio.delta") {
         console.log("Response audio delta received");
         const userSocket = socketServer.getSocketForUser(userId);
-        socketServer.emitToSocket(userSocket.id, "realtime-audio-delta", {audio: base64ToPCM(event.delta), speaker: 'assistant'});
+        socketServer.emitToSocket(userSocket.id, "realtime-audio-delta", {audio: base64ToPCM(event.delta), speaker: 'assistant', currentRoundTime: socketServer.roomRoundTimers.get(roomId).currentRoundTime || 90});
         }
       }
 
@@ -796,7 +798,7 @@ static async addVotingRoundVote(roomId, vote) {
         if(event.type === "response.audio_transcript.delta") {
         console.log("Response audio transcript delta received");
         const userSocket = socketServer.getSocketForUser(userId);
-        socketServer.emitToSocket(userSocket.id, "realtime-audio-transcript-delta", {transcript: event.delta, speaker: 'assistant'});
+        socketServer.emitToSocket(userSocket.id, "realtime-audio-transcript-delta", {transcript: event.delta, speaker: 'assistant', currentRoundTime: socketServer.roomRoundTimers.get(roomId).currentRoundTime || 90});
         } 
       }
       
@@ -808,7 +810,7 @@ static async addVotingRoundVote(roomId, vote) {
         ws.off("message", audioDeltaListener);
         ws.off("message", audioTranscriptListener);
         reject(new Error("Realtime interrogation timed out."));
-      }, 100); 
+      }, 90000); 
 
       const responseListener = (data) => {
         const event = JSON.parse(data);

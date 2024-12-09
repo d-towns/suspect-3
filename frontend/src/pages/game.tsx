@@ -17,6 +17,8 @@ import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
 
 
+
+
 interface AllowAutoplayDialogProps {
   open: boolean;
   onClose: () => void;
@@ -490,7 +492,8 @@ const Game = () => {
   const gameIsOver = useMemo(() => {
     return gameState?.status == 'finished';
   }, [gameState])
-  // setup a event listener for mouse movement to connect the wavStreamPlayer after a user gesture
+
+
   const connectWaveStreamPlayer = async () => {
     if (wavStreamPlayerRef.current) {
       await wavStreamPlayerRef.current.connect();
@@ -504,23 +507,21 @@ const Game = () => {
 
   const handleUserAudioTranscriptEvent = useCallback((params: any) => {
     console.log('Received audio transcript:', params);
-    const {speaker, audioTranscript} = params;
-    setInterrogationTranscript(prev => [...prev, { audioTranscript , timestamp: roundTimer, speaker}]);
+    const {speaker, audioTranscript, currentRoundTime} = params;
+    setInterrogationTranscript(prev => [...prev, { audioTranscript , timestamp: currentRoundTime, speaker}]);
     setAudioTranscribing(false);
   }, [roundTimer]);
 
-  const handleRealtimeAudioTranscriptEvent = useCallback( (params: any) => {
-    // append the params.delta to the last element of the interrogationTranscript
-    console.log('Received audio transcript delta:', params);
-    const {speaker, transcript} = params;
+  const handleRealtimeAudioTranscriptEvent = (params: any) => {
+    const {speaker, transcript, currentRoundTime} = params;
     setInterrogationTranscript(prev => {
       const lastItem = prev[prev.length - 1];
       if (!lastItem) {
         // If there's no last item, create a new one and add the delta as the first text of the transcript
-        return [{ audioTranscript: transcript, timestamp: roundTimer, speaker }];
+        return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
       } else if(lastItem.speaker !== speaker) {
         // If the speaker has changed, create a new item
-        return [...prev, { audioTranscript: transcript, timestamp: roundTimer, speaker }];
+        return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
       }
       const updatedItem = {
         ...lastItem,
@@ -529,23 +530,17 @@ const Game = () => {
       };
       return [...prev.slice(0, prev.length - 1), updatedItem];
     });
-  }, [roundTimer]);
+  };
 
   const handleRealtimeAudioDeltaEvent = async (params: {speaker: string, audio: Int16Array}) => {
     console.log('Received audio delta:', params);
     const { audio } = params;
     // check if params is a int16array
     // if so, add it to the wavStreamPlayer
-    if (params instanceof Int16Array) {
-      console.log('Adding 16 bit PCM to wavStreamPlayer');
-    }
     const wavStreamPlayer = wavStreamPlayerRef.current;
     if (wavStreamPlayer) {
-
       wavStreamPlayer.add16BitPCM(new Int16Array(audio));
     }
-
-
   }
     
 
@@ -566,21 +561,7 @@ const Game = () => {
         setResultsLoading(true);
       });
 
-      // socket.on('realtime-audio-message', async (params: any) => {
-      //   try {
-      //     console.log('Received audio message:', params);
-      //     // const { audioBuffer, audioTranscript } = params;
-      //     const audioWav = await decoders.wav(params.audioBuffer);
 
-      //     // setInterrogationTranscript(prev => [...prev, { audioBuffer, audioTranscript, timestamp: roundTimer }]);
-
-      //     setResponseLoading(false);
-      //     console.log('Playing audio message:', audioWav);
-      //   } catch (error) {
-      //     console.error('Error playing audio message:', error);
-      //   }
-
-      // });
 
       socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
@@ -597,25 +578,6 @@ const Game = () => {
 
 
       socket.on('user-audio-transcript', handleUserAudioTranscriptEvent);
-
-
-      /**
-       * I FINISHED THEM ALL MOMMY
-       * 
-       * [*] TODO: Create state object that will keep track of the time left in the round, updates on websocket events from the server
-       * [*] TODO: Createa startrecording function that cretes a MediaStream and MediaRecorder object and starts recording audio
-       * [*] TODO: Stream the audio to the server through websocket events in the MediaRecorder ondataavailable event callback
-       * [*] TODO: (moved to useSocket hook) Emit a joined-game event to the server socket to let the server know that the user has joined the game
-       * [*] TODO: automatically start recording after the most recent audo message has been played fully
-       * [*] TODO: send a 'realtime-audio-response-end' event to the server when the user stops recording ( either by timer ending or manually )
-       * [*] TODO: once the round timer ends for all rounds after the first, since it is controlled by the server, we will then move to a loading screen and wait for the game state to update
-       * [*] TODO: once we have the update, we can show the new guily score for the player and the new round timer
-       * [*] TODO: once the interrogation round is over, we enter the voting round
-       * [*] TODO: in the voting round, each player will see each others guilt score and will have to vote on who they think is a rat
-       * [*] TODO: Once the voting round voting is over, the players will ahve either voted for a player or not, 
-       * [*] TODO: if a player recives at least n // 2 votes where n is the number of players and they did rat out the other players, they will lose the game and leaderboard rank
-       * [*] TODO: uf a player recieves at least n // 2 votes where n is the number of players and they did not rat out the other players, they will win the game and leaderboard rank
-       */
 
 
       joinRoom(roomId);
@@ -641,7 +603,7 @@ const Game = () => {
   useEffect(() => {
     if (roomId) {
       roomsService.getRoom(roomId).then((room) => {
-        console.log('Room:', room);
+
         if (room.game_state && typeof room.game_state === 'object') {
           console.log(room);
           setGameState(room.game_state);
