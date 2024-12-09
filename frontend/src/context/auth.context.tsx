@@ -1,7 +1,6 @@
 // src/AuthContext.tsx
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { AxiosResponse } from 'axios';
 import axiosInstance from '../utils/axios-instance';
 
 // Define the User interface

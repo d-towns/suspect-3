@@ -9,7 +9,6 @@ import { FaChevronDown } from 'react-icons/fa';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
-import { FaArrowRightLong } from "react-icons/fa6";
 import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading,  ScrollArea } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';

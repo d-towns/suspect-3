@@ -3,7 +3,6 @@ import { Socket } from 'socket.io-client';
 import { WavRecorder } from 'wavtools'
 import { FaMicrophone } from 'react-icons/fa6';
 import {Text, Flex, IconButton} from '@radix-ui/themes';
-import { useSocketContext } from '../context/SocketContext/socket.context';
 
 interface AudioRecorderParams {
     socket: Socket;
