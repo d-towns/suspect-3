@@ -48,7 +48,7 @@ async function getGameRooms(req, res) {
 // POST /create-room
 async function createGameRoom(req, res) {
   const supabase = createSupabaseClient({ req, res });
-  const { userId } = req.body;
+  const { userId, mode } = req.body;
 
   if (!userId) {
     return res.status(400).json({ success: false, message: 'User ID is required to create a room' });
@@ -58,7 +58,8 @@ async function createGameRoom(req, res) {
 
   const roomData = {
     host_id: userId,
-    created_at: new Date()
+    created_at: new Date(),
+    mode
   };
 
   const { data, error } = await supabase

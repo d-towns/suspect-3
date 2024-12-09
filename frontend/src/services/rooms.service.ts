@@ -16,9 +16,9 @@ export const roomsService = {
     }
   },
 
-  createRoom: async (userId: string | null): Promise<string> => {
+  createRoom: async (userId: string | null, mode: string): Promise<string> => {
     try {
-      const response = await axiosInstance.post('/games/create-room', { userId });
+      const response = await axiosInstance.post('/games/create-room', { userId, mode});
       if (response.data.roomId) {
         return response.data.roomId;
       }

@@ -14,7 +14,7 @@ import {
 
 
 interface ModeCardProps {
-  createRoom: () => void;
+  createRoom: (mode:string) => void;
   imgSrc: string;
   altText: string;
   description?: string;
@@ -40,7 +40,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
     >
       <Card 
         size="3" 
-        onClick={() => mode === 'multi' && createRoom()} 
+        onClick={() => mode === 'multi' && createRoom(mode)} 
         className={mode === 'multi' ? 'hover:scale-105 hover:border transition ease-in-out duration-200' : ''}
         style={{ opacity: mode === 'single' ? 0.5 : 1 }}
       >
@@ -90,10 +90,10 @@ const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const createRoom = async () => {
+  const createRoom = async (mode:string) => {
     if (!user) return;
     try {
-      const roomId = await roomsService.createRoom(user.id);
+      const roomId = await roomsService.createRoom(user.id, mode);
       navigate(`/lobby/${roomId}`);
     } catch (error) {
       console.error('Error creating room:', error);
