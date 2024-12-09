@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
     Table,
-    Button,
     IconButton,
     Text,
     Card,
+    Spinner,
 } from "@radix-ui/themes";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 import {leaderboardService} from '../services/leaderboard.service';
@@ -54,6 +54,14 @@ useEffect(() => {
 
     fetchLeaderboard();
 }, [currentPage]);
+
+if (loading) {
+    return <div>Loading... <Spinner /></div>;
+}
+
+if (error) {
+    return <div>Error: {error}</div>;
+}
 
 
     return (
