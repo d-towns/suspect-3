@@ -7,6 +7,7 @@ import Game from '../pages/game';
 import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Home from '../pages/home';
+import Leaderboard from '../pages/leaderboard';
 
 const router = createBrowserRouter([
   {
@@ -20,6 +21,10 @@ const router = createBrowserRouter([
       {
         path: 'faq',
         element: <FAQ />,
+      },
+      {
+        path: 'leaderboard',
+        element: <Leaderboard />,
       },
       {
         element: <ProtectedRoute />,

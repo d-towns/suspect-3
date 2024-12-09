@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import { usersRouter } from "./routes/users.router.js";
 import { gameRoomRouter } from "./routes/game-room.router.js";
 import { invitesRouter } from "./routes/invties.router.js";
+import { leaderboardRouter } from "./routes/leaderboard.router.js";
 import { GameRoomSocketServer } from "./socket/io.js";
 import { createServer } from "node:http";
 import path from 'path';
@@ -25,12 +26,11 @@ const main = async () => {
         credentials: true
     }));
 
-
-    // 404 handler for any unmatched routes
     // API routes
     app.use('/api/users', usersRouter);
     app.use('/api/games', gameRoomRouter);
     app.use('/api/invites', invitesRouter);
+    app.use('/api/leaderboard', leaderboardRouter);
     // Ping route to check if the server is running, return pong and ms of ping time
     app.get('/api/ping', (req, res) => {
         const pingTime = Date.now() - Number(req.headers['x-ping-time']);
@@ -45,8 +45,6 @@ const main = async () => {
     httpServer.listen(3000, () => {
         console.log('Server is running on port 3000');
     });
-
-    
 
 }
 
