@@ -13,7 +13,7 @@ import  {GameRoomService} from '../../services/game-room.service.js';
         const threadMessages = await client.beta.threads.messages.list(
             threadId, {limit: 100}
           );
-          for (let message of threadMessages.data) {
+          for (let message of threadMessages.data.reverse()) {
               console.log(message.content[0].text)
               console.log("\n")
           }

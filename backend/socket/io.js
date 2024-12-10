@@ -55,6 +55,14 @@ export class GameRoomSocketServer {
       return GameRoomSocketServer.instance;
     }
     this.openaiGameService = new OpenaiGameService();
+    if (!httpServer) {
+      this.io = new Server(3001, {
+        cors: {
+          origin: "*", // Allow all origins
+          methods: ["GET", "POST"],
+        },
+      });
+    }
     this.io = new Server(httpServer, {
       cors: {
         origin: "*", // Allow all origins
@@ -486,6 +494,7 @@ export class GameRoomSocketServer {
 
         // if the game is not over, start the next round
         if (updatedGameState.status == "finished") {
+          OpenaiGameService.endGameAndCalculateResults(roomId);
           this.emitToRoom(roomId, "game-end");
         }
 
@@ -644,7 +653,7 @@ export class GameRoomSocketServer {
         GameRoomSocketServer.instance.io.path()
       );
     } else if (!GameRoomSocketServer.instance && !httpServer) {
-      console.log("No HTTP server provided");
+      new GameRoomSocketServer();
     }
     return GameRoomSocketServer.instance;
   }

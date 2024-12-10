@@ -16,6 +16,8 @@ import { GameRoomSocketServer } from "../socket/io.js";
 import Websocket from "ws";
 import fs from "fs";
 import { GameRoomService } from "./game-room.service.js";
+import { LeaderboardService } from "./leaderboard.service.js";
+import { OpenAIEloService } from "./openai-elo.service.js";
 import {
   saveBase64PCM16ToWav,
   convertAudioMessageDeltasToAudio,
@@ -704,6 +706,34 @@ static async addVotingRoundVote(roomId, vote) {
       ws.send(JSON.stringify({ type: "response.create" }));
       console.log("Sent end interrogation message to realtime API");
     });
+  }
+
+
+  static async endGameAndCalculateResults(threadId, roomId) {
+    try {
+      // Get the final game state
+      const game = await GameRoomService.getGameRoom(roomId);
+      const gameState = GameRoomService.decryptGameState(game.game_state);
+
+      // Create a thread for ELO calculations
+
+      const playerStats = LeaderboardService.getLeaderboardStatsForPlayers(gameState.players.map(player => player.id));
+      // Add player ELOs to thread
+      await OpenAIEloService.addPlayerEloToThread(
+        eloThread.id,
+        playerStats
+      );
+
+      // Add game conversation history
+
+      // Process ELO changes
+      await OpenAIEloService.processGameThread(threadId, roomId);
+
+      console.log('Game results and ELO changes processed successfully');
+    } catch (error) {
+      console.error('Error calculating game results:', error);
+      throw error;
+    }
   }
 
 
