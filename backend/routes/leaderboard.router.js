@@ -66,7 +66,7 @@ async function getUserStats(req, res) {
   const supabase = createSupabaseClient({ req, res });
 
   const { data, error } = await supabase
-    .from("leaderboard")
+    .from("leaderboard_with_usernames")
     .select("*")
     .eq("user_id", userId)
     .single();

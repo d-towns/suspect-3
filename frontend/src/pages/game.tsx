@@ -2,14 +2,16 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
 import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
+import { leaderboardService } from '../services/leaderboard.service';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
+import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 import { FaChevronDown } from 'react-icons/fa';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading,  ScrollArea } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, ScrollArea, Badge } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -97,46 +99,46 @@ const VotingRound: React.FC<VotingRoundProps> = ({
   return (
     <>
       <h2 className="text-2xl font-bold mb-4 text-center">Voting Round</h2>
-        <>
+      <>
+        <div>
+          <p className="text-xl font-bold mb-4 text-center">
+            Interrogator's Deduction
+          </p>
           <div>
-            <p className="text-xl font-bold mb-4 text-center">
-              Interrogator's Deduction
+            <p className="text-lg p-4">
+              {gameState.rounds
+                ?.slice()
+                .reverse()
+                .find((round) => round.status === 'completed')
+                ?.results?.deduction}
             </p>
-            <div>
-              <p className="text-lg p-4">
-                {gameState.rounds
-                  ?.slice()
-                  .reverse()
-                  .find((round) => round.status === 'completed')
-                  ?.results?.deduction}
-              </p>
-            </div>
           </div>
-          <RadioCards.Root
-            className="w-full"
-            value={killerVote}
-            onValueChange={(vote) => setKillerVote(vote)}
-            columns={{ initial: '1', sm: '2' }}
-            disabled={voteSubmitted}
-          >
-            {gameState.players.map((player) => (
-              <RadioCards.Item value={player.id} key={player.id}>
-                <PlayerCard player={player} />
-              </RadioCards.Item>
-            ))}
-          </RadioCards.Root>
-        </>
-        <Flex>
-          <Button
-            onClick={handleVoteSubmission}
-            color={`${killerVote ? 'green' : 'gray'}`}
-            style={{ width: '40%', margin: '20px auto' }}
-            mt="4"
-            disabled={!killerVote || voteSubmitted}
-          >
-            {voteSubmitted ? 'Vote Submitted!' : 'Submit Vote'}
-          </Button>
-        </Flex>
+        </div>
+        <RadioCards.Root
+          className="w-full"
+          value={killerVote}
+          onValueChange={(vote) => setKillerVote(vote)}
+          columns={{ initial: '1', sm: '2' }}
+          disabled={voteSubmitted}
+        >
+          {gameState.players.map((player) => (
+            <RadioCards.Item value={player.id} key={player.id}>
+              <PlayerCard player={player} />
+            </RadioCards.Item>
+          ))}
+        </RadioCards.Root>
+      </>
+      <Flex>
+        <Button
+          onClick={handleVoteSubmission}
+          color={`${killerVote ? 'green' : 'gray'}`}
+          style={{ width: '40%', margin: '20px auto' }}
+          mt="4"
+          disabled={!killerVote || voteSubmitted}
+        >
+          {voteSubmitted ? 'Vote Submitted!' : 'Submit Vote'}
+        </Button>
+      </Flex>
     </>
   );
 };
@@ -239,13 +241,13 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
         Changing Rounds
       </Heading>
       <Flex
-      direction={{ xs: 'column', md: 'row' }}
+        direction={{ xs: 'column', md: 'row' }}
         justify="center"
         align="center"
         gap="2"
         maxHeight="90vh"
         height="100%"
-      
+
       >
         {gameState.rounds.map((round, index) => {
           if (round.type === 'interrogation') {
@@ -261,18 +263,18 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
                           'border border-lime-400 animate-bounce'
                           }`}
                         mt="3"
-                        size={{ md: '9', sm: '6',  xs: '4'  }}
+                        size={{ md: '9', sm: '6', xs: '4' }}
                         fallback={initial}
-                      /> 
-                      <Text size="2" style={{maxWidth: '100px'}} as="p" align="center">
-                         Questioning
+                      />
+                      <Text size="2" style={{ maxWidth: '100px' }} as="p" align="center">
+                        Questioning
                       </Text>
                     </Flex>
                     <Box width={'30px'}>
-                        {index < gameState.rounds.length - 1 && (
-                      <Separator size="4" my="3" />
-                    )}
-                        </Box>
+                      {index < gameState.rounds.length - 1 && (
+                        <Separator size="4" my="3" />
+                      )}
+                    </Box>
                   </Flex>
                 </Box>
               </React.Fragment>
@@ -281,7 +283,7 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
             return (
               <React.Fragment key={index}>
                 <Box>
-                  <Flex align="center" gap="2"       direction={{ xs: 'column', md: 'row' }}>
+                  <Flex align="center" gap="2" direction={{ xs: 'column', md: 'row' }}>
                     <Flex direction="column" align="center" gap="2">
                       <Avatar
                         className={`${round.status === 'active' && 'border border-lime-400 animate-bounce'
@@ -295,13 +297,13 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
                         Voting
                       </Text>
                     </Flex>
-                        <Box width={'30px'}>
-                        {index < gameState.rounds.length - 1 && (
-                      <Separator size="4" my="3" />
-                    )}
-                        </Box>
+                    <Box width={'30px'}>
+                      {index < gameState.rounds.length - 1 && (
+                        <Separator size="4" my="3" />
+                      )}
+                    </Box>
                   </Flex>
-                  
+
                 </Box>
               </React.Fragment>
             );
@@ -313,16 +315,70 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
   );
 };
 
+interface ResultsSummaryProps {
+  elo: number;
+  newElo: number | 0;
+  badges: string[];
+}
+
+const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) => {
+  const eloDiff = newElo == 0 ? 0 : newElo - elo;
+  return (
+    <Flex direction={'column'}>
+
+      <Heading> Results Summary </Heading>
+      <Flex gap={'5'} mt='3'>
+        <Flex gap={'3'} >
+          <Text weight='bold' size='9'>{newElo || elo}</Text>
+          <Text>
+            {eloDiff > 0 ? (
+              eloDiff > 15 ? (
+                <>
+                  <FiChevronsUp /> {eloDiff}
+                </>
+              ) : (
+                <>
+                  <FiChevronUp /> {eloDiff}
+                </>
+              )
+            ) : eloDiff < 0 ? (
+              eloDiff < -15 ? (
+                <>
+                  <FiChevronsDown /> {eloDiff}
+                </>
+              ) : (
+                <>
+                  <FiChevronDown /> {eloDiff}
+                </>
+              )
+            ) : (
+              '----'
+            )}
+          </Text>
+        </Flex>
+        <Flex gap={'2'}>
+          {badges.map((badge, index) => (
+            <Badge key={index} size='2' variant='surface'>{badge}</Badge>
+          ))}
+        </Flex>
+      </Flex>
+    </Flex>
+  )
+}
+
 // GameOver Component
 interface GameOverProps {
   gameState: GameState;
+  elo: number;
+  newElo: number | 0
+  badges: string[];
 }
 
-const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
+const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) => {
   return (
-    <Flex direction="column" gap="4">
-      <Box mt="8">
-        <Box className="flex flex-col items-center justify-center h-full animate-bounce">
+    <Flex direction="column" gap="4" >
+      <Flex>
+        <Box className="flex flex-col w-full items-center justify-center h-full">
           {gameState.outcome?.winner === 'innocents' ? (
             <>
               <Heading className="mb-4 text-4xl">Innocents Win!</Heading>
@@ -334,7 +390,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
                       key={player.id}
                       size="2"
                       variant="surface"
-                      className="p-4 flex flex-col items-center"
+                      className="p-4 flex flex-col items-center animate-bounce"
                     >
                       <Avatar
                         fallback={player.identity.split(',')[0].charAt(0)}
@@ -342,49 +398,57 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
                       />
                       <Text className="mt-2 text-xl">
                         {player.identity.split(',')[0]}
+
                       </Text>
                     </Card>
                   ))}
+                <ResultsSummary elo={elo} newElo={newElo} badges={badges} />
               </Flex>
             </>
           ) : (
             <>
               <Heading className="mb-4 text-4xl">Culprit Wins!</Heading>
-              <Flex gap="4">
-                {gameState.players
-                  .filter((player) => player.isCulprit)
-                  .map((player) => (
-                    <Card
-                      key={player.id}
-                      size="2"
-                      variant="surface"
-                      className="p-4 flex flex-col items-center"
-                    >
-                      <Avatar
-                        fallback={player.identity.split(',')[0].charAt(0)}
-                        size="6"
-                      />
-                      <Text className="mt-2 text-xl">
-                        {player.identity.split(',')[0]}
-                      </Text>
-                    </Card>
-                  ))}
+              <Flex gap="9" my={'4'} width={'80%'} justify={'between'} align={'center'}>
+                <Flex direction={'column'}>
+                  <Heading> Winning Team </Heading>
+                  <Flex mt='9'>
+                    {gameState.players
+                      .filter((player) => player.isCulprit)
+                      .map((player) => (
+                        <Card
+                          key={player.id}
+                          size="2"
+                          variant="surface"
+                          className="p-4 flex flex-col items-center  animate-bounce"
+                        >
+                          <Avatar
+                            fallback={player.identity.split(',')[0].charAt(0)}
+                            size="6"
+                          />
+                          <Text className="mt-2 text-xl">
+                            {player.identity.split(',')[0]}
+                          </Text>
+                        </Card>
+                      ))}
+                  </Flex>
+                </Flex>
+                <ResultsSummary elo={elo} newElo={newElo} badges={badges} />
               </Flex>
             </>
           )}
         </Box>
-      </Box>
+      </Flex>
       <Heading>Game Summary</Heading>
       <ScrollArea
-        className="border rounded-lg p-4"
+        className="border rounded-lg p-4 h-full"
         type="always"
         scrollbars="vertical"
-        style={{ height: 500 }}
+        style={{ height: 350 }}
       >
         <Heading size="7" mt="4" mb="7" align="left">
           Deductions from Each Round
         </Heading>
-        <Flex direction="row" gap="2" justify="center">
+        <Grid columns={'2'} gap={'5'}>
           {gameState.rounds
             .filter((round) => round.type === 'interrogation')
             .map((round, index) => (
@@ -392,7 +456,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
                 key={index}
                 size="2"
                 variant="surface"
-                style={{ maxWidth: '400px', width: '400px' }}
+                style={{ maxWidth: '400px', width: '400px', margin: 'auto' }}
               >
                 <Flex direction="column" align="center">
                   <Text weight="bold" size="6">
@@ -419,7 +483,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState }) => {
                 </Flex>
               </Card>
             ))}
-        </Flex>
+        </Grid>
         <Heading align="left" mb="7" mt="7" size="7">
           Voting Results
         </Heading>
@@ -484,6 +548,9 @@ const Game = () => {
   const [killerVote, setKillerVote] = useState<string>();
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
   const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
+  const [playerElo, setPlayerElo] = useState<{ currentElo: number, updatedElo: number }>({ currentElo: 0, updatedElo: 0 });
+  const [playerBadges, setPlayerBadges] = useState<string[]>([]);
+
   const wavStreamPlayerRef = useRef<WavStreamPlayer>(
     new WavStreamPlayer({ sampleRate: 24000 })
   );
@@ -506,32 +573,32 @@ const Game = () => {
 
   const handleUserAudioTranscriptEvent = useCallback((params: any) => {
     console.log('Received audio transcript:', params);
-    const {speaker, audioTranscript, currentRoundTime} = params;
-    setInterrogationTranscript(prev => [...prev, { audioTranscript , timestamp: currentRoundTime, speaker}]);
+    const { speaker, audioTranscript, currentRoundTime } = params;
+    setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker }]);
     setAudioTranscribing(false);
   }, [roundTimer]);
 
   const handleRealtimeAudioTranscriptEvent = (params: any) => {
-    const {speaker, transcript, currentRoundTime} = params;
+    const { speaker, transcript, currentRoundTime } = params;
     setInterrogationTranscript(prev => {
       const lastItem = prev[prev.length - 1];
       if (!lastItem) {
         // If there's no last item, create a new one and add the delta as the first text of the transcript
         return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
-      } else if(lastItem.speaker !== speaker) {
+      } else if (lastItem.speaker !== speaker) {
         // If the speaker has changed, create a new item
         return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
       }
       const updatedItem = {
         ...lastItem,
-        audioTranscript: lastItem.audioTranscript + transcript, 
+        audioTranscript: lastItem.audioTranscript + transcript,
         speaker
       };
       return [...prev.slice(0, prev.length - 1), updatedItem];
     });
   };
 
-  const handleRealtimeAudioDeltaEvent = async (params: {speaker: string, audio: Int16Array}) => {
+  const handleRealtimeAudioDeltaEvent = async (params: { speaker: string, audio: Int16Array }) => {
     console.log('Received audio delta:', params);
     const { audio } = params;
     // check if params is a int16array
@@ -541,42 +608,43 @@ const Game = () => {
       wavStreamPlayer.add16BitPCM(new Int16Array(audio));
     }
   }
-    
+
+  const handleLeaderboardStatsUpdate = (params: any) => {
+    console.log('Leaderboard stats update:', params);
+    const { elo, badges } = params;
+    setPlayerElo(prev => ({ ...prev, updatedElo: elo }));
+    setPlayerBadges(badges);
+  }
+
+
+
+
 
 
   useEffect(() => {
     if (socket) {
-      console.log('Adding listeners');
       socket.on('game-state-update', (newState: GameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
         setInterrogationTranscript([]);
         setResultsLoading(false);
-
       });
+
       socket.on('game-state-updating', () => {
-        console.log('Game state is updating');
-        
         setResultsLoading(true);
       });
 
-
-
       socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
-      socket.on('realtime-audio-transcript-delta',handleRealtimeAudioTranscriptEvent);
+      socket.on('realtime-audio-transcript-delta', handleRealtimeAudioTranscriptEvent);
 
       socket.on('round-timer-tick', (params: any) => {
         setRoundTimer(params.countdown);
-        console.log('Round timer tick:', params.countdown);
       });
-
-      socket.on('voting-round-start', (params: any) => {
-        console.log('Voting round starting:', params);
-      });
-
 
       socket.on('user-audio-transcript', handleUserAudioTranscriptEvent);
+
+      socket.on('leaderboard-stats-update', handleLeaderboardStatsUpdate);
 
 
       joinRoom(roomId);
@@ -587,9 +655,8 @@ const Game = () => {
       if (socket) {
         console.log('Removing listeners');
         socket.off('game-state-update');
-        socket.off('realtime-audio-message');
+        socket.off('game-state-updating');
         socket.off('round-timer-tick');
-        socket.off('voting-round-start');
         socket.off('user-audio-transcript');
         socket.off('realtime-audio-transcript-delta');
         socket.off('realtime-audio-delta');
@@ -597,6 +664,8 @@ const Game = () => {
       }
     };
   }, [socket]);
+
+
 
 
   useEffect(() => {
@@ -616,6 +685,7 @@ const Game = () => {
 
 
   useEffect(() => {
+
     const setCurrentPlayerState = () => {
       if (gameState && user) {
         const player = gameState.players.find(player => player.id === user.id);
@@ -634,8 +704,22 @@ const Game = () => {
       }
     }
 
+    // TODO: clean up this function in the return statement
+    const getUserElo = async () => {
+      if (!user) {
+        return;
+      }
+      leaderboardService.getUserStats(user?.id || '').then((response) => {
+        setPlayerElo(prev => ({ ...prev, currentElo: response?.stats?.elo || 0 }));
+      });
+    }
+
+
     setCurrentPlayerState();
+    getUserElo();
     getActiveRoundFromGameState();
+
+
 
   }, [gameState, user]);
 
@@ -679,7 +763,7 @@ const Game = () => {
     }
 
     if (gameIsOver) {
-      return <GameOver gameState={gameState} />;
+      return <GameOver elo={playerElo.currentElo} newElo={playerElo.updatedElo} badges={playerBadges} gameState={gameState} />;
     }
 
     if (resultsLoading) {
@@ -766,23 +850,24 @@ const Game = () => {
   return (
     <Box>
       <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
+      {/* <Button onClick={() => handleLeaderboardStatsUpdate({ elo: 220, badges: ['Strategist', 'Crash Out'] })}>Update ELO </Button> */}
       <Box className="h-screen flex">
         {/* Main game area */}
         <Flex px={'5'} py={'5'} gap={'4'} className='w-full'>
           {/* Left panel: Crime and Evidence */}
           <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '400px' }}>
             {/* Round Timer */}
-            
-              <Box className="timerBox mb-4 p-4 rounded border">
-                {roundTimer > 0 ? (
-                  <>
-                <Text as='p' size={'5'}>Round Timer</Text>
-                <Text as='p' size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
+
+            <Box className="timerBox mb-4 p-4 rounded border">
+              {roundTimer > 0 ? (
+                <>
+                  <Text as='p' size={'5'}>Round Timer</Text>
+                  <Text as='p' size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
                 </>
-                ) : (
-                  <Text as='p' size={'5'}>Game Over</Text>
-                )}
-              </Box>
+              ) : (
+                <Text as='p' size={'5'}>Game Over</Text>
+              )}
+            </Box>
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
             <ScrollArea>
