@@ -605,22 +605,6 @@ static async addVotingRoundVote(roomId, vote) {
                 content: `Interrogator: ${interrogatorTranscript}`,
               });
               break;
-            // case "response.audio.delta":
-            //   console.log("Response audio delta received in realtime session");
-            //   if(!this.lastAudioMessageDeltas.has(roomId)) {
-            //     this.lastAudioMessageDeltas.set(roomId, []);
-            //   }
-            //   this.lastAudioMessageDeltas.get(roomId).push(event.delta);
-            //   break;
-
-            // case "response.audio_transcript.delta":
-            //   console.log("Response audio transcript delta received in realtime session");
-            //   // TODO: emit an event to the client with the transcript delta so that the client can display the transcript in real-time
-            //   if(!this.lastAudioMessageTranscript.has(roomId)) {
-            //     this.lastAudioMessageTranscript.set(roomId, []);
-            //   }
-            //   this.lastAudioMessageTranscript.get(roomId).push(event.delta);
-            //   break;
             default:
               console.warn("Unhandled event type:", event.type);
               break;

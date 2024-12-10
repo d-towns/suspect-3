@@ -103,9 +103,4 @@ async function getRoom(req, res) {
   return res.status(200).json({ success: true, room: data });
 }
 
-// Utility function to generate unique room UUID
-const generateRoomId = () => {
-  return 
-};
-
 export { router as gameRoomRouter };
