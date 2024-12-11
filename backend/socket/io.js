@@ -393,6 +393,7 @@ export class GameRoomSocketServer {
     // function to start the first round, this will be called after the first round timer ends
     // this will start the first round and then start the interval for the rest of the rounds
     const emitRoundStart = async () => {
+      try {
       console.log("Starting round...");
       this.emitToRoom(roomId, "round-end");
 
@@ -422,6 +423,7 @@ export class GameRoomSocketServer {
       if (nextRoundPlayerSocket) {
         // check to see what type of round it is
         if (nextRound.type == "interrogation") {
+
           // if(true) {
           await OpenaiGameService.openRealtimeSession(
             roomId,
@@ -456,6 +458,9 @@ export class GameRoomSocketServer {
           clearRoundTimer: clear,
         });
       }
+    } catch (error) {
+      console.error("Error starting round:", error);
+    }
     };
 
     const handleRoundEnd = async () => {
