@@ -462,7 +462,7 @@ static async addVotingRoundVote(roomId, vote) {
         "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01";
       const ws = new Websocket(url, {
         headers: {
-          Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+          Authorization: "Bearer " + process.env.NODE_ENV === 'dev' ? process.env.OPENAI_API_KEY : process.env.OPENAI_SERVICE_API_KEY_TEST,
           "OpenAI-Beta": "realtime=v1",
         },
       });
