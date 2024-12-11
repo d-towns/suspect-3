@@ -329,7 +329,7 @@ export const Lobby: React.FC = () => {
             </Heading>
             <Separator size={'4'} />
             <ScrollArea style={{ height: '200px', marginTop: '8px' }}>
-              <Box ref={chatMessagesRef} pr="2">
+              <Box ref={chatMessagesRef} pr="2" className='flex flex-col'>
                 {lobbyState.chat.messages.map((message, index) => (
                   <Text key={index} mt="2">
                     <strong>{message.userEmail}:</strong> {message.message}
@@ -337,7 +337,7 @@ export const Lobby: React.FC = () => {
                 ))}
               </Box>
             </ScrollArea>
-            <Flex mt="2" gap="2">
+            <Flex mt="2" gap="2" >
               <TextField.Root
                 placeholder="Type a message..."
                 value={lobbyState.chat.inputMessage}

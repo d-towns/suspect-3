@@ -38,10 +38,10 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
         </Text>
         </DropdownMenu.Label>
         <Separator size={'4'} />
-        <DropdownMenu.Item onSelect={() => navigate('/profile')} className='my-2'>
+        <DropdownMenu.Item  className='my-2'>
           Profile
         </DropdownMenu.Item>
-        <DropdownMenu.Item onSelect={() => navigate('/settings')} className='mb-2'>
+        <DropdownMenu.Item className='mb-2'>
           Settings
         </DropdownMenu.Item>
         <Separator size={'4'} />

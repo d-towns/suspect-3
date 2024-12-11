@@ -11,11 +11,12 @@ import { FaChevronDown } from 'react-icons/fa';
 import AudioRecorder from '../components/audio-recorder';
 import ResponseLoading from '../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, ScrollArea, Badge } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, ScrollArea, Badge, TextField } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
+import { ChatMessage } from '../models';
 
 
 
@@ -324,7 +325,7 @@ interface ResultsSummaryProps {
 const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) => {
   const eloDiff = newElo == 0 ? 0 : newElo - elo;
   return (
-    <Flex direction={'column'}>
+    <Flex direction={'column'} align={'center'}>
 
       <Heading> Results Summary </Heading>
       <Flex gap={'5'} mt='3'>
@@ -382,7 +383,8 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
           {gameState.outcome?.winner === 'innocents' ? (
             <>
               <Heading className="mb-4 text-4xl">Innocents Win!</Heading>
-              <Flex gap="4">
+              <Flex gap="4"  mt={'9'} direction={{sm: 'column', md: 'row'}} width={'80%'} justify={'between'} align={'center'}>
+                <Flex gap="4" >
                 {gameState.players
                   .filter((player) => !player.isCulprit)
                   .map((player) => (
@@ -390,7 +392,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
                       key={player.id}
                       size="2"
                       variant="surface"
-                      className="p-4 flex flex-col items-center animate-bounce"
+                      className="p-4 flex flex-col items-center lg:animate-bounce  "
                     >
                       <Avatar
                         fallback={player.identity.split(',')[0].charAt(0)}
@@ -402,13 +404,14 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
                       </Text>
                     </Card>
                   ))}
+                  </Flex>
                 <ResultsSummary elo={elo} newElo={newElo} badges={badges} />
               </Flex>
             </>
           ) : (
             <>
               <Heading className="mb-4 text-4xl">Culprit Wins!</Heading>
-              <Flex gap="9" my={'4'} width={'80%'} justify={'between'} align={'center'}>
+              <Flex gap="9" mt={'9'} width={'80%'} justify={'between'} align={'center'} direction={{sm: 'column', md: 'row'}} >
                 <Flex direction={'column'}>
                   <Heading> Winning Team </Heading>
                   <Flex mt='9'>
@@ -419,7 +422,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
                           key={player.id}
                           size="2"
                           variant="surface"
-                          className="p-4 flex flex-col items-center  animate-bounce"
+                          className="p-4 flex flex-col items-center  lg:animate-bounce"
                         >
                           <Avatar
                             fallback={player.identity.split(',')[0].charAt(0)}
@@ -443,12 +446,12 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
         className="border rounded-lg p-4 h-full"
         type="always"
         scrollbars="vertical"
-        style={{ height: 350 }}
+        style={{ height: '50vh' }}
       >
         <Heading size="7" mt="4" mb="7" align="left">
           Deductions from Each Round
         </Heading>
-        <Grid columns={'2'} gap={'5'}>
+        <Grid columns={{md: '1', lg:"2"}} gap={'5'}>
           {gameState.rounds
             .filter((round) => round.type === 'interrogation')
             .map((round, index) => (
@@ -532,7 +535,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
 
 
 const Game = () => {
-  const { socket, emitEvent, joinRoom } = useSocketContext();
+  const { socket, emitEvent, joinRoom, sendChatMessage } = useSocketContext();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
@@ -540,6 +543,7 @@ const Game = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
   const nodeRef = useRef(null);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
   const [roundTimer, setRoundTimer] = useState<number>(0);
   const [resultsLoading, setResultsLoading] = useState<boolean>(false);
   const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
@@ -550,6 +554,14 @@ const Game = () => {
   const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
   const [playerElo, setPlayerElo] = useState<{ currentElo: number, updatedElo: number }>({ currentElo: 0, updatedElo: 0 });
   const [playerBadges, setPlayerBadges] = useState<string[]>([]);
+  const [chatState, setChatState] = useState<{
+    messages: ChatMessage[];
+    inputMessage: string;
+  }>({
+    messages: [],
+    inputMessage: '',
+  }
+  );
 
   const wavStreamPlayerRef = useRef<WavStreamPlayer>(
     new WavStreamPlayer({ sampleRate: 24000 })
@@ -617,7 +629,27 @@ const Game = () => {
   }
 
 
+  const addChatMessage = (messageData: ChatMessage) => {
+    console.log('Received chat message:', messageData);
+    setChatState(prev => ({
+      ...prev,
+      messages: [...prev.messages, messageData]
+    }));
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  };
 
+  const handleSendMessage = () => {
+    console.log('Sending message:', chatState.inputMessage);
+    if(!chatState.inputMessage) {
+      return;
+    }
+    sendChatMessage(chatState.inputMessage);
+    setChatState(prev => ({messages:[ ...prev.messages , {message: prev.inputMessage, userEmail: user?.username || 'YOU'}] , inputMessage: ''}));
+
+
+  };
 
 
 
@@ -632,6 +664,10 @@ const Game = () => {
 
       socket.on('game-state-updating', () => {
         setResultsLoading(true);
+      });
+
+      socket.on('chat-message', () => {
+        console.log('Received chat message');
       });
 
       socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
@@ -660,6 +696,9 @@ const Game = () => {
         socket.off('user-audio-transcript');
         socket.off('realtime-audio-transcript-delta');
         socket.off('realtime-audio-delta');
+      socket.off('leaderboard-stats-update');
+      socket.off('chat-message');
+
         // Remove other listeners
       }
     };
@@ -685,6 +724,7 @@ const Game = () => {
 
 
   useEffect(() => {
+    //
 
     const setCurrentPlayerState = () => {
       if (gameState && user) {
@@ -847,6 +887,12 @@ const Game = () => {
     return <></>
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
+
   return (
     <Box>
       <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
@@ -871,9 +917,40 @@ const Game = () => {
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
             <ScrollArea>
+            <Box mt={'4'} >
+            <Heading size="4" mb="2">
+              Chat
+            </Heading>
+            <Separator size={'4'} />
+            <ScrollArea style={{ height: '200px', marginTop: '8px' }}>
+              <Box ref={chatMessagesRef} pr="2">
+                {chatState.messages.map((message, index) => (
+                  <Text key={index} mt="2">
+                    <strong>{message.userEmail}:</strong> {message.message}
+                  </Text>
+                ))}
+              </Box>
+            </ScrollArea>
+            <Flex mt="2" gap="2">
+              <TextField.Root
+                placeholder="Type a message..."
+                value={chatState.inputMessage}
+                onChange={(e) =>
+                  setChatState((prev) => ({
+                    ...prev,
+                    inputMessage: e.target.value,
+                  }))
+                }
+                onKeyDown={handleKeyDown}
+                style={{ flex: 1 }}
+              />
+              <Button onClick={handleSendMessage}>Send</Button>
+            </Flex>
+          </Box>
+
               <Accordion.Root
                 type="multiple"
-                className="w-full rounded-md shadow-md px-2"
+                className="w-full rounded-md shadow-md px-2 mt-9"
               >
 
                 <Accordion.Item value="identity-evidence" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_1px] focus-within:shadow-mauve12">
@@ -927,6 +1004,7 @@ const Game = () => {
                 </Accordion.Item>
 
               </Accordion.Root>
+
             </ScrollArea>
           </Card>
           <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>

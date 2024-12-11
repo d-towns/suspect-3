@@ -123,19 +123,38 @@ const Login: React.FC = () => {
             Dive into the ultimate web-based mystery where deception meets strategy.
           </Text>
           <Text size="3">
-            Assign your unique identity, gather crucial evidence, and have five intense minutes to prove your innocence to our intelligent interrogator.
+            A game of wit and deception, Suspect is a multiplayer online game where players take on the role of a detective or a suspect. 
           </Text>
+          <Flex direction="row" gap="4" justify="center">
+            <Card
+              size="2"
+              variant="surface"
+              className="flex-1 cursor-pointer transition-transform duration-300 hover:scale-105 border border-transparent hover:border-orange-500"
+            >
+              <Heading size="5">Single Player</Heading>
+              <Text size="3">
+                Play as the dectective and solve the mystery by gathering evidence and questioning AI suspects via real-time voice conversation.
+              </Text>
+            </Card>
+            <Card
+              size="2"
+              variant="surface"
+              className="flex-1 cursor-pointer transition-transform duration-300 hover:scale-105 border border-transparent hover:border-orange-500"
+            >
+              <Heading size="5">Multiplayer</Heading>
+              <Text size="3">
+                Enter the interrogation room as a suspect or the culprit. Use your wit to deceive others and avoid getting framed...or caught!
+              </Text>
+            </Card>
+          </Flex>
           <Text size="3">
-            Navigate through rounds of interrogation and voting, uncover inconsistencies, and work with your team to keep the average guilt score below 0.30.
-          </Text>
-          <Text size="3">
-            Are you ready to outsmart others and reveal the true culprit? Join Suspect 3 now and put your detective skills to the test!
+            Are you ready to outsmart others and reveal the true culprit? Join Suspect now and put your detective skills to the test!
           </Text>
         </Flex>
       </Card>
       <Card size="3" variant="surface" style={{ width: '100%', padding: '60px', maxWidth: '600px' }}>
-      <Tabs.Root defaultValue="account" className='w-full'>
-        <Tabs.List className='mb-6 flex align-center'>
+      <Tabs.Root defaultValue="account" className='w-full flex flex-col justify-center'>
+        <Tabs.List className='mb-6 flex justify-center'>
         <Tabs.Trigger value="account">Account</Tabs.Trigger>
         <Tabs.Trigger value="guest">Guest</Tabs.Trigger>
         </Tabs.List>
