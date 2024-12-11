@@ -466,6 +466,8 @@ static async addVotingRoundVote(roomId, vote) {
           "OpenAI-Beta": "realtime=v1",
         },
       });
+      console.log('key being used', process.env.NODE_ENV === 'dev' ? process.env.OPENAI_API_KEY : process.env.OPENAI_SERVICE_API_KEY_TEST);
+
       const socketServer = GameRoomSocketServer.getInstance();
 
       console.log("Connecting to OpenAI Realtime API...");
@@ -477,7 +479,6 @@ static async addVotingRoundVote(roomId, vote) {
 
       ws.on("error", (error) => {
         console.error("Error with OpenAI Realtime API:", error);
-        reject(error);
       });
 
       ws.on("message", async (data) => {
