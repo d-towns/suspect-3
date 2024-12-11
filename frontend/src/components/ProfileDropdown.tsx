@@ -25,14 +25,14 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
           size="2"
           style={{ borderRadius: '30%'  }}
           aria-label="Profile options"
-          className='transition transform duration-200 ease-in-out hover:scale-110'
+          className='transition transform duration-200 ease-in-out'
         >
           <Avatar size={'2'} fallback={email.charAt(0).toUpperCase()}>
           </Avatar>
         </Button>
       </DropdownMenu.Trigger>
 
-      <DropdownMenu.Content align="center" style={{width: '150px'}}>
+      <DropdownMenu.Content align="start" style={{width: '200px'}}>
         <DropdownMenu.Label className='my-2' >
         <Text as="div"  size="2" color="gray" my={"3"}>
           {email}

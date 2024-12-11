@@ -11,7 +11,7 @@ import {
   Inset,
   Strong,
 } from '@radix-ui/themes';
-import {Waitlist, GetWaitlistWidget} from '../components/waitlist';
+import {Waitlist} from '../components/waitlist';
 
 
 interface ModeCardProps {

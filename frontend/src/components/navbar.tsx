@@ -6,7 +6,7 @@ import { Invite } from '../models/invite.model';
 import moment from 'moment';
 import InvitesDropdown from './InvitesDropdown';
 import ProfileDropdown from './ProfileDropdown';
-import { Box, Flex, Heading, Text } from '@radix-ui/themes';
+import { Box, Flex, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
 import './navbar.css';
@@ -58,11 +58,11 @@ const Navbar: React.FC = () => {
 
   return (
     <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }}>
-      <Flex align="center" justify="between">
-        <RouterLink to="/" style={{ textDecoration: 'none' }}>
-          <Heading className=" hover:scale-110 transition ease-in-out main-header" size="8">
+      <Flex align="center" justify="between" >
+        <RouterLink to="/">
+          <Text className=" hover:scale-110 transition ease-in-out main-header"size="8">
             Suspect
-          </Heading>
+          </Text>
         </RouterLink>
         <Flex align="center" justify={'center'} gap="6">
           <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header text-2xl'  to="/play" color="gray">

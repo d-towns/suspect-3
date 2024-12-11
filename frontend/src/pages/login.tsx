@@ -27,7 +27,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (user?.email) {
       navigate('/play');
     }
   }, [user, navigate]);
