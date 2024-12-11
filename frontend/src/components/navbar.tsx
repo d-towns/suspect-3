@@ -60,7 +60,7 @@ const Navbar: React.FC = () => {
     <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }} className=''>
       <Flex align="center" justify="between" >
         <RouterLink to="/">
-          <Text className="hover:scale-110 transition ease-in-out main-header md:text-2xl xs:text-xl"size="8">
+          <Text className="hover:scale-110 transition ease-in-out main-header md:text-3xl xs:text-xl"size="8">
             Suspect
           </Text>
         </RouterLink>

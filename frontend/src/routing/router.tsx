@@ -23,10 +23,6 @@ const router = createBrowserRouter([
         element: <FAQ />,
       },
       {
-        path: 'leaderboard',
-        element: <Leaderboard />,
-      },
-      {
         path: 'terms',
         element: <Terms />,
       },
@@ -36,6 +32,10 @@ const router = createBrowserRouter([
           {
             path: 'play',
             element: <PlayMenu />,
+          },
+          {
+            path: 'leaderboard',
+            element: <Leaderboard />,
           },
           {
             path: 'lobby/:roomId',
