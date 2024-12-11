@@ -8,6 +8,7 @@ import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Home from '../pages/home';
 import Leaderboard from '../pages/leaderboard';
+import Terms from '../pages/terms';
 
 const router = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ const router = createBrowserRouter([
       {
         path: 'leaderboard',
         element: <Leaderboard />,
+      },
+      {
+        path: 'terms',
+        element: <Terms />,
       },
       {
         element: <ProtectedRoute />,
