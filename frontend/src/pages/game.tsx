@@ -325,12 +325,14 @@ interface ResultsSummaryProps {
 const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) => {
   const eloDiff = newElo == 0 ? 0 : newElo - elo;
   return (
-    <Flex direction={'column'} align={'center'}>
+    <Flex direction={'column'} >
 
       <Heading> Results Summary </Heading>
       <Flex gap={'5'} mt='3'>
         <Flex gap={'3'} >
-          <Text weight='bold' size='9'>{newElo || elo}</Text>
+
+          <Text weight='bold' size='9'>{newElo || elo}<Text size={'3'} as='p'> New Rank</Text></Text>
+
           <Text>
             {eloDiff > 0 ? (
               eloDiff > 15 ? (
@@ -383,7 +385,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
           {gameState.outcome?.winner === 'innocents' ? (
             <>
               <Heading className="mb-4 text-4xl">Innocents Win!</Heading>
-              <Flex gap="4"  mt={'9'} direction={{sm: 'column', md: 'row'}} width={'80%'} justify={'between'} align={'center'}>
+              <Flex gap="4"  mt={'9'} direction={{sm: 'column', md: 'row'}} width={'80%'} justify={'between'} >
                 <Flex gap="4" >
                 {gameState.players
                   .filter((player) => !player.isCulprit)
@@ -916,7 +918,7 @@ const Game = () => {
             </Box>
 
             {/* Accordion for Identity, Evidence, and Guilt Scores */}
-            <ScrollArea>
+            <ScrollArea style={{ height: '800px', marginTop: '8px' }}>
             <Box mt={'4'} >
             <Heading size="4" mb="2">
               Chat
@@ -924,11 +926,15 @@ const Game = () => {
             <Separator size={'4'} />
             <ScrollArea style={{ height: '200px', marginTop: '8px' }}>
               <Box ref={chatMessagesRef} pr="2">
+                <ScrollArea>
+                  <Flex direction="column">
                 {chatState.messages.map((message, index) => (
                   <Text key={index} mt="2">
                     <strong>{message.userEmail}:</strong> {message.message}
                   </Text>
                 ))}
+                </Flex>
+                </ScrollArea>
               </Box>
             </ScrollArea>
             <Flex mt="2" gap="2">
