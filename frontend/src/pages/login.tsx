@@ -12,6 +12,7 @@ import {
   Card,
   Tabs,
   Checkbox,
+  Spinner,
 } from '@radix-ui/themes';
 
 const Login: React.FC = () => {
@@ -20,6 +21,7 @@ const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [guestUsername, setGuestUsername] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState(false);
@@ -33,6 +35,7 @@ const Login: React.FC = () => {
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    setLoading(true);
     e.preventDefault();
     setError('');
 
@@ -40,8 +43,10 @@ const Login: React.FC = () => {
       if (isSignup) {
         await signup(email, password, username);
         setSignupSuccess(true);
+        setLoading(false);
       } else {
         await login(email, password);
+        setLoading(false);
       }
     } catch (err) {
       setError(
@@ -53,11 +58,13 @@ const Login: React.FC = () => {
   };
 
   const handleGuestSubmit = async (e: React.FormEvent) => {
+    setLoading(true);
     e.preventDefault();
     setError('');
 
     try {
       await guestSignIn(guestUsername);
+      setLoading(false);
     } catch (err) {
       setError(
         `An error occurred. Please try again. ${err instanceof Error ? err.message : ''
@@ -205,7 +212,9 @@ const Login: React.FC = () => {
                     </Flex>
                   </Text> )}
                   <Button type="submit" mt="4">
-                    {isSignup ? 'Sign Up' : 'Sign In'}
+
+                    { !loading && (isSignup ? 'Sign Up' : 'Sign In')}
+                    {loading && <Spinner />}
                   </Button>
                 </Flex>
               </form>
