@@ -6,7 +6,6 @@ import {
   Text,
   Separator,
 } from '@radix-ui/themes';
-import { useNavigate } from 'react-router-dom';
 
 interface ProfileDropdownProps {
   logout: () => void;
@@ -14,7 +13,6 @@ interface ProfileDropdownProps {
 }
 
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: email }) => {
-  const navigate = useNavigate();
 
   return (
     <DropdownMenu.Root>

@@ -668,9 +668,7 @@ const Game = () => {
         setResultsLoading(true);
       });
 
-      socket.on('chat-message', () => {
-        console.log('Received chat message');
-      });
+      socket.on('chat-message', addChatMessage);
 
       socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
