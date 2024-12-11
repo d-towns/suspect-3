@@ -70,7 +70,7 @@ const Waitlist: React.FC = () => {
 
         <Box>
             {signedUp ? <Text size={'4'} as="p" align='center' weight={'bold'}>Thanks for signing up!</Text> :
-                <Flex gap={'3'}>
+                <Flex gap={'3'} direction={{xs:'column', md:'row'}} align="center" justify="center">
                     <TextField.Root
                         placeholder="example@getwaitlist.com"
                         type="email"

@@ -57,21 +57,21 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }}>
+    <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }} className=''>
       <Flex align="center" justify="between" >
         <RouterLink to="/">
-          <Text className=" hover:scale-110 transition ease-in-out main-header"size="8">
+          <Text className="hover:scale-110 transition ease-in-out main-header md:text-2xl xs:text-xl"size="8">
             Suspect
           </Text>
         </RouterLink>
-        <Flex align="center" justify={'center'} gap="6">
-          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header text-2xl'  to="/play" color="gray">
+        <Flex align="center" justify={'center'} gap="6" className='md:text-2xl xs:text-xl'>
+          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header'  to="/play" color="gray">
            <Text>Play</Text> 
           </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header text-2xl'  to="/faq" color="gray">
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="/faq" color="gray">
             How To Play
           </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header text-2xl'  to="/leaderboard" color="gray">
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="/leaderboard" color="gray">
             Leaderboard
           </RouterLink>
           {user && (

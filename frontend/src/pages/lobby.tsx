@@ -298,9 +298,9 @@ export const Lobby: React.FC = () => {
             <Box mt="4">
               {Array.from(lobbyState.players.values()).map((player, index) => (
 
-                <Flex key={player.username} align="center" gap="2" mt="4">
+                <Flex key={player.username || player.email} align="center" gap="2" mt="4">
                   <Text size={'4'}>{index +1}. </Text>
-                  <Text size={'4'}>{player.username}</Text>
+                  <Text size={'4'}>{player.username || player.email}</Text>
                   {player.isReady ? <Badge color="green">Ready</Badge> : <Badge color="red">Not Ready</Badge>}
                   {player.username === user?.username && <Badge color="blue">You</Badge>}
                   {player?.id === lobbyState.room?.host_id && <Badge color="orange">Host</Badge>}

@@ -79,11 +79,11 @@ const ModeCard: React.FC<ModeCardProps> = ({
           }}
           variant='surface'
         >
-          <Text as="p" align='center' size="8">
+          <Text as="p" align='center' size={{ lg: '5', md: '4', sm: '3'}} >
             <Strong>Coming Soon!</Strong>
             
           </Text>
-          <Text as="p" size='5'my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
+          <Text as="p" size={{ lg: '5', md: '4', sm: '3'}} my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
           <Waitlist />
         </Card>
       )}
