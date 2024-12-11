@@ -479,6 +479,7 @@ static async addVotingRoundVote(roomId, vote) {
 
       ws.on("error", (error) => {
         console.error("Error with OpenAI Realtime API:", error);
+        reject(error);
       });
 
       ws.on("message", async (data) => {
