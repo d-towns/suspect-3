@@ -1,5 +1,5 @@
 # Suspect
-
+![Screenshot 2024-12-10 at 10 22 10 PM](https://github.com/user-attachments/assets/5e89defd-06dc-4d47-a19c-43e88cd7ea44)
 Suspect is a web-based multiplayer game that combines mystery, strategy, and deception. Players take on the roles of detectives or suspects in an engaging game where wit and deduction are key.
 
 ## Game Features
@@ -28,6 +28,7 @@ Suspect is a web-based multiplayer game that combines mystery, strategy, and dec
 
     ```bash
     cd backend && npm start
+
     ```
 
     The server will start at `http://localhost:3000`.
