@@ -107,15 +107,35 @@ const Login: React.FC = () => {
 
   return (
     <Flex
-      direction="column"
+      direction="row"
       align="center"
       justify="center"
       style={{ minHeight: '100vh', height: '100%' }}
       px="4"
+      gap='9'
     >
-      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px' }}>
+      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px',  padding: '60px', textAlign: 'center' }}>
+        <Heading size="9" mb="4" style={{fontFamily:"Barriecito"}}>
+         Suspect
+        </Heading>
+        <Flex direction="column" gap="4" mt="4" style={{margin:'auto'}}>
+          <Text size="6" weight="bold">
+            Dive into the ultimate web-based mystery where deception meets strategy.
+          </Text>
+          <Text size="3">
+            Assign your unique identity, gather crucial evidence, and have five intense minutes to prove your innocence to our intelligent interrogator.
+          </Text>
+          <Text size="3">
+            Navigate through rounds of interrogation and voting, uncover inconsistencies, and work with your team to keep the average guilt score below 0.30.
+          </Text>
+          <Text size="3">
+            Are you ready to outsmart others and reveal the true culprit? Join Suspect 3 now and put your detective skills to the test!
+          </Text>
+        </Flex>
+      </Card>
+      <Card size="3" variant="surface" style={{ width: '100%', padding: '60px', maxWidth: '600px' }}>
       <Tabs.Root defaultValue="account" className='w-full'>
-        <Tabs.List className='mb-6'>
+        <Tabs.List className='mb-6 flex align-center'>
         <Tabs.Trigger value="account">Account</Tabs.Trigger>
         <Tabs.Trigger value="guest">Guest</Tabs.Trigger>
         </Tabs.List>

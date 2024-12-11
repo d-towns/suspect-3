@@ -5,7 +5,6 @@ const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
 import OpenaiGameService from "../services/openai-game-service.js";
 import { GameRoomService } from "../services/game-room.service.js";
-import NodeCache from 'node-cache';
 
 function startInterval(initialNumber, tickCallback, doneCallback) {
   let intervalId;
