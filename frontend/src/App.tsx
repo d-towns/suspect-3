@@ -7,6 +7,7 @@ import { SocketProvider } from './context/SocketContext/socket.context';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import "@radix-ui/themes/styles.css";
 import { Theme } from "@radix-ui/themes";
+import Footer from './components/footer';
 
 const App: React.FC = () => {
   return (
@@ -33,6 +34,7 @@ const ThemedApp: React.FC = () => {
         <main className="flex-grow">
           <Outlet />
         </main>
+        <Footer />
       </div>
     </Theme>
     </React.StrictMode>

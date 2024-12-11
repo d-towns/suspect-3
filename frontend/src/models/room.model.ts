@@ -6,4 +6,5 @@ export interface GameRoom {
     host_id: string;
     game_state: GameState | string | null;
     thread_id: string;
+    mode: string;
   }

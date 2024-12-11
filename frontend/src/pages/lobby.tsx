@@ -83,6 +83,7 @@ export const Lobby: React.FC = () => {
         console.log('Players in room:', players);
         updatePlayerList(players);
         const room = await roomsService.getRoom(roomId);
+        
         console.log('Room:', room);
 
         setLobbyState(prevState => ({
@@ -362,7 +363,7 @@ export const Lobby: React.FC = () => {
               onClick={handleStartGameClick}
               style={{ flex: 1 }}
               disabled={
-                !lobbyState.gameStatus.allPlayersReady || lobbyState.gameStarting
+                !lobbyState.gameStatus.allPlayersReady || lobbyState.gameStarting || lobbyState.players.size < 2
               }
             >
               {lobbyState.gameStarting ? 'Starting Game...' : 'Start Game'}

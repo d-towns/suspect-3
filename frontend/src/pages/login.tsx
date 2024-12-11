@@ -108,7 +108,7 @@ const Login: React.FC = () => {
 
   return (
     <Flex
-      direction="row"
+      direction={{ xs: 'column', md: 'row' }}
       align="center"
       justify="center"
       style={{ minHeight: '100vh', height: '100%' }}
