@@ -6,7 +6,6 @@ import Lobby from '../pages/lobby';
 import Game from '../pages/game';
 import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
-import Home from '../pages/home';
 import Leaderboard from '../pages/leaderboard';
 import Terms from '../pages/terms';
 
@@ -34,10 +33,6 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          {
-            path: 'home', 
-            element: <Home />,
-          },
           {
             path: 'play',
             element: <PlayMenu />,

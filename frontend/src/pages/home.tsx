@@ -6,7 +6,7 @@ import './home.css'
 
 const Home: React.FC = () => {
     return (
-        <Flex justify="center" align="center" style={{ height: '100vh', width: '100%' }}>
+        <Flex justify="center" align="center" style={{ height: '100vh', width: '100%' }} mt={'2'}>
             <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '800px', padding: '50px'}} >
                 <Inset clip="padding-box" side="top" pb="current">
                     <img

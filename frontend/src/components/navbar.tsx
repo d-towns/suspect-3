@@ -8,16 +8,14 @@ import InvitesDropdown from './InvitesDropdown';
 import ProfileDropdown from './ProfileDropdown';
 import { Box, Flex, Heading, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
-import { FaSun, FaMoon } from 'react-icons/fa';
-import { useTheme } from '../context/ThemeContext';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
+import './navbar.css';
 
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [invites, setInvites] = useState<Invite[]>([]);
-  const { theme, toggleTheme } = useTheme();
   const [ playing, setPlaying ] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   
@@ -61,26 +59,26 @@ const Navbar: React.FC = () => {
   return (
     <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }}>
       <Flex align="center" justify="between">
-        <RouterLink to="/home" style={{ textDecoration: 'none' }}>
+        <RouterLink to="/" style={{ textDecoration: 'none' }}>
           <Heading className=" hover:scale-110 transition ease-in-out main-header" size="8">
             Suspect
           </Heading>
         </RouterLink>
-        <Flex align="center" gap="6">
+        <Flex align="center" justify={'center'} gap="6">
           <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header text-2xl'  to="/play" color="gray">
            <Text>Play</Text> 
           </RouterLink>
-          <RouterLink className='hover:scale-110 transition ease-in-out main-header text-2xl'  to="/faq" color="gray">
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header text-2xl'  to="/faq" color="gray">
             How To Play
+          </RouterLink>
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header text-2xl'  to="/leaderboard" color="gray">
+            Leaderboard
           </RouterLink>
           {user && (
             <>
               <InvitesDropdown invites={invites} />
               <ProfileDropdown logout={handleLogout} username={user.username || user.email} />
-              <Switch className='hover:scale-110 transition ease-in-out' checked={theme === 'dark'} onCheckedChange={toggleTheme} aria-label="Toggle Theme">
-                {theme === 'dark' ? <FaMoon /> : <FaSun />}
-              </Switch>
-              <Switch className='hover:scale-110 transition ease-in-out' checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
+              <Switch  className='hover:scale-110 transition ease-in-out' checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
                 {playing ? <MdMusicNote size={24} /> : <MdMusicOff size={24}/>}
               </Switch>
             </>

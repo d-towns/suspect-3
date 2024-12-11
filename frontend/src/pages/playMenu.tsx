@@ -11,6 +11,7 @@ import {
   Inset,
   Strong,
 } from '@radix-ui/themes';
+import {Waitlist, GetWaitlistWidget} from '../components/waitlist';
 
 
 interface ModeCardProps {
@@ -72,14 +73,18 @@ const ModeCard: React.FC<ModeCardProps> = ({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            width: '60%',
             padding: '20px',
             borderRadius: '8px',
           }}
+          variant='surface'
         >
-          <Text as="p" align='center' style={{ color: 'white' }} size="6">
+          <Text as="p" align='center' size="8">
             <Strong>Coming Soon!</Strong>
+            
           </Text>
+          <Text as="p" size='5'my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
+          <Waitlist />
         </Card>
       )}
     </Box>
@@ -103,7 +108,7 @@ const PlayMenu: React.FC = () => {
 
 
   return (
-    <Flex justify="center" align="center" style={{ height: '100vh', width:'100%'}}>
+    <Flex justify="center" align="center" style={{ height: '100vh', width:'100%' }}>
       <Flex>
         <ModeCard
           createRoom={createRoom}

@@ -6,6 +6,7 @@ import {
   Text,
   Separator,
 } from '@radix-ui/themes';
+import { useTheme } from '../context/ThemeContext';
 
 interface ProfileDropdownProps {
   logout: () => void;
@@ -13,6 +14,8 @@ interface ProfileDropdownProps {
 }
 
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: email }) => {
+  const { theme, toggleTheme } = useTheme();
+
 
   return (
     <DropdownMenu.Root>
@@ -29,13 +32,16 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
         </Button>
       </DropdownMenu.Trigger>
 
-      <DropdownMenu.Content align="end">
-        <DropdownMenu.Label className='my-2'>
-        <Text as="div" size="2" color="gray" my={"3"}>
+      <DropdownMenu.Content align="center" style={{width: '150px'}}>
+        <DropdownMenu.Label className='my-2' >
+        <Text as="div"  size="2" color="gray" my={"3"}>
           {email}
         </Text>
         </DropdownMenu.Label>
         <Separator size={'4'} />
+        <DropdownMenu.Item shortcut={`${theme == 'light' ? '☀️' :'🌙' }`} onClick={() => toggleTheme()} className='my-2'>
+          Theme
+          </DropdownMenu.Item>
         <DropdownMenu.Item  className='my-2'>
           Profile
         </DropdownMenu.Item>

@@ -28,7 +28,7 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/home');
+      navigate('/play');
     }
   }, [user, navigate]);
 
@@ -116,15 +116,15 @@ const Login: React.FC = () => {
       gap='9'
     >
       <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px', padding: '60px', textAlign: 'center' }}>
-        <Heading size="9" mb="4" style={{ fontFamily: "Barriecito" }}>
+        <Heading size="9" mb="4" style={{ fontFamily: "Special Elite"}}>
           Suspect
         </Heading>
         <Flex direction="column" gap="4" mt="4" style={{ margin: 'auto' }}>
-          <Text size="6" weight="bold">
-            Dive into the ultimate web-based mystery where deception meets strategy.
+          <Text size="6" weight="bold" style={{fontFamily:"Special Elite"}}>
+            Deduction and Deception
           </Text>
           <Text size="3">
-            A game of wit and deception, Suspect is a multiplayer online game where players take on the role of a detective or a suspect.
+            Suspect is a online game where players use their deduction skills to solve a mystery. Players can choose to play as the detective or a suspect in a multiplayer setting.
           </Text>
           <Flex direction="row" gap="4" justify="center">
             <Card
@@ -144,7 +144,7 @@ const Login: React.FC = () => {
             >
               <Heading size="5">Multiplayer</Heading>
               <Text size="3">
-                Enter the interrogation room as a suspect or the culprit. Use your wit to deceive others and avoid getting framed...or caught!
+                Enter the interrogation room as a suspect or the culprit. Use your wit to deceive the detective and other suspects to avoid getting framed...or caught!
               </Text>
             </Card>
           </Flex>
@@ -155,7 +155,7 @@ const Login: React.FC = () => {
       </Card>
       <Card size="3" variant="surface" style={{ width: '100%', padding: '60px', maxWidth: '600px' }}>
         <Tabs.Root defaultValue="account" className='w-full flex flex-col justify-center'>
-          <Tabs.List className='mb-6 flex justify-center'>
+          <Tabs.List className='mb-6 flex justify-center text-xl'>
             <Tabs.Trigger value="account">Account</Tabs.Trigger>
             <Tabs.Trigger value="guest">Guest</Tabs.Trigger>
           </Tabs.List>
