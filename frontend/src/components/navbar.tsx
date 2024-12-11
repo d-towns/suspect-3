@@ -65,14 +65,17 @@ const Navbar: React.FC = () => {
           </Text>
         </RouterLink>
         <Flex align="center" justify={'center'} gap="6" className='md:text-2xl xs:text-xl'>
-          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header'  to="/play" color="gray">
+          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header hidden md:block'  to="/play" color="gray">
            <Text>Play</Text> 
           </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="/faq" color="gray">
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header '  to="/faq" color="gray">
             How To Play
           </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="/leaderboard" color="gray">
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header hidden md:block'  to="/leaderboard" color="gray">
             Leaderboard
+          </RouterLink>
+          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
+            Support
           </RouterLink>
           {user && (
             <>
