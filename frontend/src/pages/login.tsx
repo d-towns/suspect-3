@@ -108,14 +108,16 @@ const Login: React.FC = () => {
 
   return (
     <Flex
-      direction={{ xs: 'column', md: 'row' }}
+      direction={{ initial: 'column', md: 'row' }}
+      className='xxs:flex-col'
       align="center"
       justify="center"
       style={{ minHeight: '100vh', height: '100%' }}
       px="4"
       gap='9'
+      mt={'6'}
     >
-      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px', padding: '60px', textAlign: 'center' }}>
+      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px', textAlign: 'center' }}>
         <Heading size="9" mb="4" style={{ fontFamily: "Special Elite"}}>
           Suspect
         </Heading>
