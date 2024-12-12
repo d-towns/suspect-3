@@ -30,6 +30,7 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      console.log('User:', user);
       navigate('/play');
     }
   }, [user, navigate]);
@@ -252,7 +253,8 @@ const Login: React.FC = () => {
                     </Flex>
                   </Text>
                   <Button type="submit" mt="4">
-                    Continue as Guest
+                    { !loading && 'Continue as Guest'}
+                    {loading && <Spinner />}
                   </Button>
                 </Flex>
               </form>
