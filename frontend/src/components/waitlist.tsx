@@ -58,19 +58,10 @@ const Waitlist: React.FC = () => {
         setSignedUp(true);
     }
 
-    if (!user?.email) {
-        return (
-            <Flex direction="column" align="center" gap="3">
-                <Button>Please sign in to join the waitlist</Button>
-            </Flex>
-        )
-    }
-
     return (
-
         <Box>
             {signedUp ? <Text size={'4'} as="p" align='center' weight={'bold'}>Thanks for signing up!</Text> :
-                <Flex gap={'3'} direction={{xs:'column', md:'row'}} align="center" justify="center">
+                <Flex gap={'3'} direction={{initial:'column', lg:'row'}} align="center" justify="center">
                     <TextField.Root
                         placeholder="example@getwaitlist.com"
                         type="email"
