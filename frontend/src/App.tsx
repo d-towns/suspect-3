@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Navbar from './components/navbar';
+import Navbar from './components/Navbar/navbar';
 import { AuthProvider } from './context/auth.context';
 import { ToastProvider } from './context/ToastContext/toast.context';
 import { SocketProvider } from './context/SocketContext/socket.context';

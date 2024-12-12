@@ -11,11 +11,11 @@ import {
   Inset,
   Strong,
 } from '@radix-ui/themes';
-import {Waitlist} from '../components/waitlist';
+import { Waitlist } from '../components/waitlist';
 
 
 interface ModeCardProps {
-  createRoom: (mode:string) => void;
+  createRoom: (mode: string) => void;
   imgSrc: string;
   altText: string;
   description?: string;
@@ -39,9 +39,9 @@ const ModeCard: React.FC<ModeCardProps> = ({
         margin: '0 16px',
       }}
     >
-      <Card 
-        size="3" 
-        onClick={() => mode === 'multi' && createRoom(mode)} 
+      <Card
+        size="3"
+        onClick={() => mode === 'multi' && createRoom(mode)}
         className={mode === 'multi' ? 'hover:scale-105 hover:border transition ease-in-out duration-200' : ''}
         style={{ opacity: mode === 'single' ? 0.5 : 1 }}
       >
@@ -49,16 +49,10 @@ const ModeCard: React.FC<ModeCardProps> = ({
           <img
             src={imgSrc}
             alt={altText}
-            style={{
-              display: 'block',
-              objectFit: 'cover',
-              width: '100%',
-              height: 440,
-              backgroundColor: 'var(--gray-5)',
-            }}
+            className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
           />
         </Inset>
-        <Text as="p" align='center' size={{ lg: '7', md: '5', sm: '4'}} >
+        <Text as="p" align='center' size={{ lg: '7', md: '5', sm: '4' }} >
           <Strong>{altText} Mode</Strong>
         </Text>
         <Separator my="3" size="4" />
@@ -79,11 +73,11 @@ const ModeCard: React.FC<ModeCardProps> = ({
           }}
           variant='surface'
         >
-          <Text as="p" align='center' size={{ lg: '5', md: '4', sm: '3'}} >
+          <Text as="p" align='center' size={{ lg: '5', md: '4', sm: '3' }} >
             <Strong>Coming Soon!</Strong>
-            
+
           </Text>
-          <Text as="p" size={{ lg: '5', md: '4', sm: '3'}} my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
+          <Text as="p" size={{ lg: '5', md: '4', sm: '3' }} my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
           <Waitlist />
         </Card>
       )}
@@ -95,7 +89,7 @@ const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const createRoom = async (mode:string) => {
+  const createRoom = async (mode: string) => {
     if (!user) return;
     try {
       const roomId = await roomsService.createRoom(user.id, mode);
@@ -108,8 +102,8 @@ const PlayMenu: React.FC = () => {
 
 
   return (
-    <Flex justify="center" align="center" style={{ height: '100vh', width:'100%' }}>
-      <Flex>
+    <Flex justify="center" align="center" my={'9'}>
+      <Flex direction={{ initial: 'column', md: 'row' }} gap={'9'}>
         <ModeCard
           createRoom={createRoom}
           imgSrc="single-player-splash-2.webp"

@@ -65,8 +65,8 @@ if (error) {
 
 
     return (
-        <div className="container mx-auto py-8">
-            <h1 className="text-3xl font-bold mb-6">Leaderboard</h1>
+        <div className="container mx-auto p-8">
+            <h1 className="text-3xl text-center font-bold mb-6">Leaderboard</h1>
             
             <div className="rounded-lg shadow">
                 <Table.Root variant="surface">
@@ -75,8 +75,10 @@ if (error) {
                             <Table.ColumnHeaderCell className="w-16">Rank</Table.ColumnHeaderCell>
                             <Table.ColumnHeaderCell>Username</Table.ColumnHeaderCell>
                             <Table.ColumnHeaderCell>ELO</Table.ColumnHeaderCell>
-                            <Table.ColumnHeaderCell>Single Player Wins</Table.ColumnHeaderCell>
-                            <Table.ColumnHeaderCell>Multiplayer Wins</Table.ColumnHeaderCell>
+                            <Table.ColumnHeaderCell className='max-md:hidden'>Single Player Wins</Table.ColumnHeaderCell>
+                            <Table.ColumnHeaderCell className='md:hidden'>S Wins</Table.ColumnHeaderCell>
+                            <Table.ColumnHeaderCell className='max-md:hidden'>Multi Player Wins</Table.ColumnHeaderCell>
+                            <Table.ColumnHeaderCell className='md:hidden'>M Wins</Table.ColumnHeaderCell>
                         </Table.Row>
                     </Table.Header>
                     <Table.Body>

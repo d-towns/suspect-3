@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/auth.context';
-import { invitesService } from '../services/invites.service';
-import { Invite } from '../models/invite.model';
+import { useAuth } from '../../context/auth.context';
+import { invitesService } from '../../services/invites.service';
+import { Invite } from '../../models/invite.model';
 import moment from 'moment';
-import InvitesDropdown from './InvitesDropdown';
-import ProfileDropdown from './ProfileDropdown';
+import InvitesDropdown from '../InvitesDropdown';
+import ProfileDropdown from '../ProfileDropdown';
 import { Box, Flex, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
@@ -16,9 +16,9 @@ const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [ playing, setPlaying ] = useState<boolean>(false);
+  const [playing, setPlaying] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  
+
 
   const handleLogout = async () => {
     await logout();
@@ -56,33 +56,61 @@ const Navbar: React.FC = () => {
     setPlaying(!playing);
   };
 
+
+  const renderNavLinks = () => {
+
+    const unauthenticatedLinks = (
+      <>
+        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out  ' to="/faq" color="gray">
+          How To Play
+        </RouterLink>
+        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header' to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
+          Support
+        </RouterLink>
+      </>
+    );
+
+    if (!user) {
+      return (
+        <>
+          {unauthenticatedLinks}
+        </>
+      );
+    } else {
+      return (
+        <>
+          <RouterLink className='hover:scale-110 transition ease-in-out' to="/play" color="gray">
+            Play
+          </RouterLink>
+          <RouterLink className='hover:scale-110 transition ease-in-out' to="/leaderboard" color="gray">
+            Leaderboard
+          </RouterLink>
+          {unauthenticatedLinks}
+        </>
+      );
+    }
+  }
+
+
+
   return (
     <Box as="div" px="4" py="3" style={{ backgroundColor: 'var(--color-panel)' }} className=''>
-      <Flex align="center" justify="between" >
+      <Flex align="center" justify="between" className='main-header ' >
         <RouterLink to="/">
-          <Text className="hover:scale-110 transition ease-in-out main-header md:text-3xl xs:text-xl"size="8">
+          <Text className="hover:scale-110 transition ease-in-out  md:text-3xl xs:text-xl" size="8">
             Suspect
           </Text>
         </RouterLink>
-        <Flex align="center" justify={'center'} gap="6" className='md:text-2xl xs:text-xl'>
-          <RouterLink className='hover:scale-110 transition ease-in-out duration-200 main-header hidden md:block'  to="/play" color="gray">
-           <Text>Play</Text> 
-          </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header '  to="/faq" color="gray">
-            How To Play
-          </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header hidden md:block'  to="/leaderboard" color="gray">
-            Leaderboard
-          </RouterLink>
-          <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header'  to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
-            Support
-          </RouterLink>
+        <Flex align="center" justify={'center'} gap="6" className=' main-header '>
+          <Flex  align="center" justify={'center'} gap="6" className='max-md:hidden'>
+            {renderNavLinks()}
+          </Flex>
           {user && (
             <>
               <InvitesDropdown invites={invites} />
               <ProfileDropdown logout={handleLogout} username={user.username || user.email} />
-              <Switch  className='hover:scale-110 transition ease-in-out' checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
-                {playing ? <MdMusicNote size={24} /> : <MdMusicOff size={24}/>}
+              <Switch className='hover:scale-110 transition ease-in-out' checked={playing} onCheckedChange={toggleMusic} aria-label="Toggle Music">
+                {playing ? <MdMusicNote size={24} /> : <MdMusicOff size={24} />}
               </Switch>
             </>
           )}
