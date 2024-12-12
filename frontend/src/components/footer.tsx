@@ -2,8 +2,8 @@ import React from 'react';
 import { Text } from '@radix-ui/themes';
 const Footer: React.FC = () => {
     return (
-        <footer className='text-center mb-5'  >
-            <Text as='p'>&copy; {new Date().getFullYear()} Towns Capital, LLC. All rights reserved.</Text>
+        <footer className='text-center mb-5 fixed bottom-0 left-1/2 transform -translate-x-1/2'>
+            <Text className='text-xs' as='p'>&copy; {new Date().getFullYear()} Towns Capital, LLC. All rights reserved.</Text>
         </footer>
     );
 };

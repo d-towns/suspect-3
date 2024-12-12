@@ -16,10 +16,12 @@ import {
   Separator,
   ScrollArea,
   Badge,
+  Callout,
 } from '@radix-ui/themes';
 import { ChatMessage } from '../models/chat-message.model';
 import { GameRoom } from '../models/room.model';
 import { User } from '../models/user.model';
+import { IoAlertCircle } from "react-icons/io5";
 
 type PlayersMap = Map<string, User>;
 
@@ -83,7 +85,7 @@ export const Lobby: React.FC = () => {
         console.log('Players in room:', players);
         updatePlayerList(players);
         const room = await roomsService.getRoom(roomId);
-        
+
         console.log('Room:', room);
 
         setLobbyState(prevState => ({
@@ -118,11 +120,11 @@ export const Lobby: React.FC = () => {
           }));
         });
         socket.on('game-created', () => navigate(`/game/${roomId}`));
-        
+
         socket.on('player-left', removePlayer);
         socket.on('player-joined', addPlayer);
       }
-  
+
       return () => {
         if (socket) {
           socket.off('player-list');
@@ -135,14 +137,14 @@ export const Lobby: React.FC = () => {
         }
       };
     }
-    let cleanupListeners : Function;
-    if(socket && socket.connected){
-        initializeLobby();
-        cleanupListeners = setupListeners();
+    let cleanupListeners: Function;
+    if (socket && socket.connected) {
+      initializeLobby();
+      cleanupListeners = setupListeners();
     }
 
     return () => {
-      if(cleanupListeners) cleanupListeners();
+      if (cleanupListeners) cleanupListeners();
     }
   }, [socket, isConnected]);
 
@@ -168,8 +170,10 @@ export const Lobby: React.FC = () => {
       const updatedPlayers = new Map(prevState.players);
       updatedPlayers.set(player.username, player);
       console.log('Updated players:', Array.from(updatedPlayers.values()));
-      return { ...prevState, players: updatedPlayers, 
-        gameStatus: { ...prevState.gameStatus, allPlayersReady: false } };
+      return {
+        ...prevState, players: updatedPlayers,
+        gameStatus: { ...prevState.gameStatus, allPlayersReady: false }
+      };
     });
   };
 
@@ -185,7 +189,7 @@ export const Lobby: React.FC = () => {
     });
   };
 
-  const updatePlayerReadyStatus = (data: { email: string; username: string,  isReady: boolean }) => {
+  const updatePlayerReadyStatus = (data: { email: string; username: string, isReady: boolean }) => {
     console.log('Updating player ready status:', data);
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
@@ -195,8 +199,10 @@ export const Lobby: React.FC = () => {
       }
       const allPlayersReady = Array.from(updatedPlayers.values()).every(player => player.isReady);
       console.log('Updated players:', Array.from(updatedPlayers.values()));
-      return { ...prevState, players: updatedPlayers, 
-        gameStatus: { ...prevState.gameStatus, allPlayersReady } };
+      return {
+        ...prevState, players: updatedPlayers,
+        gameStatus: { ...prevState.gameStatus, allPlayersReady }
+      };
     });
   };
 
@@ -239,7 +245,7 @@ export const Lobby: React.FC = () => {
   const handleReadyClick = () => {
     const newReadyStatus = !lobbyState.gameStatus.isReady;
     sendReadyStatus(newReadyStatus);
-    
+
     // Update local state optimistically
     setLobbyState(prevState => {
       const updatedPlayers = new Map(prevState.players);
@@ -264,9 +270,9 @@ export const Lobby: React.FC = () => {
         addToast('User not authenticated', undefined);
         return;
       }
-      // Replace 'currentGameId' with the actual game ID from your state
-      const toGame = roomId; // Assuming `roomId` is available from props or context
+      const toGame = roomId; 
       const fromUser = user.id;
+
       await invitesService.createInvite(fromUser, inviteEmail, toGame);
       addToast('Invite sent');
       setInviteEmail('');
@@ -283,12 +289,11 @@ export const Lobby: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" align="center" px="4" py="4" mt='9'style={{ minHeight: '100vh' }}>
+    <Flex direction="column" align="center" px="4" py="4" mt='4'>
       <Card size="3" style={{ width: '100%', maxWidth: '800px' }}>
         <Heading size="6" mb="4" align="center">
           Lobby - {lobbyState.room?.id.split('-')[0] || 'Room'}
         </Heading>
-        <Separator size={'4'} />
         <Flex direction={{ initial: 'column' }} gap="4" mt="4">
           {/* Player List */}
           <Box mb='4'>
@@ -300,7 +305,7 @@ export const Lobby: React.FC = () => {
               {Array.from(lobbyState.players.values()).map((player, index) => (
 
                 <Flex key={player.username || player.email} align="center" gap="2" mt="4">
-                  <Text size={'4'}>{index +1}. </Text>
+                  <Text size={'4'}>{index + 1}. </Text>
                   <Text size={'4'}>{player.username || player.email}</Text>
                   {player.isReady ? <Badge color="green">Ready</Badge> : <Badge color="red">Not Ready</Badge>}
                   {player.username === user?.username && <Badge color="blue">You</Badge>}
@@ -310,16 +315,25 @@ export const Lobby: React.FC = () => {
                   }
                 </Flex>
               ))}
-                        <Flex align="center" gap="2" mt='4'>
-            
-            <TextField.Root
-              placeholder="Invite other players by email"
-              value={inviteEmail}
-              style={{ flex: 1 }}
-              onChange={(e) => setInviteEmail(e.target.value)}
-            />
-            <Button onClick={handleSendInvite}>Send Invite</Button>
-          </Flex>
+              <Box className='mt-4'>
+<Callout.Root size='1' className='my-2 flex items-center'>
+	<Callout.Icon>
+		<IoAlertCircle />
+	</Callout.Icon>
+	<Callout.Text>
+		{lobbyState.players.size < 2 && 'A minimum of 2 players are required to start the game. Invite your friends to join!'}
+	</Callout.Text>
+</Callout.Root>
+              <Flex align="center" gap="2" mt='4'>
+                <TextField.Root
+                  placeholder="Invite other players by email"
+                  value={inviteEmail}
+                  style={{ flex: 1 }}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+                <Button onClick={handleSendInvite}>Send Invite</Button>
+              </Flex>
+              </Box>
             </Box>
           </Box>
 
@@ -369,24 +383,24 @@ export const Lobby: React.FC = () => {
               {lobbyState.gameStarting ? 'Starting Game...' : 'Start Game'}
             </Button>
           )}
-            <Button
+          <Button
             style={{ flex: 1 }}
-              color={lobbyState.gameStatus.isReady ? 'red' : 'green'}
-              onClick={handleReadyClick}
-            >
-              {lobbyState.gameStatus.isReady ? 'Cancel Ready' : 'Ready Up'}
-            </Button>
+            color={lobbyState.gameStatus.isReady ? 'red' : 'green'}
+            onClick={handleReadyClick}
+          >
+            {lobbyState.gameStatus.isReady ? 'Cancel Ready' : 'Ready Up'}
+          </Button>
           {/* Invite Player */}
           {lobbyState.gameStarting && (
-  <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-    <div className="bg-white p-8 rounded-lg shadow-xl text-center">
-      <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
-      <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-      <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
-    </div>
-  </div>
-)}
+            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+              <div className="bg-white p-8 rounded-lg shadow-xl text-center">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
+                <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
+              </div>
+            </div>
+          )}
         </Flex>
       </Card>
     </Flex>

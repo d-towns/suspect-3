@@ -12,6 +12,11 @@ export const invitesService = {
    */
   createInvite: async (senderUserId: string, recipentUserEmail: string, GameId: string): Promise<string> => {
     try {
+      // check if invite email is valid
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+if (!emailRegex.test(recipentUserEmail)) {
+  throw new Error('Invalid email address');
+}
       const response = await axiosInstance.post('/invites/create-invite', {
         sender_user_id: senderUserId,
         recipient_user_email: recipentUserEmail,

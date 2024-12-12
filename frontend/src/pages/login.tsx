@@ -117,10 +117,9 @@ const Login: React.FC = () => {
   return (
     <Flex
       direction={{ initial: 'column', md: 'row' }}
-      className='xxs:flex-col'
+      className='xxs:flex-col h-full w-full min-h-[600px]'
       align="center"
       justify="center"
-      style={{ minHeight: '100vh', height: '100%' }}
       px="4"
       gap='9'
       mt={'6'}

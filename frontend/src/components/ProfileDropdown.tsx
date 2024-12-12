@@ -39,8 +39,9 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
             {email}
           </Text>
         </DropdownMenu.Label>
-        <Separator size={'4'} />
+
         <DropdownMenu.Group className='md:hidden my-2'>
+        <Separator size={'4'} />
         <RouterLink to="/play" color="gray">
             <DropdownMenu.Item>
               Play
