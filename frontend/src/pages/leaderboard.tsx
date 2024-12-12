@@ -4,7 +4,6 @@ import {
     IconButton,
     Text,
     Card,
-    Spinner,
 } from "@radix-ui/themes";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 import {leaderboardService} from '../services/leaderboard.service';
