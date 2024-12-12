@@ -102,7 +102,7 @@ const PlayMenu: React.FC = () => {
 
 
   return (
-    <Flex justify="center" align="center" my={'9'}>
+    <Flex justify="center" align="center" className=' mt-[5%] w-full'>
       <Flex direction={{ initial: 'column', md: 'row' }} gap={'9'}>
         <ModeCard
           createRoom={createRoom}
