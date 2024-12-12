@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth.context';
 import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 
 import {
   Button,
@@ -136,6 +137,7 @@ const Login: React.FC = () => {
             Suspect is a online game where players use their deduction skills to solve a mystery. Players can choose to play as the detective or a suspect in a multiplayer setting.
           </Text>
           <Flex direction="row" gap="4" justify="center">
+            <RouterLink to="/faq">
             <Card
               size="2"
               variant="surface"
@@ -146,6 +148,8 @@ const Login: React.FC = () => {
                 Play as the dectective and solve the mystery by gathering evidence and questioning AI suspects via real-time voice conversation.
               </Text>
             </Card>
+            </RouterLink>
+            <RouterLink to="/faq">
             <Card
               size="2"
               variant="surface"
@@ -156,6 +160,7 @@ const Login: React.FC = () => {
                 Enter the interrogation room as a suspect or the culprit. Use your wit to deceive the detective and other suspects to avoid getting framed...or caught!
               </Text>
             </Card>
+            </RouterLink>
           </Flex>
           <Text size="6" weight={'medium'}>
             Join Suspect now and put your deductive skills to the test!
