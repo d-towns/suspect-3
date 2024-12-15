@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { createSupabaseClient } from '../db/supabase.js';
+import dotenv from 'dotenv';
 
 const router = Router();
+
+dotenv.config({path: '../.env'})
 
 const signUpUser = async (req, res) => {
   const { email, password, username } = req.body;
@@ -45,21 +48,42 @@ const guestSignIn = async (req, res) => {
 }
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
   const supabase = createSupabaseClient({ req, res });
+  const { email, password, provider } = req.body;
 
-  if (!email || !password) {
+
+  if (provider == 'none' && (!email || !password )) {
     return res.status(400).json({ message: "Please enter all fields" });
   }
 
+
+  
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (provider === 'google') {
+      const origin = process.env.NODE_ENV === 'dev' ? process.env.BACKEND_URL : process.env.PROD_BACKEND_URL
+      const {data, error} = supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/users/auth/callback`
+        },
+      })
+
+      if (data.url) {
+        res.redirect(303, data.url)
+      }
+      if (error) throw error;
+      return res.status(200).json({ message: `User ${email} signed in successfully with google`, session: data.session });
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     return res.status(200).json({ message: `User ${email} signed in successfully`, session: data.session });
+    }
+
   } catch (error) {
     return res.status(500).json({ success: false, message: `Error signing in user: ${error.message}` });
   }
 };
+
 
 const logoutUser = async (req, res) => {
   const supabase = createSupabaseClient({ req, res });
@@ -123,6 +147,31 @@ router.get("/auth/confirm", async function (req, res) {
 
   // return the user to an error page with some instructions
   res.redirect(303, '/auth/auth-code-error')
+})
+
+router.get("/auth/callback", async function (req, res) {
+  const code = req.query.code
+  const next = req.query.next ?? 'https://playsuspect.com'
+
+  if (code) {
+    const supabase = createServerClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll() {
+        return parseCookieHeader(context.req.headers.cookie ?? '')
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          context.res.appendHeader('Set-Cookie', serializeCookieHeader(name, value, options))
+        )
+      },
+    },
+  })
+    await supabase.auth.exchangeCodeForSession(code)
+  }
+  console.log('redirecting to:', next)
+  res.redirect(303, `${next.slice(1)}`)
 })
 
 export { router as usersRouter };

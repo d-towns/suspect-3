@@ -26,7 +26,7 @@ const Login: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState(false);
-  const { login, signup, guestSignIn, user } = useAuth();
+  const { login, loginWithGoogle, signup, guestSignIn, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -221,6 +221,9 @@ const Login: React.FC = () => {
                     { !loading && (isSignup ? 'Sign Up' : 'Sign In')}
                     {loading && <Spinner />}
                   </Button>
+                  <Button size={'2'}className="w-full bg-white text-black"  onClick={() => loginWithGoogle() }>
+                <Text align={'center'}> Sign in with google</Text>
+              </Button>
                 </Flex>
               </form>
               <Text size="2" align="center" mt="7">
@@ -230,6 +233,7 @@ const Login: React.FC = () => {
                     : "Don't have an account? Sign Up"}
                 </Link>
               </Text>
+
             </Tabs.Content>
 
             <Tabs.Content value="guest" className='h-full mt-6'>

@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   guestSignIn: (username: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -62,10 +63,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Function to handle user login
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, provider: string = 'none') => {
     setLoading(true);
     try {
-      const response = await api.post('users/login', { email, password });
+      const response = await api.post('users/login', { email, password, provider});
       const userData =  {
         id: response.data.session.user.id,
         email: response.data.session.user.email,
@@ -79,6 +80,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(false);
     }
   };
+
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const response = await api.post('users/login', { provider: 'google' });
+      console.log(response);
+    } catch (error) {
+      console.error('Provider login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   const guestSignIn = async (username: string) => {
     setLoading(true);
@@ -101,9 +116,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Function to handle user signup
   const signup = async (email: string, password: string, username: string) => {
     try {
-      await api.post('users/sign-up', { email, password, username });
-      // After successful signup, log the user in
-      await login(email, password);
+     await api.post('users/sign-up', { email, password, username });
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
@@ -130,6 +143,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     guestSignIn,
     checkAuth,
+    loginWithGoogle,
   };
 
   // Return the AuthContext provider with the context value
