@@ -184,7 +184,7 @@ const Login: React.FC = () => {
                   {error}
                 </Text>
               )}
-              <form onSubmit={handleSubmit} className='my-6'>
+              <form onSubmit={handleSubmit} className='my-3'>
                 <Flex direction="column" gap="3">
                   <TextField.Root
                     placeholder="Email address"
@@ -221,18 +221,25 @@ const Login: React.FC = () => {
                     { !loading && (isSignup ? 'Sign Up' : 'Sign In')}
                     {loading && <Spinner />}
                   </Button>
-                  <Button size={'2'}className="w-full bg-white text-black"  onClick={() => loginWithGoogle() }>
-                <Text align={'center'}> Sign in with google</Text>
-              </Button>
+
                 </Flex>
               </form>
-              <Text size="2" align="center" mt="7">
+              <Flex justify={'between'}>
+              <Text size="2" align="center" >
                 <Link onClick={toggleSignup}>
                   {isSignup
                     ? 'Already have an account? Sign In'
                     : "Don't have an account? Sign Up"}
                 </Link>
               </Text>
+              <Text size="2" align="center">
+                <Link href="/forgot-password">Forgot password?</Link>
+              </Text>
+              </Flex>
+              <Button size={'2'} className="w-full bg-white text-black mt-7"  onClick={() => loginWithGoogle() }>
+                <Text align={'center'}> Sign in with google</Text>
+              </Button>
+
 
             </Tabs.Content>
 
