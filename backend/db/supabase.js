@@ -12,7 +12,7 @@ export const createSupabaseClient = (context) => {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) =>
-          context.res.appendHeader('Set-Cookie', serializeCookieHeader(name, value, {...options, sameSite: 'none', secure: true }))
+          context.res.appendHeader('Set-Cookie', serializeCookieHeader(name, value, {...options, secure: true}))
         )
       },
     },
