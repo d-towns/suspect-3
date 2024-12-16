@@ -14,7 +14,7 @@ export async function runThread(gameRoomId) {
     
       const run = await client.beta.threads.runs.createAndPoll(
         gameRoom.thread_id,
-        { assistant_id: process.env.OPENAI_GAMEMASTER_ASSISTANT_ID}
+        { assistant_id: process.env.OPENAI_MULTIPLAYER_GAMEMASTER_ASSISTANT_ID}
       );
       console.log('run created')
 

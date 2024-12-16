@@ -35,15 +35,14 @@ const ModeCard: React.FC<ModeCardProps> = ({
       style={{
         position: 'relative',
         flex: 1,
-        cursor: mode === 'single' ? 'default' : 'pointer',
+        cursor:'pointer',
         margin: '0 16px',
       }}
     >
       <Card
         size="3"
-        onClick={() => mode === 'multi' && createRoom(mode)}
-        className={mode === 'multi' ? 'hover:scale-105 hover:border transition ease-in-out duration-200' : ''}
-        style={{ opacity: mode === 'single' ? 0.5 : 1 }}
+        onClick={() => createRoom(mode)}
+        className={'hover:scale-105 hover:border transition ease-in-out duration-200'}
       >
         <Inset clip="padding-box" side="top" pb="current">
           <img
@@ -60,7 +59,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
         <Separator my="3" size="4" />
       </Card>
 
-      {mode === 'single' && (
+      {/* {mode === 'single' && (
         <Card
           style={{
             position: 'absolute',
@@ -80,7 +79,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
           <Text as="p" size={{ lg: '5', md: '4', sm: '3' }} my='3' align={'center'}>Release Date: <Strong>Dec 15th</Strong></Text>
           <Waitlist />
         </Card>
-      )}
+      )} */}
     </Box>
   );
 };

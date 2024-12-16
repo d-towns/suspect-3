@@ -15,7 +15,7 @@ const players = [
 const createAndSimulateGame = async () => {
   // create the game room with the host user and the other players
 
-  const gameRoom = await GameRoomService.createGameRoom(players[0].id);
+  const gameRoom = await GameRoomService.createGameRoom(players[0].id, 'multi');
   console.log("Game Room Created: ", gameRoom);
 
   const thread = await OpenaiGameService.createGameThread(players);

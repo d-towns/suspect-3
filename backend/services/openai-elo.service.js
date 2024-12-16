@@ -81,7 +81,6 @@ export class OpenAIEloService {
     organization: process.env.OPENAI_ORGANIZATION_ID,
     project: process.env.OPENAI_PROJECT_ID,
   } : {apiKey: process.env.OPENAI_SERVICE_API_KEY_TEST});
-
   static supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_KEY

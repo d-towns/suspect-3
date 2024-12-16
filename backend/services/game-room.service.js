@@ -1,15 +1,14 @@
-import { createSupabaseClient } from '../db/supabase.js';
-import { GameRoomSocketServer } from '../socket/io.js';
 import { createClient } from '@supabase/supabase-js';
 import crypto from "crypto";
 
 export class GameRoomService {
-    static async createGameRoom(userId) {
+    static async createGameRoom(userId, mode) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
         const roomData = {
             host_id: userId,
-            created_at: new Date()
+            created_at: new Date(),
+            mode
         }
         console.log(roomData);
 

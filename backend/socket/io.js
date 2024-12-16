@@ -53,6 +53,7 @@ export class GameRoomSocketServer {
     if (GameRoomSocketServer.instance) {
       return GameRoomSocketServer.instance;
     }
+
     this.openaiGameService = new OpenaiGameService();
     if (!httpServer) {
       this.io = new Server(3001, {
@@ -90,7 +91,6 @@ export class GameRoomSocketServer {
     this.roomRoundTimers = new Map();
 
     this.io.on("connection", (socket) => {
-      console.log("A user connected");
 
       socket.on("set-user", this.handleSetUserDetails.bind(this, socket));
       socket.on("disconnect", this.handleDisconnect.bind(this, socket));
@@ -127,18 +127,10 @@ export class GameRoomSocketServer {
 
       // Start the heartbeat check interval
       setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
-      this.setupInviteListener();
     });
 
     GameRoomSocketServer.instance = this;
   }
-
-  setupInviteListener = () => {
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-  };
 
   handleSetUserDetails(socket, userEmail, userName, userId) {
     socket.userEmail = userEmail;
@@ -326,7 +318,7 @@ export class GameRoomSocketServer {
     }
   }
 
-  async handleStartGame(socket, roomId) {
+  async handleStartGame(socket, roomId, mode) {
     console.log(`Starting game in room ${roomId}`);
     this.emitToRoom(roomId, "game-creating");
     try {
@@ -340,7 +332,7 @@ export class GameRoomSocketServer {
         };
       });
 
-      const thread = await OpenaiGameService.createGameThread(playerIds);
+      const thread = await OpenaiGameService.createGameThread(playerIds, mode);
       console.log(`Thread created: ${thread.id}`);
 
       // save the thread id to the game room
@@ -349,6 +341,7 @@ export class GameRoomSocketServer {
       const run = await OpenaiGameService.runThreadAndProcess(
         thread.id,
         roomId,
+        mode,
         false
       );
 
@@ -428,7 +421,8 @@ export class GameRoomSocketServer {
           await OpenaiGameService.openRealtimeSession(
             roomId,
             gameState,
-            gameRoom.thread_id
+            gameRoom.thread_id,
+            gameRoom.mode
           );
           // run the game thread to update the round state
           // await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
@@ -437,6 +431,7 @@ export class GameRoomSocketServer {
             roomId,
             nextRoundPlayerSocket.userId,
             gameState,
+            gameRoom.mode,
             listenerFunc
           );
           // console.log("host socket", nextRoundPlayerSocket.userId);
