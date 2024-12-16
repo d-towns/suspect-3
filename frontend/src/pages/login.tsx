@@ -236,9 +236,9 @@ const Login: React.FC = () => {
                 <Link href="/forgot-password">Forgot password?</Link>
               </Text>
               </Flex>
-              <Button size={'2'} className="w-full bg-white text-black mt-7"  onClick={() => loginWithGoogle() }>
+              {/* <Button size={'2'} className="w-full bg-white text-black mt-7"  onClick={() => loginWithGoogle() }>
                 <Text align={'center'}> Sign in with google</Text>
-              </Button>
+              </Button> */}
 
 
             </Tabs.Content>
