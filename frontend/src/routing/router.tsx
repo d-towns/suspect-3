@@ -4,6 +4,7 @@ import Login from '../pages/login';
 import PlayMenu from '../pages/playMenu';
 import Lobby from '../pages/lobby';
 import Game from '../pages/game';
+import SingleGame from '../pages/singleGame';
 import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Leaderboard from '../pages/leaderboard';
@@ -43,7 +44,7 @@ const router = createBrowserRouter([
           },
           {
             path: 'game/:roomId',
-            element: <Game />,
+            element: <SingleGame />,
           },
         ],
       },

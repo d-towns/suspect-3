@@ -466,7 +466,8 @@ Remember to be impartial but thorough in your investigation.`,
     ws,
     gameState,
     threadId,
-    gameMode
+    gameMode,
+    roomId
   ) {
     const isSinglePlayer = gameMode === "single";
     const activeSuspect = gameState.suspects.find(
@@ -485,7 +486,7 @@ Remember to be impartial but thorough in your investigation.`,
 
                     The identities of the suspects are as follows:
                     ${gameState.players
-                      .map((player) => `${player.identity}`)
+                      ?.map((player) => `${player.identity}`)
                       .join("\n")}
                     
                     Conduct a thorough interrogation, but only respond as the interrogator.
@@ -541,6 +542,7 @@ Remember to be impartial but thorough in your investigation.`,
           delete session["id"];
           delete session["object"];
           delete session["expires_at"];
+          delete session["client_secret"];
           ws.send(JSON.stringify({ type: "session.update", session }));
           break;
 
@@ -670,7 +672,7 @@ Remember to be impartial but thorough in your investigation.`,
       // });
 
       ws.on("message", async (data) => {
-        this.realtimeMessageListener(data, ws, gameState, threadId, gameMode);
+        this.realtimeMessageListener(data, ws, gameState, threadId, gameMode, roomId);
       });
 
       ws.on("open", () => {
@@ -820,20 +822,15 @@ Remember to be impartial but thorough in your investigation.`,
         return;
       }
       const socketServer = GameRoomSocketServer.getInstance();
-
-      const user = gameState.players.find((player) => player.id === userId);
-
       const isSinglePlayer = gameMode === "single";
+
       /**
        * i need to add a param to this function of the previous listener function
        * for the message event that sends the audio to the client
        * so that i can remove that listener when the round is done ad add a new one for the next player
        */
 
-      if (!user) {
-        console.error("User not found in game state");
-        return;
-      }
+
 
 
       const audioDeltaListener = (data) => {
@@ -898,7 +895,14 @@ Remember to be impartial but thorough in your investigation.`,
       };
 
       ws.on("message", responseListener);
+      
+
       if(!isSinglePlayer){
+        const user = gameState.players.find((player) => player.id === userId);
+        if (!user) {
+          console.error("User not found in game state");
+          return;
+        }
 
         const event = {
           type: "conversation.item.create",
@@ -922,6 +926,23 @@ Remember to be impartial but thorough in your investigation.`,
         ws.send(JSON.stringify(event));
         ws.send(JSON.stringify({ type: "response.create" }));
         console.log("Sent user conversation item to realtime API:", event);
+      } else {
+        const activeSuspect = gameState.suspects.find(
+          (suspect) =>
+            suspect.id ==
+            gameState.rounds.find((round) => round.status == "active").suspect
+        );
+        const userSocket = socketServer.getSocketForUser(userId);
+        socketServer.emitToSocket(
+          userSocket.id,
+          "realtime-message",
+          {
+            transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
+            speaker: "assistant",
+            currentRoundTime:
+              socketServer.roomRoundTimers.get(roomId).currentRoundTime || 90,
+          }
+        );
       }
     });
   }

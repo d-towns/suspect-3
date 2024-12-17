@@ -4,7 +4,7 @@ export interface ConversationExhange {
 }
 
 export interface ConversationItem {
-
+  
   audioTranscript: string
   timestamp: number
   speaker: 'user' | 'assistant'
@@ -17,6 +17,7 @@ export interface VotingRoundVote {
 
 export interface Round {
   player: string,
+  suspect?: string,
   type: 'interrogation' | 'voting',
   conversation: ConversationExhange[],
   results: {
@@ -47,11 +48,35 @@ export interface GameState {
     status: 'setup' | 'active' | 'finished';
     crime?: Crime;
     rounds: Round[];
-    players: Player[];
     allEvidence: string[];
     interrogationProgress?: number;
     outcome?: {
       winner: "innocents" | "culprit" | "not_yet_determined";
-      averageGuiltScore: number;
+      averageGuiltScore?: number;
     };
+  }
+
+  export interface Suspect {
+    id: string;
+    name: string;
+    identity: string;
+    temperment: string;
+    interrogated: boolean;
+    isCulprit: boolean;
+  }
+
+  export interface Lead {
+    suspect: string;
+    evidence: string;
+  }
+
+  export interface SingleGameState extends GameState {
+    player: string;
+    suspects: Suspect[];
+    leads: Lead[];
+    culpritVote: string;
+  }
+
+  export interface MultiGameState extends GameState {
+    players: Player[];
   }

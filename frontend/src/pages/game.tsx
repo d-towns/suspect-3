@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import React from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, GameState, Player, VotingRoundVote } from '../models/game-state.model';
+import { ConversationItem, MultiGameState, Player, VotingRoundVote } from '../models/game-state.model';
 import { leaderboardService } from '../services/leaderboard.service';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
@@ -83,7 +83,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
 
 // VotingRound Component
 interface VotingRoundProps {
-  gameState: GameState;
+  gameState: MultiGameState;
   killerVote: string | undefined;
   setKillerVote: React.Dispatch<React.SetStateAction<string | undefined>>;
   handleVoteSubmission: () => void;
@@ -146,7 +146,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
 
 // Interrogation Component
 interface InterrogationProps {
-  gameState: GameState;
+  gameState: MultiGameState;
   currentPlayer: Player | null;
   interrogationTranscript: ConversationItem[];
   responseLoading: boolean;
@@ -225,7 +225,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
 
 // ChangingRounds Component
 interface ChangingRoundsProps {
-  gameState: GameState;
+  gameState: MultiGameState;
 }
 
 const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
@@ -371,7 +371,7 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) 
 
 // GameOver Component
 interface GameOverProps {
-  gameState: GameState;
+  gameState: MultiGameState;
   elo: number;
   newElo: number | 0
   badges: string[];
@@ -542,7 +542,7 @@ const Game = () => {
   const navigate = useNavigate();
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const { roomId } = useParams<{ roomId: string }>();
-  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [gameState, setGameState] = useState<MultiGameState | null>(null);
   const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
   const nodeRef = useRef(null);
   const chatMessagesRef = useRef<HTMLDivElement>(null);
@@ -657,7 +657,7 @@ const Game = () => {
 
   useEffect(() => {
     if (socket) {
-      socket.on('game-state-update', (newState: GameState) => {
+      socket.on('game-state-update', (newState: MultiGameState) => {
         console.log('Received game state update:', newState);
         setGameState(newState);
         setInterrogationTranscript([]);
@@ -713,7 +713,7 @@ const Game = () => {
 
         if (room.game_state && typeof room.game_state === 'object') {
           console.log(room);
-          setGameState(room.game_state);
+          setGameState(room.game_state as MultiGameState);
 
         } else {
           navigate(`/lobby/${roomId}`);
@@ -735,7 +735,7 @@ const Game = () => {
 
       }
     }
-    const getActiveRoundFromGameState = () => {
+    const getActiveRoundFromMultiGameState = () => {
       if (gameState) {
         const activeRound = gameState.rounds.find(round => round.status === 'active');
         if (activeRound) {
@@ -757,7 +757,7 @@ const Game = () => {
 
     setCurrentPlayerState();
     getUserElo();
-    getActiveRoundFromGameState();
+    getActiveRoundFromMultiGameState();
 
 
 
