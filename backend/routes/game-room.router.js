@@ -35,6 +35,9 @@ router.get("/get-room/:roomId", asyncHandler(getRoom));
 // POST /:roomId/leads/create
 router.post("/:roomId/leads/create", asyncHandler(createNewLead));
 
+// POST /:roomId/culprit-vote/create
+router.post("/:roomId/culprit-vote/create", asyncHandler(createNewCulpritVote));
+
 async function getGameRooms(req, res) {
   const supabase = createSupabaseClient({ req, res });
   const { data, error } = await supabase.from("game_rooms").select("*");
@@ -126,6 +129,68 @@ async function getRoom(req, res) {
 
   return res.status(200).json({ success: true, room: data });
 }
+
+async function createNewCulpritVote(req, res) {
+  try {
+    const { roomId } = req.params;
+    const { culpritVote } = req.body;
+    const supabase = createSupabaseClient({ req, res });
+
+    if (!culpritVote) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Culprit vote is required" });
+    }
+
+    const { data: roomData, error: roomError } = await supabase
+      .from("game_rooms")
+      .select("*")
+      .eq("id", roomId)
+      .single();
+
+    if (roomError) {
+      console.error("Error fetching game room:", roomError);
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: `Error fetching game room: ${roomError.message}`,
+        });
+    }
+
+    if (!roomData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Game room not found" });
+    }
+
+    let gameState = GameRoomService.decryptGameState(roomData.game_state);
+    const deduction = gameState.deductions.find(deduction => !deduction.submitted);
+    if (deduction) {
+      deduction.culpritVote = culpritVote;
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "No unsubmitted deduction found" });
+    }
+
+    gameState = GameRoomService.encryptGameState(gameState);
+
+    const updatedRoomData = await GameRoomService.updateGameRoom(roomId, { game_state: gameState });
+
+    return res
+      .status(200)
+      .json({ success: true, game_state: updatedRoomData.game_state });
+  } catch (error) {
+    console.error("Error creating new culprit vote:", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: `Error creating new culprit vote: ${error.message}`,
+      });
+  }
+}
 // take in a lead object from the body, get the game state from the room, and update the game state with the new lead and save it back to the database
 async function createNewLead(req, res) {
   try {
@@ -162,7 +227,8 @@ async function createNewLead(req, res) {
     }
     // console.log('Game room data:', roomData);
     let gameState = GameRoomService.decryptGameState(roomData.game_state);
-    gameState.leads.push(lead);
+    // push the leads onto the first unsubmuttied deduction
+    gameState.deductions.find(deduction => !deduction.submitted).leads.push(lead);
     // console.log('Updated game state:', gameState);
     gameState = GameRoomService.encryptGameState(gameState);
     // console.log('Encrypted game state:', gameState);

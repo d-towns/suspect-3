@@ -70,6 +70,19 @@ export const roomsService = {
     }
   },
 
+  createCulpritVote: async (roomId: string, culpritVote: string): Promise<string> => {
+    try {
+      const response = await axiosInstance.post(`/games/${roomId}/culprit-vote/create`, {culpritVote});
+      if (response.data.success) {
+        return response.data.game_state;
+      }
+      throw new Error('Failed to create culprit vote');
+    } catch (error) {
+      console.error('Error creating culprit vote:', error);
+      throw error;
+    }
+  }
+
   
 };
 

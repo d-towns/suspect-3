@@ -14,6 +14,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import {
   MultiPlayerGameStateSchema,
   SinglePlayerGameStateSchema,
+  AnalysisSchema,
 } from "../models/game-state-schema.js";
 import z from "zod";
 
@@ -118,7 +119,7 @@ Remember to be impartial but thorough in your investigation.`,
           "game_state"
         ),
       });
-      console.log("Game Master Assistant created successfully:", assistant.id);
+      console.log("Multiplayer Game Master Assistant created successfully:", assistant.id);
       return assistant;
     } catch (error) {
       console.error("Error creating Game Master Assistant:", error);
@@ -154,19 +155,22 @@ Remember to be impartial but thorough in your investigation.`,
 4. Analyze interrogations:
    - a conversation between the player acting as the detective and the suspects who are LLM's will take place each interrogation round
     - the round object should be updated with the conversation between the detective ( player ) and the suspect.
-    - After the interrogation is complete, the next round should be conducted. 
+    - After the interrogation is complete, START THE NEXT VOTING ROUND OF THE GAME. IF THERE IS NO ROUND AFTER THE INTERROGATION ROUND, THE GAME IS FINISHED AND THE CULPRIT WINS.
+    - DO NOT REMOVE ANY ROUNDS FROM THE PREVIOUS GAME STATE IN THE NEXT STATE UPDATE. 
 
 5. Analyze voting rounds:
-    - At the end of each interrogation round, there should be a voting rund where the players has a chance to vote on a suspect who they think is the killer
+    - At the end of each interrogation round, there should be a voting rund where the player has a chance to vote on a suspect who they think is the killer
     - the players deduction, which includes 3 leads and a vote for who the culprit is, along with the analysis from their police chief, should be placed in the game thread
     - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
-    - if the players deduction is accepted, but the vote is incorrect, the player loses the game
-    - if the players had two deductions that are rejected (false), the player loses the game
-    - if the players deduction is accepted and is correct, the player wins the game
+    - if the active deduction is accepted, but the vote is incorrect, the player loses the game, change the game status to finished and change the outcome to the player losing
+    - if the active deduction is rejected, and the player has two deductions that are rejected, the player loses the game, change the game status to finished and change the outcome to the player losing
+    - the voting round is over once there is a message in the game thread that the curent voting round is over
+    - if the active deduction is accepted and is correct, the player wins the game, change the game status to finished and change the outcome to the player winning
     - voting rounds may be skipped if the players hasnt gathered enough leads to make an informed decision. if a vote round is beig skipped, a message should be placed in the game thread that indicates the vote round is being skipped
 
 6. Assign rounds:
     - Conduct a total of n*2 rounds, where n is the number of suspects. so the total number of rounds is 2 times the number of suspects. there should never be more rounds than the number of suspects multiplied by 2
+    - DO NOT REMOVE ROUNDS FROM THE GAME STATE AFTER THE INITAL CREATION. IF A ROUND IS SKIPPED, A MESSAGE SHOULD BE PLACED IN THE GAME THREAD THAT INDICATES THE ROUND IS BEING SKIPPED
     - Each round is either an interrogation or a voting round
     - Interrogation Round Rules:
       - The suspect attribute for each round should be the suspect ID
@@ -174,21 +178,25 @@ Remember to be impartial but thorough in your investigation.`,
       - Each round has a status, it is either inactive, active, or completed
       - Interrogation rounds are for individual suspects, assign a suspect attribute for these rounds using their suspect id
     - voting round Rules:
-      - At the end of each interrogation round, there should be a voting rund where the players has a chance to vote on a suspect who they think is the killer
+      - voting rounds involve the player creating leads and determining a culprit vote, make the suspect attribute for these rounds be am empty string.
+      - At the end of each interrogation round, there should be a voting round where the players has a chance to vote on a suspect who they think is the killer
       - the players deduction, which includes 3 leads and a vote for who the culprit is, along with the analysis from their police chief, should be placed in the game thread
       - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
       - if the players deduction is accepted, but the vote is incorrect, the player loses the game
       - if the players had two deductions that are rejected (false), the player loses the game
       - if the players deduction is accepted and is correct, the player wins the game
       - voting rounds may be skipped if the players hasnt gathered enough leads to make an informed decision. if a vote round is beig skipped, a message should be placed in the game thread that indicates the vote round is being skipped
+      - when a voting round starts, if there is a deductions that has been submitted and not accepted, that previous deduction should be set to active = false and the next deduction should be set to active = true
 
   7. Determine if the game is finished:
     - The game is finished when either all the rounds are completed or the player (detective) correctly vote for the culprit
     - if the player hasnt made a deduction that is accepted by the police chief and is the correct culprit vote by the time all the rounds are completed, the player loses the game
 
   8. IMPORTANT NOTE:
+    WHEN THE GAME STATE IS FIRST BEING CREATED, THE DEDUCTIONS ANAYLSIS SHOULD BE CREATED WITH TWO OBJECTS THAT HAVE EITHER EMPTY STRINGS OR ARRAYS FOR THEIR VALUES.
     DO NOT CHANGE ANY OF THE DEDUCTION ANALYSIS OR VOTING ROUND RULES. ONLY UPDATE THE GAMESTATE WITH THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.
-
+    DO NOT REMOVE ROUNDS FROM THE GAME STATE OR ADD MORE ROUNDS THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.
+    DO NOT REMOVE ROUNDS FORM THE GAME STATE AFTER THE INITAL CREATION. IF A ROUND IS SKIPPED, A MESSAGE SHOULD BE PLACED IN THE GAME THREAD THAT INDICATES THE ROUND IS BEING SKIPPED.
     IMPORTANT NOTE:
     NEVER ADD MORE ROUNDS TO THE GAME THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.`,
         model: "gpt-4o-2024-08-06",
@@ -197,7 +205,7 @@ Remember to be impartial but thorough in your investigation.`,
           "game_state"
         ),
       });
-      console.log("Game Master Assistant created successfully:", assistant.id);
+      console.log("Single player Game Master Assistant created successfully:", assistant.id);
       return assistant;
     } catch (error) {
       console.error("Error creating Game Master Assistant:", error);
@@ -277,9 +285,14 @@ Remember to be impartial but thorough in your investigation.`,
 
       console.log(activeRound, suspectInInterrogation)
       await this.addMessageToThread(threadId, {
-        role: "user",
-        content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded. Start the next voting round of the game.`,
+        role: "assistant",
+        content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded. Start the next voting round of the game. KEEP ALL OF THE ROUNDS THAT HAVE BEEN CREATED IN THE GAME STATE. ONLY UPDATE THE STATUS OF THE CURRENT ACTIVE ROUND, AND SET THE NEXT ROUND TO BE ACTIVE`,
       });
+      await this.addMessageToThread(threadId, {
+        role: "assistant",
+        content: `KEEP ALL OF THE ROUNDS THAT HAVE BEEN CREATED IN THE GAME STATE. DO NOT REMOVE ANY ROUNDS FROM THE GAME STATE. ONLY UPDATE THE STATUS OF THE CURRENT ACTIVE ROUND, AND SET THE NEXT ROUND TO BE ACTIVE`,
+      });
+
       console.log("Interrogation round end message sent \n");
     } else {
       const activeRound = gameState.rounds.find(
@@ -344,7 +357,8 @@ Remember to be impartial but thorough in your investigation.`,
     threadId,
     roomId,
     gameMode,
-    simulated = false
+    simulated = false,
+    roundEnd = true,
   ) {
     console.log(`Running thread: ${threadId}`);
 
@@ -365,7 +379,7 @@ Remember to be impartial but thorough in your investigation.`,
       });
       console.log("Run created:", run.id);
       const socketServer = GameRoomSocketServer.getInstance();
-      socketServer.emitToRoom(roomId, "game-state-updating");
+      socketServer.emitToRoom(roomId, "game-state-updating", roundEnd);
 
       const gameState = await this.waitForRunCompletion(threadId, run.id);
 
@@ -478,9 +492,13 @@ Remember to be impartial but thorough in your investigation.`,
    * response.audio.done: look for active round suspect instead of player
    *
    */
-  static async runDeductionAnalysis(roomId, gameState) {
+  static async runDeductionAnalysis(roomId, threadId, gameState) {
     try {
-      const { crime, evidence, suspects, leads } = gameState;
+      const { crime, evidence, suspects, deductions } = gameState;
+      // delete the isCulprit property from the suspects
+      suspects.forEach((suspect) => delete suspect.isCulprit);
+      const currentDeduction = deductions.find((deduction) => deduction.submitted === false);
+      const {leads, culpritVote} = currentDeduction;
 
       const messages = [
         {
@@ -497,7 +515,8 @@ Remember to be impartial but thorough in your investigation.`,
             suspects
           )}\n\nLeads:\n${JSON.stringify(
             leads
-          )}\n\nPlease analyze the evidence like a police chief and decide whether to accept the deduction as highly plausible.`,
+          )}\n\nCulprit Vote:\n${culpritVote}
+          \n\nPlease analyze the evidence like a seasoned police chief would and decide whether to accept the deduction as highly plausible. make your anaylsis based on the evidence and the suspect's responses to the detective's questions. repsond in a speaking language, like a police cheif would in a real conversation.`,
         },
       ];
 
@@ -516,21 +535,35 @@ Remember to be impartial but thorough in your investigation.`,
 
       console.log("Deduction analysis completed:", result);
 
+      const socketServer = GameRoomSocketServer.getInstance();
+      socketServer.emitToRoom(roomId, "deduction-analysis-completed", {});
+
+      currentDeduction.analysis = result;
+      currentDeduction.submitted = true;
+
       // add the result to the game thread as an assistant message
-      const threadId = gameState.thread_id;
       await this.addMessageToThread(threadId, {
         role: "assistant",
-        content: `Deduction Analysis #${gameState.deductionAnalysis.length + 1}: ${result}`,
+        content: `Deduction: ${JSON.stringify(currentDeduction)}`,
       });
+
+      await this.addMessageToThread(threadId, {
+        role: "assistant",
+        content: `DO NOT REMOVE ANY ROUNDS FROM THE GAME STATE IN THE NEXT STATE UPDATE. JUST UPDATE THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD AND KEEP THE CURRENT ACTIVE VOTING ROUND ACTIVE. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.`,
+      });
+
+
+
+      await OpenaiGameService.runThreadAndProcess(threadId, roomId, "single", false, false);
 
       // update the game state with the deduction analysis
 
 
-      gameState.deductionAnalysis.push(result);
-      await GameRoomService.saveGameState(roomId, gameState);
-      // emit the analysis result to the room
-      const socketServer = GameRoomSocketServer.getInstance();
-      socketServer.emitToRoom(roomId, "game-state-update", gameState);
+      // gameState.deductionAnalysis.push(result);
+      // await GameRoomService.saveGameState(roomId, gameState);
+      // // emit the analysis result to the room
+      // const socketServer = GameRoomSocketServer.getInstance();
+      // socketServer.emitToRoom(roomId, "game-state-update", gameState);
 
       console.log("Analysis Result:", result);
 

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, VotingRoundVote, Suspect, Lead, ConversationExhange, DeductionAnalysis } from '../models/game-state.model';
+import { ConversationItem, SingleGameState, VotingRoundVote, Suspect, Lead, ConversationExhange, DeductionAnalysis, Deduction } from '../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 import AudioRecorder from '../components/audioRecorder';
 import ResponseLoading from '../components/responseLoading';
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, TextField, Callout, Strong, CardProps, Tabs } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, TextField, Callout, Strong, CardProps, Tabs, Spinner } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -47,21 +47,21 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, suspects, index }) => {
                             {suspects.find((suspect) => suspect.id === lead.suspect)?.name}
                         </Text>
                         <ScrollArea className="h-20 p-1" type='auto'>
-                        <Text
-                            as="p"
-                            size="2"
-                            weight="bold"
-                            style={{
-                                textAlign: 'center',
-                            }}
-                        >
-                            {lead.evidence}
-                        </Text>
+                            <Text
+                                as="p"
+                                size="2"
+                                weight="bold"
+                                style={{
+                                    textAlign: 'center',
+                                }}
+                            >
+                                {lead.evidence}
+                            </Text>
                         </ScrollArea>
                     </>
                 ) : (
-                    <Text as="p" size="5" weight="bold" color="gray">
-                        Lead # {index + 1}
+                    <Text as="p" size="3" weight="bold" color="gray">
+                        Lead #{index + 1}
                     </Text>
                 )}
             </Flex>
@@ -74,13 +74,13 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, suspects, index }) => {
 interface ChiefCardProps {
     gameState: SingleGameState;
     defaultMessage: string;
-    deductionAnalysis: DeductionAnalysis | undefined;
+    deduction: Deduction ;
 }
 
-const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deductionAnalysis }) => {
+const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction }) => {
     return (
         <Card variant='ghost' className='w-full min-w-[100px] text-center ' >
-            <Flex gap="4" direction="row">
+            <Flex gap="4" direction="row" align={'center'}>
                 <Box>
 
                     <Avatar
@@ -92,24 +92,24 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                         Commisioner Gordon
                     </Text>
                 </Box>
-                <AnimatedChatBubble message={deductionAnalysis?.analysis || defaultMessage} tailPosition='topRight' animationSpeed={50} />
-                {deductionAnalysis && (
+                <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                {/* {deduction?.submitted && (
                     <Callout.Root
                         className="my-4"
-                        color={deductionAnalysis.accepted ? 'green' : 'red'}
+                        color={deduction.analysis.accepted ? 'green' : 'red'}
                     >
                         <Callout.Icon>
                             <IoAlertCircle />
                         </Callout.Icon>
                         <Callout.Text>
                             <Text size="4">
-                                {deductionAnalysis.accepted
+                                {deduction.analysis.accepted
                                     ? 'Deduction accepted'
                                     : 'Deduction denied'}
                             </Text>
                         </Callout.Text>
                     </Callout.Root>
-                )}
+                )} */}
             </Flex>
         </Card>
     );
@@ -168,11 +168,12 @@ const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose
 };
 
 interface PlayerCardProps {
-    suspect: Suspect;
+    suspect: Suspect | undefined;
     variant: CardProps['variant'];
 }
 
 const SuspectCard: React.FC<PlayerCardProps> = ({ suspect, variant }) => {
+    if(!suspect) return null
     return (
         <Card variant={variant} className="">
             <Box key={suspect.id}>
@@ -234,10 +235,12 @@ interface VotingRoundProps {
     gameState: SingleGameState;
     killerVote: string | undefined;
     roundTimer: number
+    deductionSubmitted: boolean;
     handleStartNextRound: () => void;
     handleCreateNewLead: (evidence: string) => void;
     setKillerVote: React.Dispatch<React.SetStateAction<string | undefined>>;
     handleSubmitDeduction: () => void;
+    handleShowGameOver: () => void;
     handleVoteSubmission: () => void;
     voteSubmitted: boolean;
 }
@@ -245,84 +248,102 @@ interface VotingRoundProps {
 const VotingRound: React.FC<VotingRoundProps> = ({
     gameState,
     killerVote,
+    deductionSubmitted,
     handleCreateNewLead,
     setKillerVote,
     handleSubmitDeduction,
+    handleShowGameOver,
     handleVoteSubmission,
     handleStartNextRound,
     voteSubmitted,
 }) => {
     let cheifMessage
-    if (gameState.leads.length < 3) {
+
+    const mostRecentConvesation = gameState.rounds.filter((round) => round.type === 'interrogation').slice().reverse().find((round) => round.status === 'completed')?.conversation || [];
+    const currentDeduction = gameState.deductions.find((deduction) => (deduction.active == true )) || null;
+    if (!currentDeduction) { return (<Text> No deductions available </Text>) }
+    if (currentDeduction && currentDeduction.leads.length < 3 ) {
         cheifMessage = "Your gonna need at least a few leads before we can make a case against our culprit, Detective!"
     }
-    else {
-        cheifMessage = "I see you've been hard at work, Detective. What leads do you have for us?"
+    else if(currentDeduction && currentDeduction.culpritVote === '') {
+        cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?"
+    } else if (currentDeduction && currentDeduction.culpritVote !== '' && !deductionSubmitted) {
+        cheifMessage = "You've made your choice, Detective. I'll take a look at this and get back to you shortly."
+    } else {
+        cheifMessage = "*Chief Gordon is reviewing your deduction*"
     }
-    const mostRecentConvesation = gameState.rounds.filter((round) => round.type === 'interrogation').slice().reverse().find((round) => round.status === 'completed')?.conversation || [];
     return (
         <>
             <Flex gap={'4'} direction={'column'}>
                 {/* First item: ChiefCard */}
-                <Flex justify={'center'} align={'center'}>
+                <Flex direction={'column'} justify={'center'} align={'center'}>
 
-                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deductionAnalysis={gameState.deductionAnalysis?.at(gameState.deductionAnalysis?.length - 1)} />
-                    <Flex direction={'column'}>
+                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={currentDeduction}/>
+                    <Flex direction={'row'} justify={'between'} className='w-full'>
                         <Button
                             onClick={handleSubmitDeduction}
                             style={{ margin: '20px auto' }}
                             mt="4"
                             size="4"
-                            disabled={gameState.leads.length < 3 || !killerVote}
+                            disabled={currentDeduction.leads.length < 3 || currentDeduction.culpritVote === ''}
                         >
-                            Submit Deduction
+                           {deductionSubmitted ? <Spinner /> : 'Submit Deduction'}
                         </Button>
                         <Button
-                            onClick={handleStartNextRound}
+                            onClick={ gameState.status == 'finished' ? () => handleShowGameOver() : handleStartNextRound }
                             style={{ margin: '20px auto', padding: '10px 20px' }}
                             mt="4"
                             size="4"
                             disabled={gameState.rounds[gameState.rounds.length - 1].status === 'active'}
                         >
-                            Start Next Round
+                            {gameState.status == 'finished' && !deductionSubmitted ? 'Go to court' : 'Start Next Round'}
                         </Button>
                     </Flex>
                 </Flex>
                 {/* Second item: List of Leads */}
-                <Flex direction='column'>
-                    <Flex direction='row' gap='4'>
-                        <Flex direction="row" gap="2">
+
+                <Flex direction='row' gap={'4'}>
+                    <Flex direction='column' justify='center' align='center' gap='4' className='max-w-xs'>
+                        <Card variant='surface' className=' flex flex-col'>
+                            <Text align={'center'} mb={'2'}> Culprit </Text>
+                            {currentDeduction.culpritVote ?
+                            <SuspectCard suspect={gameState.suspects.find((suspect) => suspect.id === currentDeduction.culpritVote) } variant='ghost' />
+                            : <Text> No vote submitted </Text>
+}
+                        </Card>
+                        <Flex direction="column" gap="2" className='w-full'>
+
                             {Array.from({ length: 3 }).map((_, index) => (
                                 <React.Fragment key={index}>
                                     <LeadCard
-                                        lead={gameState.leads[index]}
+                                        lead={currentDeduction.leads[index]}
                                         suspects={gameState.suspects}
                                         index={index}
-                                        />
-                                    {index < 2 && <Separator orientation="vertical" size="4" />}
+                                    />
+                                    {index < 2 && <Separator orientation="horizontal" size="4" />}
                                 </React.Fragment>
                             ))}
                         </Flex>
                     </Flex>
-                </Flex>
+                
 
                 {/* Third item: Tabs component */}
-                <Tabs.Root defaultValue='conversation'>
+                <Tabs.Root defaultValue='conversation' className='w-full h-full'>
                     <Tabs.List className='w-full text-center justify-center mb-2 text-xl'>
                         <Tabs.Trigger value='conversation'>Transcript</Tabs.Trigger>
                         <Tabs.Trigger value='evidence'>Evidence</Tabs.Trigger>
-                        {gameState.leads.length === 3 && (
+                        {currentDeduction.leads.length === 3 && (
                             <Tabs.Trigger value='vote'>Culprit</Tabs.Trigger>
                         )}
                     </Tabs.List>
-                    <Tabs.Content value='conversation'>
-                        <Box className='interrogationChat w-full overflow-y-auto p-4 rounded-lg h-[350px]'>
+                    <Tabs.Content value='conversation' className='h-full'>
+                        <Box className='interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full'>
                             {mostRecentConvesation.map((conversationItem, index) => (
                                 <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this statement</Text>} className='p-1'>
                                     <Flex className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.message)}>
                                         <Box ml="2" mb="2">
                                             <Text as="p" weight="bold" size="3">
-                                                {conversationItem.speaker === 'Detective' ? 'You' : conversationItem.speaker}
+                                                {conversationItem.speaker === 'detective' ? 'You' : conversationItem.speaker}
                                             </Text>
                                         </Box>
                                         <Box className="col-span-7">
@@ -355,35 +376,36 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                         </Grid>
                     </Tabs.Content>
                     <Tabs.Content value='vote'>
-                            <>
-                                <Heading size='4' my={'5'} >Based on your deduction, the culprit is...</Heading>
-                                <RadioCards.Root
-                                    className="w-full"
-                                    value={killerVote}
-                                    onValueChange={(vote) => setKillerVote(vote)}
-                                    disabled={voteSubmitted}
+                        <>
+                            <Heading size='4' my={'5'} >Based on your deduction, the culprit is...</Heading>
+                            <RadioCards.Root
+                                className="w-full"
+                                value={killerVote}
+                                onValueChange={(vote) => setKillerVote(vote)}
+                                disabled={voteSubmitted}
+                            >
+                                {gameState.suspects.map((player) => (
+                                    <RadioCards.Item value={player.id} key={player.id}>
+                                        <SuspectCard suspect={player} variant='ghost' />
+                                    </RadioCards.Item>
+                                ))}
+                            </RadioCards.Root>
+                            <Flex>
+                                <Button
+                                    onClick={handleVoteSubmission}
+                                    color={`${killerVote ? 'green' : 'gray'}`}
+                                    style={{ width: '40%', margin: '20px auto' }}
+                                    mt="4"
+                                    size={'4'}
+                                    disabled={!killerVote || voteSubmitted}
                                 >
-                                    {gameState.suspects.map((player) => (
-                                        <RadioCards.Item value={player.id} key={player.id}>
-                                            <SuspectCard suspect={player} variant='ghost' />
-                                        </RadioCards.Item>
-                                    ))}
-                                </RadioCards.Root>
-                                <Flex>
-                                    <Button
-                                        onClick={handleVoteSubmission}
-                                        color={`${killerVote ? 'green' : 'gray'}`}
-                                        style={{ width: '40%', margin: '20px auto' }}
-                                        mt="4"
-                                        size={'4'}
-                                        disabled={!killerVote || voteSubmitted}
-                                    >
-                                        {voteSubmitted ? 'Vote Submitted!' : 'Submit Deduction'}
-                                    </Button>
-                                </Flex>
-                            </>
+                                    {voteSubmitted ? 'Vote Submitted!' : 'Add to deduction'}
+                                </Button>
+                            </Flex>
+                        </>
                     </Tabs.Content>
                 </Tabs.Root>
+                </Flex>
                 {/* Fourth item: if there is anther round left in the game, and the player has less than 3 leads, show the next interrogation button, else show the submit deduction button */}
             </Flex>
 
@@ -785,13 +807,16 @@ const SingleGame = () => {
     const nodeRef = useRef(null);
     const [roundTimer, setRoundTimer] = useState<number>(0);
     const [resultsLoading, setResultsLoading] = useState<boolean>(false);
+    const [showGameOver, setShowGameOver] = useState<boolean>(false);
     const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
     const [responseLoading, setResponseLoading] = useState<boolean>(false);
     const [killerVote, setKillerVote] = useState<string>();
+    const [deductionSubmitted, setDeductionSubmitted] = useState<boolean>(false);
     const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
     const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
     const [playerElo, setPlayerElo] = useState<{ oldRating: number, newRating: number }>({ oldRating: 0, newRating: 0 });
     const [playerBadges, setPlayerBadges] = useState<string[]>([]);
+
 
     const wavStreamPlayerRef = useRef<WavStreamPlayer>(
         new WavStreamPlayer({ sampleRate: 24000 })
@@ -807,10 +832,9 @@ const SingleGame = () => {
     }, [gameState]);
 
     const currentSuspect: Suspect | null = useMemo(() => {
-        console.log(gameState?.suspects.find((suspect) => suspect.id === gameState?.rounds.slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null);
-        return gameState?.suspects.find((suspect) => suspect.id === gameState?.rounds.slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null;
+        console.log(gameState?.suspects.find((suspect) => suspect.id === gameState?.rounds.filter((round) => round.type == 'interrogation').slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null);
+        return gameState?.suspects.find((suspect) => suspect.id === gameState?.rounds.filter((round) => round.type == 'interrogation').slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null;
     }, [gameState]);
-
 
 
     const connectWaveStreamPlayer = async () => {
@@ -877,9 +901,13 @@ const SingleGame = () => {
     }
 
     const handleCreateNewLead = (evidence: string) => {
+        console.log('Creating new lead with evidence:', evidence);
+        // log current suspect
+        console.log(currentSuspect);
         if (!currentSuspect || !gameState || !roomId) {
             return;
         }
+        console.log('Creating new lead with evidence:', evidence);
 
         const newLead: Lead = {
             evidence: evidence,
@@ -903,9 +931,13 @@ const SingleGame = () => {
                 setResultsLoading(false);
             });
 
-            socket.on('game-state-updating', () => {
-                setResultsLoading(true);
+            socket.on('game-state-updating', (roundEnd: boolean) => {
+                if(roundEnd) setResultsLoading(true);
             });
+
+            socket.on('deduction-analysis-completed', () => {
+                setDeductionSubmitted(false);
+            })
 
             socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
@@ -968,18 +1000,23 @@ const SingleGame = () => {
     }
 
     const handleVoteSubmission = () => {
-        if (killerVote && user) {
-            const vote: VotingRoundVote = {
-                playerId: killerVote,
-                voterId: user?.id
-            };
-            emitEvent('voting-round-vote', vote);
-            setVoteSubmitted(true)
+        if (!roomId || !killerVote || !socket) {
+            return;
         }
-    }
+
+        roomsService.createCulpritVote(roomId, killerVote)
+            .then(async (newGameState) => {
+                setGameState(await decryptGameState(newGameState));
+                setVoteSubmitted(true);
+            })
+            .catch((error) => {
+                console.error('Error submitting vote:', error);
+            });
+    };
 
     const handleSubmitDeduction = () => {
-            emitEvent('submit-deduction', {} );
+        setDeductionSubmitted(true);
+        emitEvent('submit-deduction', roomId);
     }
 
     const renderGameContent = (): JSX.Element | null => {
@@ -987,7 +1024,7 @@ const SingleGame = () => {
             return <></>;
         }
 
-        if (gameIsOver) {
+        if (gameIsOver && showGameOver) {
             return <GameOver oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} gameState={gameState} />;
         }
 
@@ -1000,6 +1037,8 @@ const SingleGame = () => {
                 <VotingRound
                     roundTimer={roundTimer}
                     gameState={gameState}
+                    handleShowGameOver={() => setShowGameOver(true)}
+                    deductionSubmitted={deductionSubmitted}
                     handleCreateNewLead={handleCreateNewLead}
                     handleStartNextRound={handleStartNextRound}
                     handleVoteSubmission={handleVoteSubmission}
@@ -1035,7 +1074,7 @@ const SingleGame = () => {
 
 
     const determineKeyBasedOnState = () => {
-        if (!gameIsOver) {
+        if (!gameIsOver && !showGameOver) {
             if (!resultsLoading) {
                 if (
                     (user && activeRound === 'voting')
@@ -1068,41 +1107,42 @@ const SingleGame = () => {
     return (
 
         <>
-            <Box className=" flex">
+            <Box className="flex">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
+                <Box>
                 <Flex px={'2'} py={'5'} >
-                <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%'}}>
-                    {/* Round Timer */}
+                    <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%' }}>
+                        {/* Round Timer */}
 
-                    {/* Accordion for Identity, Evidence, and Guilt Scores */}
-                    <ScrollArea style={{ height: '800px', padding: '10px' }} type='always'>
-                        <h2 className="text-4xl text-center font-bold mb-4">Case Files</h2>
-                        {gameState.crime && (
-                            <Flex gap="3" direction="column" mb={'6'}>
-                                <Text size="5">A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported {gameState.crime.description}</Text>
-                            </Flex>
-                        )}
-                        <h3 className="text-2xl font-bold mb-2">Evidence</h3>
-                        <Grid columns="2" gap="4">
-                            {gameState?.allEvidence?.map((item, index) => (
-                                <Card key={index} variant="surface" className="p-4">
-                                    <Flex gap="2" align="center">
-                                        <Box>
-                                            <Text>{item}</Text>
-                                        </Box>
-                                    </Flex>
-                                </Card>
-                            )) || (
-                                    <Card variant="surface" className="p-4">
-                                        <Text>No evidence available</Text>
+                        {/* Accordion for Identity, Evidence, and Guilt Scores */}
+                        <ScrollArea style={{ height: '700px', padding: '10px' }} type='always'>
+                            <h2 className="text-4xl text-center font-bold mb-4">Case Files</h2>
+                            {gameState.crime && (
+                                <Flex gap="3" direction="column" mb={'6'}>
+                                    <Text size="4">A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported {gameState.crime.description}</Text>
+                                </Flex>
+                            )}
+                            <h3 className="text-2xl font-bold mb-2">Evidence</h3>
+                            <Grid columns="2" gap="4">
+                                {gameState?.allEvidence?.map((item, index) => (
+                                    <Card key={index} variant="surface" className="p-4">
+                                        <Flex gap="2" align="center">
+                                            <Box>
+                                                <Text>{item}</Text>
+                                            </Box>
+                                        </Flex>
                                     </Card>
-                                )}
-                        </Grid>
-                        {/* </Container> */}
-                        {/* </Accordion.Content>
+                                )) || (
+                                        <Card variant="surface" className="p-4">
+                                            <Text>No evidence available</Text>
+                                        </Card>
+                                    )}
+                            </Grid>
+                            {/* </Container> */}
+                            {/* </Accordion.Content>
                 </Accordion.Item> */}
 
-                        {/* <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
+                            {/* <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
                   <Accordion.Header>
                     <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
 
@@ -1110,25 +1150,26 @@ const SingleGame = () => {
                       <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
                     </Accordion.Trigger>
                   </Accordion.Header> */}
-                        {/* <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown"> */}
-                        <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>
-                            <Heading size='7'>Suspects</Heading>
-                            {gameState.suspects.map(suspect => (
-                                <SuspectCard suspect={suspect} key={suspect.id} variant='surface' />
-                            ))}
+                            {/* <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown"> */}
+                            <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>
+                                <Heading size='7'>Suspects</Heading>
+                                {gameState.suspects.map(suspect => (
+                                    <SuspectCard suspect={suspect} key={suspect.id} variant='surface' />
+                                ))}
 
-                        </Flex>
-                        {/* </Accordion.Content>
+                            </Flex>
+                            {/* </Accordion.Content>
                 </Accordion.Item> */}
 
-                        {/* </Accordion.Root> */}
+                            {/* </Accordion.Root> */}
 
-                    </ScrollArea>
-                </Card>
+                        </ScrollArea>
+                    </Card>
                 </Flex>
-                <Box className="h-screen flex-grow">
+                </Box>
+                <Box className="w-full h-[700px]  ">
                     {/* Main game area */}
-                    <Flex px={'2'} py={'5'} gap={'4'} className='w-full'>
+                    <Flex px={'2'} py={'5'} gap={'4'} className='w-full '>
                         {/* Left panel: Crime and Evidence */}
 
                         <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>

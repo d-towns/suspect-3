@@ -201,10 +201,10 @@ export class GameRoomSocketServer {
       return;
     }
 
-    if (!deduction) {
-      console.error('handleSubmitDeduction: Deduction data is missing.');
-      return;
-    }
+    // if (!deduction) {
+    //   console.error('handleSubmitDeduction: Deduction data is missing.');
+    //   return;
+    // }
 
     try {
 
@@ -212,7 +212,7 @@ export class GameRoomSocketServer {
       const gameRoom = await GameRoomService.getGameRoom(roomId);
       const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
 
-      await OpenaiGameService.runDeductionAnalysis(roomId, gameState);
+      await OpenaiGameService.runDeductionAnalysis(roomId, gameRoom.thread_id, gameState);
       console.log(`Deduction analysis sent to room ${roomId} by user ${socket.userEmail}.`);
     } catch (error) {
       console.error('handleSubmitDeduction: Error during deduction analysis.', error);

@@ -1,3 +1,4 @@
+import { ScrollArea } from '@radix-ui/themes';
 import React, { useState, useEffect, useCallback } from 'react';
 
 interface AnimatedChatBubbleProps {
@@ -52,20 +53,23 @@ const AnimatedChatBubble: React.FC<AnimatedChatBubbleProps> = ({
 
   return (
     <div className={`relative ${maxWidth} mt-2`}>
-      <div
-        className={`absolute w-0 h-0 border-8 border-transparent ${tailBorderColor[tailPosition]} ${tailClasses[tailPosition]}`}
-        style={{ 
-          [tailPosition === 'topLeft' ? 'left' : 'right']: '12px',
-          borderBottomColor: backgroundColor.replace('bg-', ''),
-          marginTop: '-8px'
-        }}
-      />
-      <div className={`${backgroundColor} rounded-lg p-4 ${textColor}`}>
-        {displayedText}
-        {!isAnimationComplete && (
-          <span className="animate-pulse">|</span>
-        )}
-      </div>
+      <ScrollArea style={{ maxHeight: '100px' }}>
+        <div
+          className={`absolute w-0 h-0 border-8 border-transparent ${tailBorderColor[tailPosition]} ${tailClasses[tailPosition]}`}
+          style={{ 
+            [tailPosition === 'topLeft' ? 'left' : 'right']: '12px',
+            borderBottomColor: backgroundColor.replace('bg-', ''),
+            marginTop: '-8px'
+          }}
+        />
+
+        <div className={`${backgroundColor} rounded-lg p-4 ${textColor}`}>
+          {displayedText}
+          {!isAnimationComplete && (
+            <span className="animate-pulse">|</span>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 };

@@ -5,7 +5,7 @@ export const ConversationResponseSchema = z.object({
   message: z.string(),
 }).strict();
 
-const AnalysisSchema = z.object({
+export const AnalysisSchema = z.object({
   analysis: z.string(),
   accepted: z.boolean(),
 });
@@ -161,6 +161,8 @@ export const SinglePlayerGameStateSchema = z
         leads: z
         .array(z.object({ suspect: z.string(), evidence: z.union([z.string(), z.array(z.string())]) }))
         .describe("The leads that the player has gathered"),
+        active: z.boolean().describe("Whether the player is currently working on this deduction, this should only be true for one deduction at a time"),
+        submitted: z.boolean().describe("Whether the player has submitted this deduction"),
         culpritVote: z.string().describe("The suspect ID that the player thinks is the culprit for this deducution"),
         analysis: AnalysisSchema
       })

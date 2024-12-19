@@ -74,12 +74,19 @@ export interface GameState {
     accepted: boolean;
   }
 
+  export interface Deduction {
+    submitted: boolean;
+    active: boolean;
+    leads: Lead[];
+    culpritVote: string;
+    analysis: DeductionAnalysis
+  }
+
   export interface SingleGameState extends GameState {
     player: string;
     suspects: Suspect[];
-    leads: Lead[];
+    deductions: Deduction[];
     culpritVote: string;
-    deductionAnalysis: DeductionAnalysis[];
   }
 
   export interface MultiGameState extends GameState {
