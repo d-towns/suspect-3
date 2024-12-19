@@ -158,37 +158,36 @@ Remember to be impartial but thorough in your investigation.`,
 
 5. Analyze voting rounds:
     - At the end of each interrogation round, there should be a voting rund where the players has a chance to vote on a suspect who they think is the killer
-    - the vote will be placed in the game thread along with at least 3 leads that the player has gathered
-    - if the vote was correct, the innocent players win the game and the game is finished
-    - if the vote was incorrect, the culprit wins the game
-    - voting roudns may be skipped if the players hasnt gathered enough leads to make an informed decision
-    - After the voting round is complete, the next round should be conducted. If there is no round after the voting round, the outcome of the game should be determined accoridng to the instructions below
+    - the players deduction, which includes 3 leads and a vote for who the culprit is, along with the analysis from their police chief, should be placed in the game thread
+    - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
+    - if the players deduction is accepted, but the vote is incorrect, the player loses the game
+    - if the players had two deductions that are rejected (false), the player loses the game
+    - if the players deduction is accepted and is correct, the player wins the game
+    - voting rounds may be skipped if the players hasnt gathered enough leads to make an informed decision. if a vote round is beig skipped, a message should be placed in the game thread that indicates the vote round is being skipped
 
 6. Assign rounds:
     - Conduct a total of n*2 rounds, where n is the number of suspects. so the total number of rounds is 2 times the number of suspects. there should never be more rounds than the number of suspects multiplied by 2
     - Each round is either an interrogation or a voting round
     - Interrogation Round Rules:
-    - The suspect attribute for each round should be the suspect ID
-    - When the game state is first created, the first round should be an interrogation round for the first suspect. the round should be active and the game_state status should be active
-    - Each round has a status, it is either inactive, active, or completed
-    - Interrogation rounds are for individual suspects, assign a suspect attribute for these rounds using their suspect id
+      - The suspect attribute for each round should be the suspect ID
+      - When the game state is first created, the first round should be an interrogation round for the first suspect. the round should be active and the game_state status should be active
+      - Each round has a status, it is either inactive, active, or completed
+      - Interrogation rounds are for individual suspects, assign a suspect attribute for these rounds using their suspect id
     - voting round Rules:
-    - voting rounds involve the detective voting on a suspect who they think is the killer
-    - there will be messages for the detective and who they voted for
-    - place those votes in the game state inside the culprit vote object
-    - if the voting round is skipped, the game should continue to the next round
-    - if the vote was correct, the innocent players win the game and the game is finished
-    - if the vote was incorrect, the next interrogation round should be conducted. if there is no round after the voting round, the game is finished and the culprit wins
-    - Conduct the rounds in sequence, starting with the first suspect and alternating between interrogation and voting rounds
-    - Assign a interregation round for each suspect
+      - At the end of each interrogation round, there should be a voting rund where the players has a chance to vote on a suspect who they think is the killer
+      - the players deduction, which includes 3 leads and a vote for who the culprit is, along with the analysis from their police chief, should be placed in the game thread
+      - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
+      - if the players deduction is accepted, but the vote is incorrect, the player loses the game
+      - if the players had two deductions that are rejected (false), the player loses the game
+      - if the players deduction is accepted and is correct, the player wins the game
+      - voting rounds may be skipped if the players hasnt gathered enough leads to make an informed decision. if a vote round is beig skipped, a message should be placed in the game thread that indicates the vote round is being skipped
 
   7. Determine if the game is finished:
     - The game is finished when either all the rounds are completed or the player (detective) correctly vote for the culprit
-    - If the detective correctly vote for the culprit, the player (detective ) wins the game
-    - If the detective does not correctly vote for the culprit, the culprit wins the game
-    - Update the game state with the outcome of the game only when one of these conditions is met
-    - Until a winner has been determined, the game should continue with the next round and the game_state.status should be set to active
+    - if the player hasnt made a deduction that is accepted by the police chief and is the correct culprit vote by the time all the rounds are completed, the player loses the game
 
+  8. IMPORTANT NOTE:
+    DO NOT CHANGE ANY OF THE DEDUCTION ANALYSIS OR VOTING ROUND RULES. ONLY UPDATE THE GAMESTATE WITH THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.
 
     IMPORTANT NOTE:
     NEVER ADD MORE ROUNDS TO THE GAME THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.`,

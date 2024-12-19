@@ -156,8 +156,14 @@ export const SinglePlayerGameStateSchema = z
         })
         .strict()
     ),
-    deductionAnalysis: z.array(
-      AnalysisSchema
+    deductions: z.array(
+      z.object({
+        leads: z
+        .array(z.object({ suspect: z.string(), evidence: z.union([z.string(), z.array(z.string())]) }))
+        .describe("The leads that the player has gathered"),
+        culpritVote: z.string().describe("The suspect ID that the player thinks is the culprit for this deducution"),
+        analysis: AnalysisSchema
+      })
     ),
     allEvidence: z.array(z.string()),
     outcome: z
@@ -168,9 +174,6 @@ export const SinglePlayerGameStateSchema = z
     culpritVote: z
       .string()
       .describe("The suspect ID that the player thinks is the culprit"),
-    leads: z
-      .array(z.object({ suspect: z.string(), evidence: z.union([z.string(), z.array(z.string())]) }))
-      .describe("The leads that the player has gathered"),
   })
   .strict();
 
