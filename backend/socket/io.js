@@ -116,6 +116,7 @@ export class GameRoomSocketServer {
         "voting-round-vote",
         this.handleVotingRoundVote.bind(this, socket)
       );
+      socket.on("submit-deduction", this.handleSubmitDeduction.bind(this, socket));
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
       socket.on("start-game", this.handleStartGame.bind(this, socket));
       socket.on("joined-game", this.handleJoinedGame.bind(this, socket));
@@ -182,6 +183,42 @@ export class GameRoomSocketServer {
     socket.to(roomId).emit("user-left", { userEmail, userName });
   }
 
+  /**
+   * Handles the submission of a deduction by a user.
+   *
+   * @param {Socket} socket - The socket instance of the user.
+   * @param {string} roomId - The ID of the room.
+   * @param {Object} deduction - The deduction submitted by the user.
+   */
+  async handleSubmitDeduction(socket, roomId, deduction) {
+    if (!socket) {
+      console.error('handleSubmitDeduction: Socket is undefined.');
+      return;
+    }
+
+    if (!roomId) {
+      console.error('handleSubmitDeduction: roomId is undefined.');
+      return;
+    }
+
+    if (!deduction) {
+      console.error('handleSubmitDeduction: Deduction data is missing.');
+      return;
+    }
+
+    try {
+
+      // get the most recent game state
+      const gameRoom = await GameRoomService.getGameRoom(roomId);
+      const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
+
+      await OpenaiGameService.runDeductionAnalysis(roomId, gameState);
+      console.log(`Deduction analysis sent to room ${roomId} by user ${socket.userEmail}.`);
+    } catch (error) {
+      console.error('handleSubmitDeduction: Error during deduction analysis.', error);
+    }
+  }
+
   async handleStartNextRound(socket, roomId) {
     const userId = socket.userId;
     const supabase = createClient(
@@ -191,18 +228,26 @@ export class GameRoomSocketServer {
     const { data, error } = await supabase
       .from("game_rooms")
       .select()
-      .eq("id", roomId);
+      .eq("id", roomId)
+      .single();
     if (error) {
       console.error("Error fetching game room:", error);
       return;
     }
-    const room = data[0];
-    const game_state = GameRoomService.decryptGameState(room.game_state);
-    await OpenaiGameService.startRealtimeInterregation(
+    // const room = data[0];
+    // const game_state = GameRoomService.decryptGameState(room.game_state);
+    // await OpenaiGameService.startRealtimeInterregation(
+    //   roomId,
+    //   userId,
+    //   game_state
+    // );
+    await OpenaiGameService.runThreadAndProcess(
+      data.thread_id,
       roomId,
-      userId,
-      game_state
+      data.mode,
+      false
     );
+    this.startGameLoop(socket, roomId);
   }
 
   async handleVotingRoundVote(socket, vote) {
@@ -378,6 +423,7 @@ export class GameRoomSocketServer {
         currentRoundTime: number,
       });
     };
+
     // function to start the first round, this will be called after the first round timer ends
     // this will start the first round and then start the interval for the rest of the rounds
     const emitRoundStart = async () => {
@@ -456,8 +502,8 @@ export class GameRoomSocketServer {
             });
           }
         } else {
+          // SINGLE PLAYER MODE
           if (nextRound.type == "interrogation") {
-            // if(true) {
             await OpenaiGameService.openRealtimeSession(
               roomId,
               gameState,
@@ -486,11 +532,11 @@ export class GameRoomSocketServer {
           } else {
             this.emitToRoom(roomId, "voting-round-start");
 
-            const { clear } = startInterval(30, emitRoundTick, handleRoundEnd);
-            this.roomRoundTimers.set(socket.roomId, {
-              ...this.roomRoundTimers.get(socket.roomId),
-              clearRoundTimer: clear,
-            });
+            // const { clear } = startInterval(30, emitRoundTick, handleRoundEnd);
+            // this.roomRoundTimers.set(socket.roomId, {
+            //   ...this.roomRoundTimers.get(socket.roomId),
+            //   clearRoundTimer: clear,
+            // });
           }
         }
       } catch (error) {
@@ -514,18 +560,27 @@ export class GameRoomSocketServer {
         );
 
         if (activeRound.type == "interrogation") {
-          await OpenaiGameService.endRealtimeInterrogation(gameRoom.id);
+          await OpenaiGameService.endRealtimeInterrogation(
+            gameRoom.id,
+            gameRoom.mode
+          );
+          console.log("Ending interrogation round...");
           await OpenaiGameService.endInterrogationRound(
             gameRoom.thread_id,
-            gameState
+            gameState,
+            gameRoom.mode
           );
         } else if (activeRound.type == "voting") {
-          await OpenaiGameService.endVotingRound(gameRoom.thread_id);
+          await OpenaiGameService.endVotingRound(
+            gameRoom.thread_id,
+            gameRoom.mode
+          );
         }
 
         const updatedGameState = await OpenaiGameService.runThreadAndProcess(
           initialGameRoom.thread_id,
           roomId,
+          gameRoom.mode,
           false
         );
 
@@ -543,39 +598,42 @@ export class GameRoomSocketServer {
           this.emitToRoom(roomId, "game-end");
         }
 
-        // if the player in the active round is not connected, skip the round
-        const playerSocket = Array.from(room).find((socketId) => {
-          const s = this.io.sockets.sockets.get(socketId);
-          return s.userId === activeRound.player;
-        });
-        if (!playerSocket) {
-          await OpenaiGameService.skipInterrogationRound(
-            roomId,
-            activeRound.player
-          );
-          handleRoundEnd();
-          return;
-        }
+        if (gameRoom.mode == "multi") {
+          // if the player in the active round is not connected, skip the round
+          const playerSocket = Array.from(room).find((socketId) => {
+            const s = this.io.sockets.sockets.get(socketId);
+            return s.userId === activeRound.player;
+          });
+          if (!playerSocket) {
+            await OpenaiGameService.skipInterrogationRound(
+              roomId,
+              activeRound.player
+            );
+            handleRoundEnd();
+            return;
+          }
 
-        if (activeRound.type == "interrogation") {
-          await OpenaiGameService.startRealtimeInterregation(
-            roomId,
-            activeRound.player,
-            updatedGameState
-          );
-          // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, activeRound.player )
-          const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
-          this.roomRoundTimers.set(socket.roomId, {
-            ...this.roomRoundTimers.get(socket.roomId),
-            clearRoundTimer: clear,
-          });
-        } else if (activeRound.type == "voting") {
-          this.emitToRoom(roomId, "voting-round-start");
-          const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
-          this.roomRoundTimers.set(socket.roomId, {
-            ...this.roomRoundTimers.get(socket.roomId),
-            clearRoundTimer: clear,
-          });
+          if (activeRound.type == "interrogation") {
+            await OpenaiGameService.startRealtimeInterregation(
+              roomId,
+              activeRound.player,
+              updatedGameState,
+              gameRoom.mode
+            );
+            // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, activeRound.player )
+            const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
+            this.roomRoundTimers.set(socket.roomId, {
+              ...this.roomRoundTimers.get(socket.roomId),
+              clearRoundTimer: clear,
+            });
+          } else if (activeRound.type == "voting") {
+            this.emitToRoom(roomId, "voting-round-start");
+            const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
+            this.roomRoundTimers.set(socket.roomId, {
+              ...this.roomRoundTimers.get(socket.roomId),
+              clearRoundTimer: clear,
+            });
+          }
         }
       } catch (error) {
         console.error("Error handling round end:", error);
@@ -590,7 +648,7 @@ export class GameRoomSocketServer {
       });
     };
 
-    startFirstRound(2000);
+    startFirstRound(20);
   }
 
   async handleJoinedGame(socket, roomId, userId) {

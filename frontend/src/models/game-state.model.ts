@@ -4,7 +4,6 @@ export interface ConversationExhange {
 }
 
 export interface ConversationItem {
-  
   audioTranscript: string
   timestamp: number
   speaker: 'user' | 'assistant'
@@ -70,11 +69,17 @@ export interface GameState {
     evidence: string;
   }
 
+  export interface DeductionAnalysis {
+    analysis: string;
+    accepted: boolean;
+  }
+
   export interface SingleGameState extends GameState {
     player: string;
     suspects: Suspect[];
     leads: Lead[];
     culpritVote: string;
+    deductionAnalysis: DeductionAnalysis[];
   }
 
   export interface MultiGameState extends GameState {

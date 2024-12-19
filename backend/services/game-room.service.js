@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from "crypto";
+import dotenv from "dotenv";
+dotenv.config({path: "../../.env"});
+
+
 
 export class GameRoomService {
     static async createGameRoom(userId, mode) {
@@ -32,7 +36,7 @@ export class GameRoomService {
         const { data, error } = await supabase
             .from('game_rooms')
             .update(updates)
-            .eq('id', roomId);
+            .eq('id', roomId).select().single();
 
         if (error) {
             throw new Error(`Error updating game room: ${error.message}`);

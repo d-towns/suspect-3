@@ -5,6 +5,12 @@ export const ConversationResponseSchema = z.object({
   message: z.string(),
 }).strict();
 
+const AnalysisSchema = z.object({
+  analysis: z.string(),
+  accepted: z.boolean(),
+});
+
+
 export const SuspectTermpemtmentSchema = z
   .enum([
     "calm",
@@ -149,6 +155,9 @@ export const SinglePlayerGameStateSchema = z
           isCulprit: z.boolean(),
         })
         .strict()
+    ),
+    deductionAnalysis: z.array(
+      AnalysisSchema
     ),
     allEvidence: z.array(z.string()),
     outcome: z

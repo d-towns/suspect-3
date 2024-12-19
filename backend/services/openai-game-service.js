@@ -15,6 +15,7 @@ import {
   MultiPlayerGameStateSchema,
   SinglePlayerGameStateSchema,
 } from "../models/game-state-schema.js";
+import z from "zod";
 
 dotenv.config({ path: "../.env" });
 
@@ -265,27 +266,46 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
-  static async endInterrogationRound(threadId, gameState) {
-    const activeRound = gameState.rounds.find(
-      (round) => round.status === "active"
-    );
+  static async endInterrogationRound(threadId, gameState, gameMode) {
+    if (gameMode === "single") {
+      const activeRound = gameState.rounds.find(
+        (round) => round.status === "active"
+      );
 
-    const playerInInterrogation = gameState.players.find(
-      (player) => player.id === activeRound.player
-    );
-    await this.addMessageToThread(threadId, {
-      role: "user",
-      content: `The interrogation of ${playerInInterrogation.identity} has concluded. The detective has left the room. Update the guilt score of ${playerInInterrogation.id} based on the interrogation. Start the next voting round of the game `,
-    });
-    console.log("Interrogation round end message sent \n");
+      const suspectInInterrogation = gameState.suspects.find(
+        (suspect) => suspect.id === activeRound.suspect
+      );
+
+      console.log(activeRound, suspectInInterrogation)
+      await this.addMessageToThread(threadId, {
+        role: "user",
+        content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded. Start the next voting round of the game.`,
+      });
+      console.log("Interrogation round end message sent \n");
+    } else {
+      const activeRound = gameState.rounds.find(
+        (round) => round.status === "active"
+      );
+
+      const playerInInterrogation = gameState.players.find(
+        (player) => player.id === activeRound.player
+      );
+      await this.addMessageToThread(threadId, {
+        role: "user",
+        content: `The interrogation of ${playerInInterrogation.identity} has concluded. The detective has left the room. Update the guilt score of ${playerInInterrogation.id} based on the interrogation. Start the next voting round of the game `,
+      });
+      console.log("Interrogation round end message sent \n");
+    }
   }
 
-  static async endVotingRound(threadId) {
+  static async endVotingRound(threadId, gameMode) {
+    if(mode == 'multi') {
     await this.addMessageToThread(threadId, {
       role: "user",
       content: `The voting round has ended. Tally the votes and determine the outcome of the game. If there is not a majority vote for the culprit, the game will continue to the next round. set this voting round to be completed and the next Interrogation round to be active`,
     });
     console.log("Interrogation round end message sent \n");
+  }
   }
 
   static async addVotingRoundVote(roomId, vote) {
@@ -321,19 +341,28 @@ Remember to be impartial but thorough in your investigation.`,
     });
   }
 
-  static async runThreadAndProcess(threadId, roomId, gameMode, simulated = false) {
+  static async runThreadAndProcess(
+    threadId,
+    roomId,
+    gameMode,
+    simulated = false
+  ) {
     console.log(`Running thread: ${threadId}`);
 
     try {
       const isSinglePlayer = gameMode === "single";
-      const assistantId = isSinglePlayer 
-      ? process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID
-      : process.env.OPENAI_MULTIPLAYER_GAMEMASTER_ASSISTANT_ID;
+      const assistantId = isSinglePlayer
+        ? process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID
+        : process.env.OPENAI_MULTIPLAYER_GAMEMASTER_ASSISTANT_ID;
 
-      console.log(`Using ${isSinglePlayer ? "single" : "multi"} player assistant: ${assistantId}`);
-      
+      console.log(
+        `Using ${
+          isSinglePlayer ? "single" : "multi"
+        } player assistant: ${assistantId}`
+      );
+
       const run = await this.client.beta.threads.runs.create(threadId, {
-      assistant_id: assistantId,
+        assistant_id: assistantId,
       });
       console.log("Run created:", run.id);
       const socketServer = GameRoomSocketServer.getInstance();
@@ -450,6 +479,68 @@ Remember to be impartial but thorough in your investigation.`,
    * response.audio.done: look for active round suspect instead of player
    *
    */
+  static async runDeductionAnalysis(roomId, gameState) {
+    try {
+      const { crime, evidence, suspects, leads } = gameState;
+
+      const messages = [
+        {
+          role: "system",
+          content: "You are a police chief analyzing a detective's deduction.",
+        },
+        {
+          role: "user",
+          content: `Crime Description:\n${
+            crime.description
+          }\n\nEvidence:\n${JSON.stringify(
+            evidence
+          )}\n\nSuspects:\n${JSON.stringify(
+            suspects
+          )}\n\nLeads:\n${JSON.stringify(
+            leads
+          )}\n\nPlease analyze the evidence like a police chief and decide whether to accept the deduction as highly plausible.`,
+        },
+      ];
+
+      const responseFormat = zodResponseFormat(
+        AnalysisSchema,
+        "analysis_result"
+      );
+      console.log("Running deduction analysis...");
+      const completion = await this.client.chat.completions.create({
+        model: "gpt-4o-2024-08-06",
+        messages: messages,
+        response_format: responseFormat,
+      });
+
+      const result = completion.choices[0].message.content;
+
+      console.log("Deduction analysis completed:", result);
+
+      // add the result to the game thread as an assistant message
+      const threadId = gameState.thread_id;
+      await this.addMessageToThread(threadId, {
+        role: "assistant",
+        content: `Deduction Analysis #${gameState.deductionAnalysis.length + 1}: ${result}`,
+      });
+
+      // update the game state with the deduction analysis
+
+
+      gameState.deductionAnalysis.push(result);
+      await GameRoomService.saveGameState(roomId, gameState);
+      // emit the analysis result to the room
+      const socketServer = GameRoomSocketServer.getInstance();
+      socketServer.emitToRoom(roomId, "game-state-update", gameState);
+
+      console.log("Analysis Result:", result);
+
+      return result;
+    } catch (error) {
+      console.error("Error running deduction analysis:", error);
+      throw error;
+    }
+  }
 
   static assignVoiceToSuspect(suspect) {
     if (suspect.temperment.includes("aggressive")) {
@@ -553,12 +644,11 @@ Remember to be impartial but thorough in your investigation.`,
         case "conversation.item.input_audio_transcription.completed":
           // commit the transcript to the game thread as a user message
           console.log("Audio transcription completed", event.transcript);
-          const suspectTranscript = event.transcript;
 
           this.lastAudioMessageDeltas.set(roomId, []);
 
           const playerConversationItem = {
-            audioTranscript: suspectTranscript,
+            audioTranscript: event.transcript,
             speaker: "user",
             currentRoundTime:
               socketServer.roomRoundTimers.get(roomId).currentRoundTime,
@@ -566,7 +656,7 @@ Remember to be impartial but thorough in your investigation.`,
 
           await this.client.beta.threads.messages.create(threadId, {
             role: "user",
-            content: `${isSinglePlayer ? "Detective: " : ""} suspectTranscript`,
+            content: `${isSinglePlayer ? "Detective: " : ""} ${event.transcript}`,
           });
           // sedn the transctiption back to the client
           socketServer.emitToRoom(
@@ -672,7 +762,14 @@ Remember to be impartial but thorough in your investigation.`,
       // });
 
       ws.on("message", async (data) => {
-        this.realtimeMessageListener(data, ws, gameState, threadId, gameMode, roomId);
+        this.realtimeMessageListener(
+          data,
+          ws,
+          gameState,
+          threadId,
+          gameMode,
+          roomId
+        );
       });
 
       ws.on("open", () => {
@@ -727,7 +824,7 @@ Remember to be impartial but thorough in your investigation.`,
     }
   }
 
-  static async endRealtimeInterrogation(roomId) {
+  static async endRealtimeInterrogation(roomId, mode) {
     return new Promise((resolve, reject) => {
       const ws = this.roomRealtimeSessions.get(roomId);
       if (!ws) {
@@ -735,34 +832,43 @@ Remember to be impartial but thorough in your investigation.`,
         return;
       }
 
-      const event = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: "End the interrogation now. Tell the suspect they are free to go and send them out of the room.",
-            },
-          ],
-        },
-      };
+      if (mode == "multi") {
+        const event = {
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "End the interrogation now. Tell the suspect they are free to go and send them out of the room.",
+              },
+            ],
+          },
+        };
 
-      const responseListener = (data) => {
-        const event = JSON.parse(data);
-        if (event.type === "response.done") {
-          console.log("Response done event received");
-          resolve();
-          ws.off("message", responseListener);
-        }
-      };
+        const responseListener = (data) => {
+          const event = JSON.parse(data);
+          if (event.type === "response.done") {
+            console.log("Response done event received");
+            resolve();
+            ws.off("message", responseListener);
+          }
+        };
 
-      ws.on("message", responseListener);
+        ws.on("message", responseListener);
 
-      ws.send(JSON.stringify(event));
-      ws.send(JSON.stringify({ type: "response.create" }));
+        ws.send(JSON.stringify(event));
+        ws.send(JSON.stringify({ type: "response.create" }));
+      }
+      //close the ws connection in a setTimeout of 10 seconds
+      setTimeout(() => {
+        console.log("Closing realtime session for room:", roomId);
+        ws.close();
+      }, 10000);
+
       console.log("Sent end interrogation message to realtime API");
+      resolve();
     });
   }
 
@@ -830,9 +936,6 @@ Remember to be impartial but thorough in your investigation.`,
        * so that i can remove that listener when the round is done ad add a new one for the next player
        */
 
-
-
-
       const audioDeltaListener = (data) => {
         const event = JSON.parse(data);
         if (event.type === "response.audio.delta") {
@@ -895,9 +998,8 @@ Remember to be impartial but thorough in your investigation.`,
       };
 
       ws.on("message", responseListener);
-      
 
-      if(!isSinglePlayer){
+      if (!isSinglePlayer) {
         const user = gameState.players.find((player) => player.id === userId);
         if (!user) {
           console.error("User not found in game state");
@@ -933,16 +1035,12 @@ Remember to be impartial but thorough in your investigation.`,
             gameState.rounds.find((round) => round.status == "active").suspect
         );
         const userSocket = socketServer.getSocketForUser(userId);
-        socketServer.emitToSocket(
-          userSocket.id,
-          "realtime-message",
-          {
-            transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
-            speaker: "assistant",
-            currentRoundTime:
-              socketServer.roomRoundTimers.get(roomId).currentRoundTime || 90,
-          }
-        );
+        socketServer.emitToSocket(userSocket.id, "realtime-message", {
+          transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
+          speaker: "assistant",
+          currentRoundTime:
+            socketServer.roomRoundTimers.get(roomId).currentRoundTime || 90,
+        });
       }
     });
   }
