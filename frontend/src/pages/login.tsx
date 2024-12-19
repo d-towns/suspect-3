@@ -26,7 +26,7 @@ const Login: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState(false);
-  const { login, loginWithGoogle, signup, guestSignIn, user } = useAuth();
+  const { login, signup, guestSignIn, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
