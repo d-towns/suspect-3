@@ -12,6 +12,18 @@ export class LeaderboardService {
         return data;
     }
 
+    static async getLeaderboardStatsForPlayer(playerId) {
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        const { data, error } = await supabase
+            .from("leaderboard")
+            .select("*")
+            .eq("user_id", playerId);
+        if (error) {
+            throw new Error(`Error getting leaderboard stats for player: ${error.message}`);
+        }
+        return data;
+    }
+
     static async getLeaderboardStatsForPlayers(playerIds) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         const { data, error } = await supabase

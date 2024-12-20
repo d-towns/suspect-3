@@ -92,7 +92,10 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                         Commisioner Gordon
                     </Text>
                 </Box>
+                <Flex direction={'column'} gap={'2'}>
+                <AnimatedChatBubble message={gameState.deductions.find((deduction) => deduction.submitted)?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
                 <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                </Flex>
                 {/* {deduction?.submitted && (
                     <Callout.Root
                         className="my-4"
@@ -1024,15 +1027,55 @@ const SingleGame = () => {
             return <></>;
         }
 
-        if (gameIsOver && showGameOver) {
+        if (gameIsOver) {
+            if(showGameOver) {
             return <GameOver oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} gameState={gameState} />;
+            } else {
+                // shwo the most recently complted round
+                const mostRecentRound = gameState.rounds.filter((round) => round.status === 'completed').slice().reverse()[0];
+                if (mostRecentRound) {
+                    if (mostRecentRound.type === 'interrogation') {
+                        return (
+                            <Interrogation
+                                wavStreamPlayerRef={wavStreamPlayerRef}
+                                gameState={gameState}
+                                roundTimer={roundTimer}
+                                currentSuspect={gameState?.suspects.find((suspect) => suspect.id === mostRecentRound.suspect) || null}
+                                interrogationTranscript={interrogationTranscript}
+                                responseLoading={responseLoading}
+                                audioTranscribing={audioTranscribing}
+                                socket={socket}
+                                emitEvent={emitEvent}
+                                handleAudioRecorded={handleAudioRecorded}
+                                handleCreateNewLead={handleCreateNewLead}
+                            />
+                        );
+                    } else if (mostRecentRound.type === 'voting') {
+                        return (
+                            <VotingRound
+                                roundTimer={roundTimer}
+                                gameState={gameState}
+                                handleShowGameOver={() => setShowGameOver(true)}
+                                deductionSubmitted={deductionSubmitted}
+                                handleCreateNewLead={handleCreateNewLead}
+                                handleStartNextRound={handleStartNextRound}
+                                handleVoteSubmission={handleVoteSubmission}
+                                killerVote={killerVote}
+                                setKillerVote={setKillerVote}
+                                handleSubmitDeduction={handleSubmitDeduction}
+                                voteSubmitted={voteSubmitted}
+                            />
+                        );
+                    }
+                }
+            }
         }
 
         if (resultsLoading) {
             return <ChangingRounds gameState={gameState} />;
         }
 
-        if ((user && activeRound === 'voting')) {
+        if ( activeRound === 'voting') {
             return (
                 <VotingRound
                     roundTimer={roundTimer}
@@ -1050,7 +1093,7 @@ const SingleGame = () => {
             );
         }
 
-        if ((activeRound === 'interrogation')) {
+        if (activeRound === 'interrogation') {
 
             return (
                 <Interrogation
@@ -1068,7 +1111,6 @@ const SingleGame = () => {
                 />
             );
         }
-        if (gameState) return <ChangingRounds gameState={gameState} />;
         return <></>;
     };
 

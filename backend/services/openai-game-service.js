@@ -152,6 +152,8 @@ Remember to be impartial but thorough in your investigation.`,
 3. Generate evidence pieces:
    - Create 4 evidence pieces related to the crime
 
+
+
 4. Analyze interrogations:
    - a conversation between the player acting as the detective and the suspects who are LLM's will take place each interrogation round
     - the round object should be updated with the conversation between the detective ( player ) and the suspect.
@@ -176,7 +178,8 @@ Remember to be impartial but thorough in your investigation.`,
       - The suspect attribute for each round should be the suspect ID
       - When the game state is first created, the first round should be an interrogation round for the first suspect. the round should be active and the game_state status should be active
       - Each round has a status, it is either inactive, active, or completed
-      - Interrogation rounds are for individual suspects, assign a suspect attribute for these rounds using their suspect id
+      - Interrogation rounds are for individual suspects, assign a suspect attribute for these rounds using their suspect id\
+      - if both deductions have not been submitted, then at least one deduction should always be  active
     - voting round Rules:
       - voting rounds involve the player creating leads and determining a culprit vote, make the suspect attribute for these rounds be am empty string.
       - At the end of each interrogation round, there should be a voting round where the players has a chance to vote on a suspect who they think is the killer
@@ -187,12 +190,14 @@ Remember to be impartial but thorough in your investigation.`,
       - if the players deduction is accepted and is correct, the player wins the game
       - voting rounds may be skipped if the players hasnt gathered enough leads to make an informed decision. if a vote round is beig skipped, a message should be placed in the game thread that indicates the vote round is being skipped
       - when a voting round starts, if there is a deductions that has been submitted and not accepted, that previous deduction should be set to active = false and the next deduction should be set to active = true
+      - if both deductions have not been submitted, then at least one deduction should always be  active
 
   7. Determine if the game is finished:
     - The game is finished when either all the rounds are completed or the player (detective) correctly vote for the culprit
     - if the player hasnt made a deduction that is accepted by the police chief and is the correct culprit vote by the time all the rounds are completed, the player loses the game
 
   8. IMPORTANT NOTE:
+    
     WHEN THE GAME STATE IS FIRST BEING CREATED, THE DEDUCTIONS ANAYLSIS SHOULD BE CREATED WITH TWO OBJECTS THAT HAVE EITHER EMPTY STRINGS OR ARRAYS FOR THEIR VALUES.
     DO NOT CHANGE ANY OF THE DEDUCTION ANALYSIS OR VOTING ROUND RULES. ONLY UPDATE THE GAMESTATE WITH THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.
     DO NOT REMOVE ROUNDS FROM THE GAME STATE OR ADD MORE ROUNDS THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.
@@ -542,6 +547,7 @@ Remember to be impartial but thorough in your investigation.`,
       currentDeduction.submitted = true;
 
       // add the result to the game thread as an assistant message
+      console.log("Adding deduction analysis to game thread..." , currentDeduction);  
       await this.addMessageToThread(threadId, {
         role: "assistant",
         content: `Deduction: ${JSON.stringify(currentDeduction)}`,
@@ -555,6 +561,9 @@ Remember to be impartial but thorough in your investigation.`,
 
 
       await OpenaiGameService.runThreadAndProcess(threadId, roomId, "single", false, false);
+      if (gameState.status === 'finished') {
+        this.endGameAndCalculateResults(threadId, roomId);
+      }
 
       // update the game state with the deduction analysis
 
@@ -885,7 +894,7 @@ Remember to be impartial but thorough in your investigation.`,
             console.log("Response done event received");
             resolve();
             ws.off("message", responseListener);
-          }
+        }
         };
 
         ws.on("message", responseListener);
@@ -915,7 +924,7 @@ Remember to be impartial but thorough in your investigation.`,
 
       let playerStats;
       if (isSinglePlayer) {
-        playerStats = gameState.player;
+        playerStats = LeaderboardService.getLeaderboardStatsForPlayer(gameState.player)
       } else {
         playerStats = LeaderboardService.getLeaderboardStatsForPlayers(
           gameState.players.map((player) => player.id)

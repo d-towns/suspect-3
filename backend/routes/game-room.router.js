@@ -165,7 +165,7 @@ async function createNewCulpritVote(req, res) {
     }
 
     let gameState = GameRoomService.decryptGameState(roomData.game_state);
-    const deduction = gameState.deductions.find(deduction => !deduction.submitted);
+    const deduction = gameState.deductions.find(deduction => deduction.active);
     if (deduction) {
       deduction.culpritVote = culpritVote;
     } else {
@@ -228,7 +228,7 @@ async function createNewLead(req, res) {
     // console.log('Game room data:', roomData);
     let gameState = GameRoomService.decryptGameState(roomData.game_state);
     // push the leads onto the first unsubmuttied deduction
-    gameState.deductions.find(deduction => !deduction.submitted).leads.push(lead);
+    gameState.deductions.find(deduction => deduction.active).leads.push(lead);
     // console.log('Updated game state:', gameState);
     gameState = GameRoomService.encryptGameState(gameState);
     // console.log('Encrypted game state:', gameState);
