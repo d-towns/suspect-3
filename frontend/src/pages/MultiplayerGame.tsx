@@ -536,7 +536,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
 };
 
 
-const Game = () => {
+const MultiplayerGame = () => {
   const { socket, emitEvent, joinRoom, sendChatMessage } = useSocketContext();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -1033,4 +1033,4 @@ const Game = () => {
 }
 
 
-export default Game;
+export default MultiplayerGame;

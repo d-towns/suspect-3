@@ -12,7 +12,6 @@ import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
-import { IoAlertCircle } from "react-icons/io5";
 import { decryptGameState } from '../utils/decrypt';
 import AnimatedChatBubble from '../components/chatBubble';
 
