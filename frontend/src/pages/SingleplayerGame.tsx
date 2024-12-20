@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, ConversationExhange, Deduction } from '../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Lead, Deduction } from '../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
