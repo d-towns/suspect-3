@@ -290,7 +290,7 @@ export const Lobby: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" align="center" px="4" py="4" mt='4'>
+    <Flex direction="column" align="center" px="4" py="4" mt='4' className='w-full'>
       <Card size="3" style={{ width: '100%', maxWidth: '800px' }}>
         <Heading size="6" mb="4" align="center">
           Lobby - {lobbyState.room?.id.split('-')[0] || 'Room'}

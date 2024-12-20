@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { createSupabaseClient } from '../db/supabase.js';
 import dotenv from 'dotenv';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
 
 const router = Router();
 
@@ -24,6 +27,16 @@ const signUpUser = async (req, res) => {
         },
       },
     });
+
+    // create a leaderboard entry for the new user
+    const { error: leaderboardError } = await supabase
+      .from("leaderboard")
+      .insert([{ user_id: data.user.id, elo: 1000 }]);
+
+    if (leaderboardError) {
+      console.error('Error creating leaderboard entry:', leaderboardError);
+    }
+
     if (error) throw error;
     return res.status(200).json({ message: `User ${email} signed up successfully` });
   } catch (error) {
@@ -127,7 +140,6 @@ router.post("/login", loginUser);
 router.get("/get-user", getUser);
 router.post("/logout", logoutUser);
 router.post("/guest-sign-in", guestSignIn);
-// router.get("/get-session", getSession);
 
 router.get("/auth/confirm", async function (req, res) {
   const token_hash = req.query.token_hash
@@ -141,33 +153,34 @@ router.get("/auth/confirm", async function (req, res) {
       token_hash,
     })
     if (!error) {
-      res.redirect(303, `/${next.slice(1)}`)
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const filePath = path.join(__dirname, 'views', 'confirmation.html');
+      
+      fs.readFile(filePath, 'utf8', (err, html) => {
+        if (err) {
+          console.error('Error reading confirmation HTML:', err);
+          return res.status(500).send('Server Error');
+        }
+        const renderedHtml = html.replace('{{NEXT_URL}}', next);
+        res.send(renderedHtml);
+      });
+      return;
     }
+
+
   }
 
   // return the user to an error page with some instructions
-  res.redirect(303, '/auth/auth-code-error')
+  // res.redirect(303, '/auth/auth-code-error')
 })
 
 router.get("/auth/callback", async function (req, res) {
   const code = req.query.code
-  const next = req.query.next ?? 'https://playsuspect.com'
+  const next = req.query.next ?? ''
 
   if (code) {
-    const supabase = createServerClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY, {
-    cookies: {
-      getAll() {
-        return parseCookieHeader(context.req.headers.cookie ?? '')
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          context.res.appendHeader('Set-Cookie', serializeCookieHeader(name, value, options))
-        )
-      },
-    },
-  })
+    const supabase = createSupabaseClient({ req, res })
     await supabase.auth.exchangeCodeForSession(code)
   }
   console.log('redirecting to:', next)

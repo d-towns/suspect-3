@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, VotingRoundVote, Suspect, Lead, ConversationExhange, DeductionAnalysis, Deduction } from '../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Lead, ConversationExhange, Deduction } from '../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 import AudioRecorder from '../components/audioRecorder';
 import ResponseLoading from '../components/responseLoading';
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, TextField, Callout, Strong, CardProps, Tabs, Spinner } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -433,9 +433,7 @@ interface InterrogationProps {
 }
 
 const Interrogation: React.FC<InterrogationProps> = ({
-    gameState,
     interrogationTranscript,
-    wavStreamPlayerRef,
     roundTimer,
     responseLoading,
     audioTranscribing,
@@ -450,10 +448,9 @@ const Interrogation: React.FC<InterrogationProps> = ({
             <RoundTimer roundTimer={roundTimer} />
             <div className='grid grid-cols-1 grid-rows-[auto_1fr] gap-4 pt-8'>
                 <h2 className="text-2xl font-bold w-full text-center h-fit">Interrogation</h2>
-                {/* <h2 className="text-2xl font-bold w-full text-center  h-fit">Leads</h2> */}
                 <Box
                     as="div"
-                    className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-[600px]"
+                    className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-[550px]"
                 >
                     <Grid mb="2" columns="8" flow="dense" gap="5">
                         {interrogationTranscript.map((conversationItem, index) => (
@@ -465,12 +462,6 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                             {conversationItem.timestamp % 60 < 10 ? '0' : ''}
                                             {conversationItem.timestamp % 60}
                                         </Text>
-                                        {/* {conversationItem.audioBuffer && (
-                  <Flex direction="column" className="col-span-3">
-                    <Separator my="3" size="2" />
-                    <AudioPlayer audioData={conversationItem.audioBuffer} />
-                  </Flex>
-                )} */}
                                     </Box>
                                     <Box className="col-span-7">
                                         <Text align="left" as="span">
@@ -488,36 +479,6 @@ const Interrogation: React.FC<InterrogationProps> = ({
                         <ResponseLoading label="Transcribing your response..." />
                     )}
                 </Box>
-                {/* <Box
-                    as="div"
-                    className="interrogationChat w-full overflow-y-auto p-4 rounded-lg"
-                >
-                    {gameState.leads.map((lead, index) => (
-                        <Card>
-                            <Flex key={index} className='gap-3 p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
-                                <Text as='p' size='2' weight='bold'> {gameState.suspects.find((suspect) => suspect.id === lead.suspect)?.name} </Text>
-                                <Text as='p' size='3' weight='bold'> {lead.evidence} </Text>
-
-                            </Flex>
-                        </Card>
-                    ))}
-                    <Callout.Root className='my-4' color='blue'>
-                        <Callout.Icon>
-                            <IoAlertCircle />
-                        </Callout.Icon>
-                        <Callout.Text>
-                            <Text as='p' size='4'>Create leads by  <Strong>selecting a piece of evidence </Strong> OR  <Strong>suspect statements from the interrogation</Strong> </Text>
-                        </Callout.Text>
-                    </Callout.Root>
-                    <Callout.Root className='my-4' color='red'>
-                        <Callout.Icon>
-                            <IoAlertCircle />
-                        </Callout.Icon>
-                        <Callout.Text>
-                            <Text size='4'>Commisioner Gordon: "Your gonna need at least a few leads before we can make a case against our culprit, Detective!"</Text>
-                        </Callout.Text>
-                    </Callout.Root>
-                </Box> */}
             </div>
             <div className="flex justify-center">
                 {socket && (
@@ -1148,7 +1109,7 @@ const SingleGame = () => {
     return (
 
         <>
-            <Box className="flex">
+            <Box className="flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
                 <Box>
                 <Flex px={'2'} py={'5'} >

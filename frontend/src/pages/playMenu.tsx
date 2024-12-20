@@ -11,7 +11,6 @@ import {
   Inset,
   Strong,
 } from '@radix-ui/themes';
-import { Waitlist } from '../components/waitlist';
 
 
 interface ModeCardProps {
@@ -58,28 +57,6 @@ const ModeCard: React.FC<ModeCardProps> = ({
         {description && <Text as="p" size={{ sm: '2', md: '3', lg: '4' }}>{description}</Text>}
         <Separator my="3" size="4" />
       </Card>
-
-      {/* {mode === 'single' && (
-        <Card
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '60%',
-            padding: '20px',
-            borderRadius: '8px',
-          }}
-          variant='surface'
-        >
-          <Text as="p" align='center' size={{ lg: '5', md: '4', sm: '3' }} >
-            <Strong>Coming Soon!</Strong>
-
-          </Text>
-          <Text as="p" size={{ lg: '5', md: '4', sm: '3' }} my='3' align={'center'}>Release Date: <Strong>Dec 20th</Strong></Text>
-          <Waitlist />
-        </Card>
-      )} */}
     </Box>
   );
 };
@@ -101,24 +78,22 @@ const PlayMenu: React.FC = () => {
 
 
   return (
-    <Flex justify="center" align="center" className=' mt-[5%] w-full'>
-      <Flex direction={{ initial: 'column', md: 'row' }} gap={'9'}>
-        <ModeCard
-          createRoom={createRoom}
-          imgSrc="single-player-splash-2.webp"
-          altText="Single Player"
-          description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
-          mode="single"
-        />
-        <ModeCard
-          createRoom={createRoom}
-          imgSrc="multi-player-splash.webp"
-          description='Clear your name as a suspect against the detective! The culprit is among you, but who? Invite your friends and use your wits to deceive the detective and avoid being framed...or found out.'
-          altText="Multiplayer"
-          mode="multi"
-        />
-      </Flex>
-    </Flex>
+        <Flex direction={{ initial: 'column', md: 'row' }} gap={'6'} className='h-full self-center items-center justify-self-center '  mt={{xs: '6', md:'0'}}>
+          <ModeCard
+            createRoom={createRoom}
+            imgSrc="single-player-splash-2.webp"
+            altText="Single Player"
+            description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
+            mode="single"
+          />
+          <ModeCard
+            createRoom={createRoom}
+            imgSrc="multi-player-splash.webp"
+            description='Clear your name as a suspect against the detective! The culprit is among you, but who? Invite your friends and use your wits to deceive the detective and avoid being framed...or found out.'
+            altText="Multiplayer"
+            mode="multi"
+          />
+        </Flex>
   );
 };
 

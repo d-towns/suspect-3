@@ -1,4 +1,4 @@
-import { GameState, MultiGameState, SingleGameState } from "./game-state.model";
+import { MultiGameState, SingleGameState } from "./game-state.model";
 
 export interface GameRoom {
     id: string;

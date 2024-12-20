@@ -42,8 +42,8 @@ const main = async () => {
     const gameServer = GameRoomSocketServer.getInstance(httpServer);
     
 
-    httpServer.listen(3000, () => {
-        console.log('Server is running on port 3000');
+    httpServer.listen(8000, () => {
+        console.log('Server is running on port 8000');
     });
 
 }

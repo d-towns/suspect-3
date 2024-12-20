@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Email Confirmed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #111110;
+        color: white;
+        font-family: 'Special Elite', cursive;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      button {
+        background-color: #48295C;
+        border: none;
+        border-radius: 10px;
+        color: white;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-family: 'Special Elite', cursive;
+        font-size: 16px;
+      }
+      button:hover {
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Your email has been confirmed!</h1>
+    <button onclick="window.location.href='{{NEXT_URL}}'">Go to Home</button>
+  </body>
+</html>

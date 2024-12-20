@@ -11,7 +11,6 @@ import Footer from './components/footer';
 
 const App: React.FC = () => {
   return (
-    // <SidebarProvider>
     <ToastProvider>
       <AuthProvider>
         <SocketProvider>
@@ -32,7 +31,7 @@ const ThemedApp: React.FC = () => {
     <Theme accentColor="purple" grayColor="sand" radius="large" scaling="95%" appearance={theme}>
       <div className="flex flex-col min-h-screen">
         <Navbar />
-        <main>
+        <main className='min-h-[85vh] flex justify-center '>
           <Outlet />
         </main>
         <Footer />
