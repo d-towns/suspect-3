@@ -197,40 +197,40 @@ const SuspectCard: React.FC<PlayerCardProps> = ({ suspect, variant }) => {
     );
 };
 
-const testConversationExchanges: ConversationExhange[] = [
-    {
-        speaker: "Detective",
-        message: "Where were you on the night of March 15th?"
-    },
-    {
-        speaker: "John Smith",
-        message: "I was working late at the office until about 10 PM. You can check the building's security logs."
-    },
-    {
-        speaker: "Detective",
-        message: "Can anyone confirm your presence there?"
-    },
-    {
-        speaker: "John Smith",
-        message: "Yes, my colleague Mary was also working late. And I ordered takeout which was delivered around 9 PM."
-    },
-    {
-        speaker: "Detective",
-        message: "Tell me about your relationship with the victim."
-    },
-    {
-        speaker: "John Smith",
-        message: "We were business partners, but lately there had been some tension over the company's direction. Nothing violent though, I assure you."
-    },
-    {
-        speaker: "Detective",
-        message: "Were you aware of the missing documents from the company safe?"
-    },
-    {
-        speaker: "John Smith",
-        message: "Missing documents? This is the first I'm hearing about this. What documents are you referring to?"
-    }
-];
+// const testConversationExchanges: ConversationExhange[] = [
+//     {
+//         speaker: "Detective",
+//         message: "Where were you on the night of March 15th?"
+//     },
+//     {
+//         speaker: "John Smith",
+//         message: "I was working late at the office until about 10 PM. You can check the building's security logs."
+//     },
+//     {
+//         speaker: "Detective",
+//         message: "Can anyone confirm your presence there?"
+//     },
+//     {
+//         speaker: "John Smith",
+//         message: "Yes, my colleague Mary was also working late. And I ordered takeout which was delivered around 9 PM."
+//     },
+//     {
+//         speaker: "Detective",
+//         message: "Tell me about your relationship with the victim."
+//     },
+//     {
+//         speaker: "John Smith",
+//         message: "We were business partners, but lately there had been some tension over the company's direction. Nothing violent though, I assure you."
+//     },
+//     {
+//         speaker: "Detective",
+//         message: "Were you aware of the missing documents from the company safe?"
+//     },
+//     {
+//         speaker: "John Smith",
+//         message: "Missing documents? This is the first I'm hearing about this. What documents are you referring to?"
+//     }
+// ];
 
 // VotingRound Component
 interface VotingRoundProps {
