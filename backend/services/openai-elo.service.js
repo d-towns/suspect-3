@@ -81,7 +81,6 @@ export class OpenAIEloService {
     organization: process.env.OPENAI_ORGANIZATION_ID,
     project: process.env.OPENAI_PROJECT_ID,
   } : {apiKey: process.env.OPENAI_SERVICE_API_KEY_TEST});
-
   static supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_KEY
@@ -102,6 +101,7 @@ export class OpenAIEloService {
 
   static PlayerResultSchema = z.object({
     playerId: z.string(),
+    oldRating: z.number(),
     newRating: z.number(),
     won: z.boolean(),
     badges: z.array(z.enum(this.badgesEnum)),
@@ -254,11 +254,12 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
   static async emitLeaderboardUpdates(playerResults) {
     const socketServer = GameRoomSocketServer.getInstance();
     for (const results of playerResults) {
-      const { playerId, newRating, badges } = results;
+      const { playerId, oldRating, newRating, badges } = results;
       const socketId = socketServer.getSocketForUser(playerId);
       if (socketId) {
         socketServer.emitToSocket(socketId, "leaderboard-stats-update", {
-          elo: newRating,
+          oldRating,
+           newRating,
           badges,
         });
       } else {

@@ -235,11 +235,12 @@ export const Lobby: React.FC = () => {
   };
 
   const handleStartGameClick = () => {
+    if(!lobbyState.room) { return ;}
     setLobbyState(prevState => ({
       ...prevState,
       gameStarting: true
     }));
-    startGame();
+    startGame(lobbyState.room.mode);
   };
 
   const handleReadyClick = () => {
@@ -270,7 +271,7 @@ export const Lobby: React.FC = () => {
         addToast('User not authenticated', undefined);
         return;
       }
-      const toGame = roomId; 
+      const toGame = roomId;
       const fromUser = user.id;
 
       await invitesService.createInvite(fromUser, inviteEmail, toGame);
@@ -316,23 +317,23 @@ export const Lobby: React.FC = () => {
                 </Flex>
               ))}
               <Box className='mt-4'>
-<Callout.Root size='1' className='my-2 flex items-center'>
-	<Callout.Icon>
-		<IoAlertCircle />
-	</Callout.Icon>
-	<Callout.Text>
-		{lobbyState.players.size < 2 && 'A minimum of 2 players are required to start the game. Invite your friends to join!'}
-	</Callout.Text>
-</Callout.Root>
-              <Flex align="center" gap="2" mt='4'>
-                <TextField.Root
-                  placeholder="Invite other players by email"
-                  value={inviteEmail}
-                  style={{ flex: 1 }}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
-                <Button onClick={handleSendInvite}>Send Invite</Button>
-              </Flex>
+{ lobbyState.players.size < 2 && lobbyState.room?.mode == 'multi'      &&         <Callout.Root size='1' className='my-2 flex items-center'>
+                  <Callout.Icon>
+                    <IoAlertCircle />
+                  </Callout.Icon>
+                  <Callout.Text>
+                    {lobbyState.players.size < 2 && 'A minimum of 2 players are required to start the game. Invite your friends to join!'}
+                  </Callout.Text>
+                </Callout.Root>}
+                <Flex align="center" gap="2" mt='4'>
+                  <TextField.Root
+                    placeholder="Invite other players by email"
+                    value={inviteEmail}
+                    style={{ flex: 1 }}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                  <Button onClick={handleSendInvite}>Send Invite</Button>
+                </Flex>
               </Box>
             </Box>
           </Box>
@@ -377,7 +378,7 @@ export const Lobby: React.FC = () => {
               onClick={handleStartGameClick}
               style={{ flex: 1 }}
               disabled={
-                !lobbyState.gameStatus.allPlayersReady || lobbyState.gameStarting || lobbyState.players.size < 2
+                !lobbyState.gameStatus.allPlayersReady || lobbyState.gameStarting || lobbyState.players.size < 2 && lobbyState.room?.mode == 'multi' 
               }
             >
               {lobbyState.gameStarting ? 'Starting Game...' : 'Start Game'}

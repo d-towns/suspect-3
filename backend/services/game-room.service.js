@@ -1,15 +1,18 @@
-import { createSupabaseClient } from '../db/supabase.js';
-import { GameRoomSocketServer } from '../socket/io.js';
 import { createClient } from '@supabase/supabase-js';
 import crypto from "crypto";
+import dotenv from "dotenv";
+dotenv.config({path: "../../.env"});
+
+
 
 export class GameRoomService {
-    static async createGameRoom(userId) {
+    static async createGameRoom(userId, mode) {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
         const roomData = {
             host_id: userId,
-            created_at: new Date()
+            created_at: new Date(),
+            mode
         }
         console.log(roomData);
 
@@ -33,7 +36,7 @@ export class GameRoomService {
         const { data, error } = await supabase
             .from('game_rooms')
             .update(updates)
-            .eq('id', roomId);
+            .eq('id', roomId).select().single();
 
         if (error) {
             throw new Error(`Error updating game room: ${error.message}`);

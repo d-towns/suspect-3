@@ -3,7 +3,7 @@ import App from '../App';
 import Login from '../pages/login';
 import PlayMenu from '../pages/playMenu';
 import Lobby from '../pages/lobby';
-import Game from '../pages/game';
+import RenderGame from '../pages/renderGame';
 import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Leaderboard from '../pages/leaderboard';
@@ -43,7 +43,8 @@ const router = createBrowserRouter([
           },
           {
             path: 'game/:roomId',
-            element: <Game />,
+            element: <RenderGame />,
+
           },
         ],
       },

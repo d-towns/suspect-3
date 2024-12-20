@@ -1,5 +1,5 @@
 import axiosInstance from '../utils/axios-instance';
-import { GameRoom } from '../models';
+import { GameRoom, GameState, Lead } from '../models';
 import { decryptGameState } from '../utils/decrypt';
 
 export const roomsService = {
@@ -34,6 +34,7 @@ export const roomsService = {
       const response = await axiosInstance.get(`/games/get-room/${roomId}`);
       if (response.data.room) {
         const decryptedGameState = await decryptGameState(response.data.room.game_state);
+
         return { ...response.data.room, game_state: decryptedGameState };
       }
       throw new Error('Failed to fetch room');
@@ -42,6 +43,45 @@ export const roomsService = {
       throw error;
     }
   },
+
+  updateGameState: async (roomId: string, gameState: GameState): Promise<void> => {
+    try {
+      const response = await axiosInstance.post(`/games/update-game/${roomId}`, { gameState });
+      if (response.data.success) {
+        return;
+      }
+      throw new Error('Failed to update game');
+    } catch (error) {
+      console.error('Error updating game:', error);
+      throw error;
+    }
+  },
+
+  createNewLead: async (roomId: string, lead: Lead): Promise<string> => {
+    try {
+      const response = await axiosInstance.post(`/games/${roomId}/leads/create`, {lead});
+      if (response.data.success) {
+        return response.data.game_state;
+      }
+      throw new Error('Failed to create lead');
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      throw error;
+    }
+  },
+
+  createCulpritVote: async (roomId: string, culpritVote: string): Promise<string> => {
+    try {
+      const response = await axiosInstance.post(`/games/${roomId}/culprit-vote/create`, {culpritVote});
+      if (response.data.success) {
+        return response.data.game_state;
+      }
+      throw new Error('Failed to create culprit vote');
+    } catch (error) {
+      console.error('Error creating culprit vote:', error);
+      throw error;
+    }
+  }
 
   
 };

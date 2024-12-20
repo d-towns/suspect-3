@@ -47,3 +47,5 @@ export const resetGameState = async (gameRoomId) => {
 
 
 }
+
+resetGameState(process.argv[2])

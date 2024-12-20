@@ -11,6 +11,7 @@ import Footer from './components/footer';
 
 const App: React.FC = () => {
   return (
+    // <SidebarProvider>
     <ToastProvider>
       <AuthProvider>
         <SocketProvider>

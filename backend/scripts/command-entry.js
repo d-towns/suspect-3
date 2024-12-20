@@ -1,5 +1,4 @@
 import { listThreadMessages } from "./list-thread-messages/list-thread-messages.js";
-import { setGameState } from "./set-game-state/set-game-state.js";
 import { simulateVotingRound } from "./simulate-voting-round/simulate-voting-round.js";
 import { createAssistants } from './create-assistants.js';
 import { runThread } from "./run-thead.js";
