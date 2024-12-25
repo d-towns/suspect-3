@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
-import OpenaiGameService from "../services/openai-game-service.js";
+import OpenaiGameService from "../services/openai_game_service.js";
 import { GameRoomService } from "../services/game-room.service.js";
 
 function startInterval(initialNumber, tickCallback, doneCallback) {
@@ -88,22 +88,29 @@ export class GameRoomSocketServer {
       )
       .subscribe();
 
-    this.roomRoundTimers = new Map();
 
+      // keeps track of all the round timers for each room in this socket server
+    this.roomRoundTimers = new Map();
+    // set up the socket event listeners
     this.io.on("connection", (socket) => {
       socket.on("set-user", this.handleSetUserDetails.bind(this, socket));
       socket.on("disconnect", this.handleDisconnect.bind(this, socket));
       socket.on("join-room", this.handleJoinRoom.bind(this, socket));
       socket.on("leave-room", this.handleLeaveRoom.bind(this, socket));
+
+      // TODO: this should move the game into the deduction phase
       socket.on(
         "start-next-round",
         this.handleStartNextRound.bind(this, socket)
       );
+
       socket.on("chat-message", this.handleChatMessage.bind(this, socket));
+
       socket.on(
         "online-players-list",
         this.handleOnlinePlayersList.bind(this, socket)
       );
+      
       socket.on(
         "realtime-audio-response",
         this.handleRealtimeAudioResponse.bind(this, socket)
@@ -112,26 +119,38 @@ export class GameRoomSocketServer {
         "realtime-audio-response-end",
         this.handleRealtimeAudioResponseEnd.bind(this, socket)
       );
+
+      // Multiplayer only
       socket.on(
         "voting-round-vote",
         this.handleVotingRoundVote.bind(this, socket)
       );
+
+      // Single player only
       socket.on("submit-deduction", this.handleSubmitDeduction.bind(this, socket));
+
+      // heartbeat lister for client sockets connected to this server
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
-      socket.on("start-game", this.handleStartGame.bind(this, socket));
+
+      // called when the host of a game starts the game from the looby
+
+      socket.on("start-game", this.handleCreateInitialGameState.bind(this, socket));
+      // called when a player navigates to the game page
       socket.on("joined-game", this.handleJoinedGame.bind(this, socket));
+      // called when a player readies up in the game lobby
       socket.on("player-ready", this.handlePlayerReady.bind(this, socket));
 
-      // Initialize lastHeartbeat
+      // Initialize lastHeartbeat for the socket that just connected
       socket.lastHeartbeat = Date.now();
 
-      // Start the heartbeat check interval
+      // Start the heartbeat check interval for the socket that just connected
       setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
     });
 
     GameRoomSocketServer.instance = this;
   }
 
+  // TODO: these attributes should be set on the socket.data object
   handleSetUserDetails(socket, userEmail, userName, userId) {
     socket.userEmail = userEmail;
     socket.userName = userName;
@@ -139,6 +158,7 @@ export class GameRoomSocketServer {
     socket.userId = userId;
   }
 
+  // this could be moved to a 
   handleDisconnect(socket) {
     console.log(`User ${socket.userEmail} disconnected`);
     const room = this.io.sockets.adapter.rooms.get(socket.roomId);
@@ -148,7 +168,7 @@ export class GameRoomSocketServer {
     if (room) {
       const playerLeftData = {
         email: socket.userEmail,
-        id: socket.userId,
+        id: socket.userId, // this shouldnt be sent to the client
         userName: socket.userName,
       };
       socket.to(socket.roomId).emit("player-left", playerLeftData);
@@ -164,14 +184,11 @@ export class GameRoomSocketServer {
     if (!socket.rooms.has(roomId)) {
       socket.join(roomId);
     }
-    socket.userEmail = userEmail;
-    socket.userId = userId;
-    socket.roomId = roomId;
-    socket.userName = userName;
+    this.handleSetUserDetails(socket, userEmail, userName, userId);
     console.log(`User ${userEmail} joined room ${roomId}`);
     socket.to(roomId).emit("player-joined", {
       email: userEmail,
-      id: userId,
+      id: userId, // this shouldnt be sent to the client
       username: userName,
     });
     if (callback) callback({ success: true });
@@ -247,6 +264,7 @@ export class GameRoomSocketServer {
       data.mode,
       false
     );
+
     this.startGameLoop(socket, roomId);
   }
 
@@ -284,6 +302,7 @@ export class GameRoomSocketServer {
     );
   }
 
+  // TODO: this shouldn't be needed once we move to turn detection on in the realtime API
   async handleRealtimeAudioResponseEnd(socket) {
     await OpenaiGameService.createInterrogationResponse(socket.roomId);
   }
@@ -358,10 +377,12 @@ export class GameRoomSocketServer {
     }
   }
 
-  async handleStartGame(socket, roomId, mode) {
+  async handleCreateInitialGameState(socket, roomId, mode) {
     console.log(`Starting game in room ${roomId}`);
     this.emitToRoom(roomId, "game-creating");
     try {
+
+      //TODO: use a built in socket.io function for getting all sockets in a room
       const room = this.io.sockets.adapter.rooms.get(roomId);
       const playerIds = Array.from(room).map((socketId) => {
         const socket = this.io.sockets.sockets.get(socketId);
@@ -395,6 +416,23 @@ export class GameRoomSocketServer {
     }
   }
   /** the game loop
+   * Single Player:
+   * the player will enter the game room and send a joined-game event to the server
+   * this should be ignored until the host of the room sends a start-game event
+   * the start-game event will be sent once the player has gone over the offense report and is ready to start the game
+   * once the start-game event is sent, the server will start the game loop
+   * the game loop consisnts of 2 phases, the interrogation phase and the deduction phase
+   * the interrogation phase will last 10 minutes and allow the player to start one interrogation at a time and they have to end if before starting another
+   * the deduction phase will last 5 minutes and allow the player to create a deduction graph out of the statements made by the suspects, the evidnce and the susepcts themselves
+   * the deduction can be submitted at any time during the deduction phase
+   * if the deduction is rejected, the player can try again
+   * once the deduction is rejected twice, the palyer loses
+   * if the deduction is accepted, the supect with the most implication edges linked to their node will be the culprit
+   * if the player is correct, they win
+   * if the player is incorrect, they lose
+   * 
+   * 
+   * 
    * the first round will have different time than the rest of the rounds
    * it will last 30 seconds and give the players time to read their cards
    * once that timer ends, we should call the startRealtimeInterrogation function in the openaiGameService
@@ -414,8 +452,9 @@ export class GameRoomSocketServer {
   async startGameLoop(socket, roomId) {
     // function to emit the round tick event to the room
 
-    let listenerFunc = null;
+    let listenerFunc = null; // TODO: not needed
     const initialGameRoom = await GameRoomService.getGameRoom(roomId);
+
     const emitRoundTick = (number) => {
       this.emitToRoom(roomId, "round-timer-tick", { countdown: number });
       this.roomRoundTimers.set(socket.roomId, {

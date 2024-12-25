@@ -41,7 +41,7 @@ export class GameRoomService {
         if (error) {
             throw new Error(`Error updating game room: ${error.message}`);
         }
-
+        console.log( "\n" + "Game room updated successfully"+ "\n");
         return data;
     }
 

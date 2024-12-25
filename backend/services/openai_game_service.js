@@ -119,7 +119,10 @@ Remember to be impartial but thorough in your investigation.`,
           "game_state"
         ),
       });
-      console.log("Multiplayer Game Master Assistant created successfully:", assistant.id);
+      console.log(
+        "Multiplayer Game Master Assistant created successfully:",
+        assistant.id
+      );
       return assistant;
     } catch (error) {
       console.error("Error creating Game Master Assistant:", error);
@@ -210,7 +213,10 @@ Remember to be impartial but thorough in your investigation.`,
           "game_state"
         ),
       });
-      console.log("Single player Game Master Assistant created successfully:", assistant.id);
+      console.log(
+        "Single player Game Master Assistant created successfully:",
+        assistant.id
+      );
       return assistant;
     } catch (error) {
       console.error("Error creating Game Master Assistant:", error);
@@ -288,14 +294,10 @@ Remember to be impartial but thorough in your investigation.`,
         (suspect) => suspect.id === activeRound.suspect
       );
 
-      console.log(activeRound, suspectInInterrogation)
+      console.log(activeRound, suspectInInterrogation);
       await this.addMessageToThread(threadId, {
         role: "assistant",
-        content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded. Start the next voting round of the game. KEEP ALL OF THE ROUNDS THAT HAVE BEEN CREATED IN THE GAME STATE. ONLY UPDATE THE STATUS OF THE CURRENT ACTIVE ROUND, AND SET THE NEXT ROUND TO BE ACTIVE`,
-      });
-      await this.addMessageToThread(threadId, {
-        role: "assistant",
-        content: `KEEP ALL OF THE ROUNDS THAT HAVE BEEN CREATED IN THE GAME STATE. DO NOT REMOVE ANY ROUNDS FROM THE GAME STATE. ONLY UPDATE THE STATUS OF THE CURRENT ACTIVE ROUND, AND SET THE NEXT ROUND TO BE ACTIVE`,
+        content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded.`,
       });
 
       console.log("Interrogation round end message sent \n");
@@ -316,13 +318,19 @@ Remember to be impartial but thorough in your investigation.`,
   }
 
   static async endVotingRound(threadId, gameMode) {
-    if(mode == 'multi') {
-    await this.addMessageToThread(threadId, {
-      role: "user",
-      content: `The voting round has ended. Tally the votes and determine the outcome of the game. If there is not a majority vote for the culprit, the game will continue to the next round. set this voting round to be completed and the next Interrogation round to be active`,
-    });
-    console.log("Interrogation round end message sent \n");
-  }
+    if (mode == "multi") {
+      await this.addMessageToThread(threadId, {
+        role: "user",
+        content: `The voting round has ended. Tally the votes and determine the outcome of the game. If there is not a majority vote for the culprit, the game will continue to the next round. set this voting round to be completed and the next Interrogation round to be active`,
+      });
+      console.log("Interrogation round end message sent \n");
+    } else {
+      await this.addMessageToThread(threadId, {
+        role: "assistant",
+        content: `The voting round has ended. the players loses the game. The game is finished. The outcome of the game is that the player loses the game. The game is finished.`,
+      });
+      console.log("Interrogation round end message sent \n");
+    }
   }
 
   static async addVotingRoundVote(roomId, vote) {
@@ -363,7 +371,7 @@ Remember to be impartial but thorough in your investigation.`,
     roomId,
     gameMode,
     simulated = false,
-    roundEnd = true,
+    roundEnd = true
   ) {
     console.log(`Running thread: ${threadId}`);
 
@@ -502,8 +510,10 @@ Remember to be impartial but thorough in your investigation.`,
       const { crime, evidence, suspects, deductions } = gameState;
       // delete the isCulprit property from the suspects
       suspects.forEach((suspect) => delete suspect.isCulprit);
-      const currentDeduction = deductions.find((deduction) => deduction.submitted === false);
-      const {leads, culpritVote} = currentDeduction;
+      const currentDeduction = deductions.find(
+        (deduction) => deduction.submitted === false
+      );
+      const { leads, culpritVote } = currentDeduction;
 
       const messages = [
         {
@@ -547,7 +557,10 @@ Remember to be impartial but thorough in your investigation.`,
       currentDeduction.submitted = true;
 
       // add the result to the game thread as an assistant message
-      console.log("Adding deduction analysis to game thread..." , currentDeduction);  
+      console.log(
+        "Adding deduction analysis to game thread...",
+        currentDeduction
+      );
       await this.addMessageToThread(threadId, {
         role: "assistant",
         content: `Deduction: ${JSON.stringify(currentDeduction)}`,
@@ -558,15 +571,18 @@ Remember to be impartial but thorough in your investigation.`,
         content: `DO NOT REMOVE ANY ROUNDS FROM THE GAME STATE IN THE NEXT STATE UPDATE. JUST UPDATE THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD AND KEEP THE CURRENT ACTIVE VOTING ROUND ACTIVE. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.`,
       });
 
-
-
-      await OpenaiGameService.runThreadAndProcess(threadId, roomId, "single", false, false);
-      if (gameState.status === 'finished') {
+      await OpenaiGameService.runThreadAndProcess(
+        threadId,
+        roomId,
+        "single",
+        false,
+        false
+      );
+      if (gameState.status === "finished") {
         this.endGameAndCalculateResults(threadId, roomId);
       }
 
       // update the game state with the deduction analysis
-
 
       // gameState.deductionAnalysis.push(result);
       // await GameRoomService.saveGameState(roomId, gameState);
@@ -697,7 +713,9 @@ Remember to be impartial but thorough in your investigation.`,
 
           await this.client.beta.threads.messages.create(threadId, {
             role: "user",
-            content: `${isSinglePlayer ? "Detective: " : ""} ${event.transcript}`,
+            content: `${isSinglePlayer ? "Detective: " : ""} ${
+              event.transcript
+            }`,
           });
           // sedn the transctiption back to the client
           socketServer.emitToRoom(
@@ -894,7 +912,47 @@ Remember to be impartial but thorough in your investigation.`,
             console.log("Response done event received");
             resolve();
             ws.off("message", responseListener);
-        }
+          }
+        };
+
+        ws.on("message", responseListener);
+
+        ws.send(JSON.stringify(event));
+        ws.send(JSON.stringify({ type: "response.create" }));
+      } else {
+        // in single rounds i want to have a user message that tells the suspect they are free to go
+        // and then a response.create event to get the assistant's response
+
+        const event = {
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "You are free to go. The interrogation is over.",
+              },
+            ],
+          },
+        };
+
+        // add a listener for the response.done event
+        const responseListener = async (data) => {
+          const event = JSON.parse(data);
+          if (event.type === "response.done") {
+            console.log("Response done event received");
+            await this.addMessageToThread(threadId, {
+              role: "assistant",
+              content: `The interrogation of ${suspectInInterrogation.name}, ${suspectInInterrogation.identity} has concluded.`,
+            });
+            setTimeout(() => {
+              console.log("Closing realtime session for room:", roomId);
+              ws.close();
+            }, 10000);
+            resolve();
+            ws.off("message", responseListener);
+          }
         };
 
         ws.on("message", responseListener);
@@ -902,14 +960,6 @@ Remember to be impartial but thorough in your investigation.`,
         ws.send(JSON.stringify(event));
         ws.send(JSON.stringify({ type: "response.create" }));
       }
-      //close the ws connection in a setTimeout of 10 seconds
-      setTimeout(() => {
-        console.log("Closing realtime session for room:", roomId);
-        ws.close();
-      }, 10000);
-
-      console.log("Sent end interrogation message to realtime API");
-      resolve();
     });
   }
 
@@ -924,7 +974,9 @@ Remember to be impartial but thorough in your investigation.`,
 
       let playerStats;
       if (isSinglePlayer) {
-        playerStats = LeaderboardService.getLeaderboardStatsForPlayer(gameState.player)
+        playerStats = LeaderboardService.getLeaderboardStatsForPlayer(
+          gameState.player
+        );
       } else {
         playerStats = LeaderboardService.getLeaderboardStatsForPlayers(
           gameState.players.map((player) => player.id)

@@ -10,7 +10,6 @@ export const AnalysisSchema = z.object({
   accepted: z.boolean(),
 });
 
-
 export const SuspectTermpemtmentSchema = z
   .enum([
     "calm",
@@ -29,6 +28,22 @@ export const SuspectTermpemtmentSchema = z
     "untruthful",
     "vague",
   ])
+
+  export const SuspectSchema = z
+.object({
+  id: z
+    .string()
+    .describe(
+      "a 5 digits alphanumeric string that represents the suspect that is in the interrogation room for this round"
+    ),
+  name: z.string(),
+  identity: z.string(),
+  temperment: SuspectTermpemtmentSchema,
+  interrogated: z.boolean(),
+
+  isCulprit: z.boolean(),
+})
+.strict();
 
 export const MultiPlayerGameStateSchema = z
   .object({
@@ -115,18 +130,18 @@ export const SinglePlayerGameStateSchema = z
         type: z.string(),
         location: z.string(),
         time: z.string(),
-        description: z.string(),
+        offenseReport: z.array(
+          z.object({
+            location: z.string(),
+            time: z.string(),
+            description: z.string(),
+       })),
       })
       .strict(),
     player: z.string(),
     rounds: z.array(
       z
         .object({
-          suspect: z
-            .string()
-            .describe(
-              "a 5 digits alphanumeric string that represents the suspect that is in the interrogation room for this round"
-            ),
           status: z
             .enum(["inactive", "active", "completed"])
             .describe("The status of the round"),
@@ -140,42 +155,38 @@ export const SinglePlayerGameStateSchema = z
         .strict()
     ),
     suspects: z.array(
-      z
-        .object({
-          id: z
-            .string()
-            .describe(
-              "a 5 digits alphanumeric string that represents the suspect that is in the interrogation room for this round"
-            ),
-          name: z.string(),
-          identity: z.string(),
-          temperment: SuspectTermpemtmentSchema,
-          interrogated: z.boolean(),
-
-          isCulprit: z.boolean(),
-        })
-        .strict()
+      SuspectSchema
     ),
-    deductions: z.array(
+    deduction: z.object({
+      nodes: z.array(
+        z
+          .object({
+            id: z.string(),
+            type: z.enum(["statement", "evidence", "suspect"]),
+            data: z.union([ ConversationResponseSchema, z.string(), SuspectSchema ]),
+          })
+          .strict()
+      ),
+      edges: z.array(
+        z
+          .object({
+            source_node: z.string(),
+            target_node: z.string(),
+            type: z.enum(["supports", "contradicts", 'implicates']),
+          })
+          .strict()
+      ),
+      submissions: z.array(
+        AnalysisSchema
+      ),
+  }).strict(),
+    allEvidence: z.array(
       z.object({
-        leads: z
-        .array(z.object({ suspect: z.string(), evidence: z.union([z.string(), z.array(z.string())]) }))
-        .describe("The leads that the player has gathered"),
-        active: z.boolean().describe("Whether the player is currently working on this deduction, this should only be true for one deduction at a time"),
-        submitted: z.boolean().describe("Whether the player has submitted this deduction"),
-        culpritVote: z.string().describe("The suspect ID that the player thinks is the culprit for this deducution"),
-        analysis: AnalysisSchema
+        id: z.string(),
+        description: z.string(),
       })
     ),
-    allEvidence: z.array(z.string()),
-    outcome: z
-      .object({
-        winner: z.enum(["innocents", "culprit", "not_yet_determined"]),
-      })
-      .strict(),
-    culpritVote: z
-      .string()
-      .describe("The suspect ID that the player thinks is the culprit"),
+    outcome: z.enum(["win", "lose", "not_yet_determined"]),
   })
   .strict();
 
