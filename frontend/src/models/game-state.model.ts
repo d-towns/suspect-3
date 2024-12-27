@@ -36,10 +36,22 @@ export interface Player {
   isCulprit: boolean;
 }
 
+export interface OffenseReportItem {
+  location: string;
+  time: string;
+  description: string;
+  imgSrc: string;
+}
+
 export interface Crime {
   type: string;
   location: string;
   time: string;
+  offenseReport: OffenseReportItem[];
+}
+
+export interface Evidence {
+  id: string;
   description: string;
 }
 
@@ -47,7 +59,7 @@ export interface GameState {
     status: 'setup' | 'active' | 'finished';
     crime?: Crime;
     rounds: Round[];
-    allEvidence: string[];
+    allEvidence: Evidence[];
     interrogationProgress?: number;
     outcome?: {
       winner: "innocents" | "culprit" | "not_yet_determined";

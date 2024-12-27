@@ -1,5 +1,5 @@
-import OpenaiGameService from "../services/openai-game-service.js";
-import OpenAIEloService from "../services/openai-elo.service.js";
+import OpenaiGameService from "../services/openai_game_service.js";
+import OpenAIEloService from "../services/llm/elo/openai-elo.service.js";
 
 export async function createAssistants() {
     await OpenaiGameService.createMultiPlayerGameMasterAssistant();

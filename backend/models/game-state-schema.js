@@ -1,49 +1,50 @@
 import { z } from "zod";
 
-export const ConversationResponseSchema = z.object({
-  speaker: z.string(),
-  message: z.string(),
-}).strict();
+export const ConversationResponseSchema = z
+  .object({
+    speaker: z.string(),
+    message: z.string(),
+  })
+  .strict();
 
 export const AnalysisSchema = z.object({
   analysis: z.string(),
   accepted: z.boolean(),
 });
 
-export const SuspectTermpemtmentSchema = z
-  .enum([
-    "calm",
-    "nervous",
-    "angry",
-    "confused",
-    "neutral",
-    "confident",
-    "confrontational",
-    "defensive",
-    "evasive",
-    "hostile",
-    "inconsistent",
-    "uncooperative",
-    "unresponsive",
-    "untruthful",
-    "vague",
-  ])
+export const SuspectTermpemtmentSchema = z.enum([
+  "calm",
+  "nervous",
+  "angry",
+  "confused",
+  "neutral",
+  "confident",
+  "confrontational",
+  "defensive",
+  "evasive",
+  "hostile",
+  "inconsistent",
+  "uncooperative",
+  "unresponsive",
+  "untruthful",
+  "vague",
+]);
 
-  export const SuspectSchema = z
-.object({
-  id: z
-    .string()
-    .describe(
-      "a 5 digits alphanumeric string that represents the suspect that is in the interrogation room for this round"
-    ),
-  name: z.string(),
-  identity: z.string(),
-  temperment: SuspectTermpemtmentSchema,
-  interrogated: z.boolean(),
+export const SuspectSchema = z
+  .object({
+    id: z
+      .string()
+      .describe(
+        "a 5 digits alphanumeric string that represents the suspect that is in the interrogation room for this round"
+      ),
+    name: z.string(),
+    identity: z.string(),
+    temperment: SuspectTermpemtmentSchema,
+    interrogated: z.boolean(),
 
-  isCulprit: z.boolean(),
-})
-.strict();
+    isCulprit: z.boolean(),
+  })
+  .strict();
 
 export const MultiPlayerGameStateSchema = z
   .object({
@@ -135,7 +136,8 @@ export const SinglePlayerGameStateSchema = z
             location: z.string(),
             time: z.string(),
             description: z.string(),
-       })),
+          })
+        ),
       })
       .strict(),
     player: z.string(),
@@ -148,38 +150,43 @@ export const SinglePlayerGameStateSchema = z
           type: z
             .enum(["interrogation", "voting"])
             .describe("The type of round"),
-          conversation: z.array(
-            ConversationResponseSchema
+          conversations: z.array(
+            z.object({
+              suspect: z.string(),
+              responses: z.array(ConversationResponseSchema),
+            })
           ),
         })
         .strict()
     ),
-    suspects: z.array(
-      SuspectSchema
-    ),
-    deduction: z.object({
-      nodes: z.array(
-        z
-          .object({
-            id: z.string(),
-            type: z.enum(["statement", "evidence", "suspect"]),
-            data: z.union([ ConversationResponseSchema, z.string(), SuspectSchema ]),
-          })
-          .strict()
-      ),
-      edges: z.array(
-        z
-          .object({
-            source_node: z.string(),
-            target_node: z.string(),
-            type: z.enum(["supports", "contradicts", 'implicates']),
-          })
-          .strict()
-      ),
-      submissions: z.array(
-        AnalysisSchema
-      ),
-  }).strict(),
+    suspects: z.array(SuspectSchema),
+    deduction: z
+      .object({
+        nodes: z.array(
+          z
+            .object({
+              id: z.string(),
+              type: z.enum(["statement", "evidence", "suspect"]),
+              data: z.union([
+                ConversationResponseSchema,
+                z.string(),
+                SuspectSchema,
+              ]),
+            })
+            .strict()
+        ),
+        edges: z.array(
+          z
+            .object({
+              source_node: z.string(),
+              target_node: z.string(),
+              type: z.enum(["supports", "contradicts", "implicates"]),
+            })
+            .strict()
+        ),
+        submissions: z.array(AnalysisSchema),
+      })
+      .strict(),
     allEvidence: z.array(
       z.object({
         id: z.string(),
@@ -189,4 +196,3 @@ export const SinglePlayerGameStateSchema = z
     outcome: z.enum(["win", "lose", "not_yet_determined"]),
   })
   .strict();
-

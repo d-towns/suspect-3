@@ -61,7 +61,7 @@ export const useSocket = () => {
           // if we are in a game room, we should send a joined-game event
           // check if game is in the url using navigator
           if (window.location.pathname.includes('game')) {
-            socket.emit('joined-game');
+            socket.emit('joined-game', roomId);
 
           }
         } else {
@@ -113,7 +113,7 @@ export const useSocket = () => {
 
   const startGame = useCallback((mode : GameMode) => {
     if (socket && isConnected && roomId) {
-      socket.emit('start-game', roomId, mode);
+      socket.emit('game:create', roomId, mode);
     }
   }, [socket, isConnected, roomId]);
 

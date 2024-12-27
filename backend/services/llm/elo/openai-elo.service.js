@@ -1,10 +1,11 @@
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { z } from "zod";
-import { GameRoomSocketServer } from "../socket/io.js";
+import { GameRoomSocketServer } from "../../../socket/io.js";
 import { createClient } from "@supabase/supabase-js";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import { EventEmitter } from "events";
+import { LeaderboardSchema } from "../../../models/leaderboard.schema.js";
 
 dotenv.config({ path: "../.env" });
 
@@ -86,30 +87,7 @@ export class OpenAIEloService {
     process.env.SUPABASE_SERVICE_KEY
   );
 
-  static badgesEnum = [
-    "strategist",
-    "team_player",
-    "dedicated",
-    "quick_thinker",
-    "detective",
-    "slacker",
-    "antagonist",
-    "slow_poke",
-    "flustered",
-    "clueless",
-  ];
 
-  static PlayerResultSchema = z.object({
-    playerId: z.string(),
-    oldRating: z.number(),
-    newRating: z.number(),
-    won: z.boolean(),
-    badges: z.array(z.enum(this.badgesEnum)),
-  });
-
-  static LeaderboardSchema = z.object({
-    playerResults: z.array(this.PlayerResultSchema),
-  });
 
   static async createEloAssistant() {
     try {
@@ -129,9 +107,11 @@ Possible badges include:
 - Positive: 'strategist', 'team_player', 'dedicated', 'quick_thinker', 'detective'
 - Negative: 'slacker', 'antagonist', 'slow_poke', 'flustered', 'clueless'
 
+In the explanation, provide a detailed analysis of why the player received the badge, referencing their actions in the game like the kinds of questions they asked, how they built their dueduction graph, etc.
+
 Analyze the game thread thoroughly to assign appropriate ELO changes and badges.`,
         response_format: zodResponseFormat(
-          this.LeaderboardSchema,
+          LeaderboardSchema,
           "leaderboard_results"
         ),
         model: "gpt-4o-2024-08-06",
@@ -217,7 +197,7 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
     }
   }
 
-  static async processGameThread(threadId, roomId) {
+  static async processGameThread(threadId) {
     let stream;
     try {
       const assistantId = process.env.OPENAI_ELO_ASSISTANT_ID;
@@ -237,14 +217,15 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       }
 
       const leaderboardData = eventHandler.results;
+      
+      return leaderboardData;
+      // if (leaderboardData) {
+      //   // Update ELO and wins in the database
+      //   await this.updatePlayerStats(leaderboardData.playerResults);
+      //   this.emitLeaderboardUpdates(leaderboardData.playerResults);
 
-      if (leaderboardData) {
-        // Update ELO and wins in the database
-        await this.updatePlayerStats(leaderboardData.playerResults);
-        this.emitLeaderboardUpdates(leaderboardData.playerResults);
-
-        return leaderboardData.playerResults;
-      }
+      //   return leaderboardData.playerResults;
+      // }
     } catch (error) {
       // console.log the error and cancel the stream if it exists
       console.error("Error processing game thread:", error);

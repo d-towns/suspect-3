@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import LLMGameService from "./llm_game_service";
+import LLMGameService from "./llm_game_service.js";
 export default class OpenAIGameService extends LLMGameService {
   constructor() {
     super();
@@ -81,8 +81,9 @@ export default class OpenAIGameService extends LLMGameService {
         const messages = await this.client.beta.threads.messages.list(
           run.thread_id
         );
+
         const mostRecentGameState =
-          messages.data.reverse()[0].content[0].text.value;
+          messages.data[0].content[0].text.value;
         console.log("Most recent game state:", mostRecentGameState);
 
         return JSON.parse(mostRecentGameState);

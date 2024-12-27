@@ -36,6 +36,42 @@ export class LeaderboardService {
         return data;
     }
 
+    /**
+     * Updates the player stats in the leaderboard.
+     * @param {LeaderboardSchema.playerResults} playerResults 
+     */
+    static async updatePlayerStats(playerResults) {
+        console.log("Updating player stats:", playerResults);
+        for (const result of playerResults) {
+          const { playerId, newRating, won } = result;
+    
+          const { data, error } = await this.supabase
+            .from("leaderboard")
+            .select("elo, multi_wins")
+            .eq("user_id", playerId)
+            .single();
+    
+          if (error) {
+            console.error("Error fetching player stats:", error);
+            continue;
+          }
+    
+          const newElo = newRating;
+          const newWins = won ? data.multi_wins + 1 : data.multi_wins;
+    
+          const { error: updateError } = await this.supabase
+            .from("leaderboard")
+            .update({ elo: newElo, multi_wins: newWins })
+            .eq("user_id", playerId);
+    
+          console.log("Player stats updated:", playerId, newElo, newWins);
+    
+          if (updateError) {
+            console.error("Error updating player stats:", updateError);
+          }
+        }
+      }
+
     
 
 }

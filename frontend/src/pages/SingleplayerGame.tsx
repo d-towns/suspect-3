@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, Deduction } from '../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem } from '../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 import AudioRecorder from '../components/audioRecorder';
 import ResponseLoading from '../components/responseLoading';
-import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner } from '@radix-ui/themes';
+import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
 import { decryptGameState } from '../utils/decrypt';
 import AnimatedChatBubble from '../components/chatBubble';
+import AnimatedText from '../components/animatedText';
 
 /**
  * TODO:
@@ -25,6 +26,76 @@ import AnimatedChatBubble from '../components/chatBubble';
  * skip voting if there are less than 3 leads created
  * 
  */
+
+interface OffenseReportProps {
+    offenseReport: OffenseReportItem[] | null;
+    handleStartGame: () => void;
+    // suspects: Suspect[];
+}
+
+const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStartGame}) => {
+    const [currentIndex, setCurrentIndex] = React.useState(0);
+    const nodeRef = React.useRef<HTMLDivElement>(null);
+
+    if (!offenseReport) return null;
+
+    const handleNext = () => {
+        if (currentIndex < offenseReport.length - 1) {
+            setCurrentIndex(currentIndex + 1);
+        } else {
+            handleStartGame();
+        }
+    };
+
+    const currentItem = offenseReport[currentIndex];
+
+    return (
+        <Flex direction="column" align="center" justify="center" gap="4" className='offenseReport'>
+            <div onClick={handleNext} style={{ cursor: 'pointer' }}>
+                <SwitchTransition mode="out-in">
+                    <CSSTransition
+                        key={currentIndex}
+                        nodeRef={nodeRef}
+                        classNames="fade"
+                        timeout={500}
+                        unmountOnExit
+                    >
+                        <div ref={nodeRef}>
+                            <Card className="p-8" style={{minWidth: '700px'}}>  
+                                <Inset clip="padding-box" side="top" pb="current">
+                                    <img
+                                        src={currentItem.imgSrc}
+                                        className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
+                                    />
+                                </Inset>
+
+                                <div>
+                                    <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                                        Time:
+                                    </Text>
+                                    <AnimatedText message={currentItem.time} animationSpeed={300} />
+                                </div>
+                                <div>
+                                    <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                                        Location:
+                                    </Text>
+                                    <AnimatedText message={currentItem.location} animationSpeed={150} />
+                                </div>
+                                <div className='min-w-[600px] min-h-[100px]'>
+                                    <AnimatedText message={currentItem.description} animationSpeed={50} />
+                                </div>
+                                <div className='w-full text-center mt-9' >
+                                    <Text as='span' size='3' >Click to continue</Text>
+                                </div>
+                            </Card>
+                        </div>
+                    </CSSTransition>
+                </SwitchTransition>
+            </div>
+        </Flex>
+    );
+};
+
 
 
 interface LeadCardProps {
@@ -73,7 +144,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, suspects, index }) => {
 interface ChiefCardProps {
     gameState: SingleGameState;
     defaultMessage: string;
-    deduction: Deduction ;
+    deduction: Deduction;
 }
 
 const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction }) => {
@@ -92,8 +163,8 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     </Text>
                 </Box>
                 <Flex direction={'column'} gap={'2'}>
-                <AnimatedChatBubble message={gameState.deductions.find((deduction) => deduction.submitted)?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
-                <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                    <AnimatedChatBubble message={gameState.deductions.find((deduction) => deduction.submitted)?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                    <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
                 </Flex>
                 {/* {deduction?.submitted && (
                     <Callout.Root
@@ -175,7 +246,7 @@ interface PlayerCardProps {
 }
 
 const SuspectCard: React.FC<PlayerCardProps> = ({ suspect, variant }) => {
-    if(!suspect) return null
+    if (!suspect) return null
     return (
         <Card variant={variant} className="">
             <Box key={suspect.id}>
@@ -262,12 +333,12 @@ const VotingRound: React.FC<VotingRoundProps> = ({
     let cheifMessage
 
     const mostRecentConvesation = gameState.rounds.filter((round) => round.type === 'interrogation').slice().reverse().find((round) => round.status === 'completed')?.conversation || [];
-    const currentDeduction = gameState.deductions.find((deduction) => (deduction.active == true )) || null;
+    const currentDeduction = gameState.deductions.find((deduction) => (deduction.active == true)) || null;
     if (!currentDeduction) { return (<Text> No deductions available </Text>) }
-    if (currentDeduction && currentDeduction.leads.length < 3 ) {
+    if (currentDeduction && currentDeduction.leads.length < 3) {
         cheifMessage = "Your gonna need at least a few leads before we can make a case against our culprit, Detective!"
     }
-    else if(currentDeduction && currentDeduction.culpritVote === '') {
+    else if (currentDeduction && currentDeduction.culpritVote === '') {
         cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?"
     } else if (currentDeduction && currentDeduction.culpritVote !== '' && !deductionSubmitted) {
         cheifMessage = "You've made your choice, Detective. I'll take a look at this and get back to you shortly."
@@ -280,7 +351,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                 {/* First item: ChiefCard */}
                 <Flex direction={'column'} justify={'center'} align={'center'}>
 
-                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={currentDeduction}/>
+                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={currentDeduction} />
                     <Flex direction={'row'} justify={'between'} className='w-full'>
                         <Button
                             onClick={handleSubmitDeduction}
@@ -289,10 +360,10 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                             size="4"
                             disabled={currentDeduction.leads.length < 3 || currentDeduction.culpritVote === ''}
                         >
-                           {deductionSubmitted ? <Spinner /> : 'Submit Deduction'}
+                            {deductionSubmitted ? <Spinner /> : 'Submit Deduction'}
                         </Button>
                         <Button
-                            onClick={ gameState.status == 'finished' ? () => handleShowGameOver() : handleStartNextRound }
+                            onClick={gameState.status == 'finished' ? () => handleShowGameOver() : handleStartNextRound}
                             style={{ margin: '20px auto', padding: '10px 20px' }}
                             mt="4"
                             size="4"
@@ -309,9 +380,9 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                         <Card variant='surface' className=' flex flex-col'>
                             <Text align={'center'} mb={'2'}> Culprit </Text>
                             {currentDeduction.culpritVote ?
-                            <SuspectCard suspect={gameState.suspects.find((suspect) => suspect.id === currentDeduction.culpritVote) } variant='ghost' />
-                            : <Text> No vote submitted </Text>
-}
+                                <SuspectCard suspect={gameState.suspects.find((suspect) => suspect.id === currentDeduction.culpritVote)} variant='ghost' />
+                                : <Text> No vote submitted </Text>
+                            }
                         </Card>
                         <Flex direction="column" gap="2" className='w-full'>
 
@@ -327,86 +398,86 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                             ))}
                         </Flex>
                     </Flex>
-                
 
-                {/* Third item: Tabs component */}
-                <Tabs.Root defaultValue='conversation' className='w-full h-full'>
-                    <Tabs.List className='w-full text-center justify-center mb-2 text-xl'>
-                        <Tabs.Trigger value='conversation'>Transcript</Tabs.Trigger>
-                        <Tabs.Trigger value='evidence'>Evidence</Tabs.Trigger>
-                        {currentDeduction.leads.length === 3 && (
-                            <Tabs.Trigger value='vote'>Culprit</Tabs.Trigger>
-                        )}
-                    </Tabs.List>
-                    <Tabs.Content value='conversation' className='h-full'>
-                        <Box className='interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full'>
-                            {mostRecentConvesation.map((conversationItem, index) => (
-                                <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this statement</Text>} className='p-1'>
-                                    <Flex className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.message)}>
-                                        <Box ml="2" mb="2">
-                                            <Text as="p" weight="bold" size="3">
-                                                {conversationItem.speaker === 'detective' ? 'You' : conversationItem.speaker}
-                                            </Text>
-                                        </Box>
-                                        <Box className="col-span-7">
-                                            <Text align="left" as="span">
-                                                {conversationItem.message}
-                                            </Text>
-                                        </Box>
-                                    </Flex>
-                                </Tooltip>
-                            ))}
-                        </Box>
-                    </Tabs.Content>
-                    <Tabs.Content value='evidence'>
-                        <Grid columns="2" gap="4">
-                            {gameState?.allEvidence?.map((item, index) => (
-                                <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this evidence</Text>} className='p-1'>
-                                    <Card variant="surface" className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer" onClick={() => handleCreateNewLead(item)}>
-                                        <Flex gap="2" align="center">
-                                            <Box>
-                                                <Text>{item}</Text>
+
+                    {/* Third item: Tabs component */}
+                    <Tabs.Root defaultValue='conversation' className='w-full h-full'>
+                        <Tabs.List className='w-full text-center justify-center mb-2 text-xl'>
+                            <Tabs.Trigger value='conversation'>Transcript</Tabs.Trigger>
+                            <Tabs.Trigger value='evidence'>Evidence</Tabs.Trigger>
+                            {currentDeduction.leads.length === 3 && (
+                                <Tabs.Trigger value='vote'>Culprit</Tabs.Trigger>
+                            )}
+                        </Tabs.List>
+                        <Tabs.Content value='conversation' className='h-full'>
+                            <Box className='interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full'>
+                                {mostRecentConvesation.map((conversationItem, index) => (
+                                    <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this statement</Text>} className='p-1'>
+                                        <Flex className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.message)}>
+                                            <Box ml="2" mb="2">
+                                                <Text as="p" weight="bold" size="3">
+                                                    {conversationItem.speaker === 'detective' ? 'You' : conversationItem.speaker}
+                                                </Text>
+                                            </Box>
+                                            <Box className="col-span-7">
+                                                <Text align="left" as="span">
+                                                    {conversationItem.message}
+                                                </Text>
                                             </Box>
                                         </Flex>
-                                    </Card>
-                                </Tooltip>
-                            )) || (
-                                    <Card variant="surface" className="p-4">
-                                        <Text>No evidence available</Text>
-                                    </Card>
-                                )}
-                        </Grid>
-                    </Tabs.Content>
-                    <Tabs.Content value='vote'>
-                        <>
-                            <Heading size='4' my={'5'} >Based on your deduction, the culprit is...</Heading>
-                            <RadioCards.Root
-                                className="w-full"
-                                value={killerVote}
-                                onValueChange={(vote) => setKillerVote(vote)}
-                                disabled={voteSubmitted}
-                            >
-                                {gameState.suspects.map((player) => (
-                                    <RadioCards.Item value={player.id} key={player.id}>
-                                        <SuspectCard suspect={player} variant='ghost' />
-                                    </RadioCards.Item>
+                                    </Tooltip>
                                 ))}
-                            </RadioCards.Root>
-                            <Flex>
-                                <Button
-                                    onClick={handleVoteSubmission}
-                                    color={`${killerVote ? 'green' : 'gray'}`}
-                                    style={{ width: '40%', margin: '20px auto' }}
-                                    mt="4"
-                                    size={'4'}
-                                    disabled={!killerVote || voteSubmitted}
+                            </Box>
+                        </Tabs.Content>
+                        <Tabs.Content value='evidence'>
+                            <Grid columns="2" gap="4">
+                                {gameState?.allEvidence?.map((item, index) => (
+                                    <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this evidence</Text>} className='p-1'>
+                                        <Card variant="surface" className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer" onClick={() => handleCreateNewLead(item.description)}>
+                                            <Flex gap="2" align="center">
+                                                <Box>
+                                                    <Text>{item.description}</Text>
+                                                </Box>
+                                            </Flex>
+                                        </Card>
+                                    </Tooltip>
+                                )) || (
+                                        <Card variant="surface" className="p-4">
+                                            <Text>No evidence available</Text>
+                                        </Card>
+                                    )}
+                            </Grid>
+                        </Tabs.Content>
+                        <Tabs.Content value='vote'>
+                            <>
+                                <Heading size='4' my={'5'} >Based on your deduction, the culprit is...</Heading>
+                                <RadioCards.Root
+                                    className="w-full"
+                                    value={killerVote}
+                                    onValueChange={(vote) => setKillerVote(vote)}
+                                    disabled={voteSubmitted}
                                 >
-                                    {voteSubmitted ? 'Vote Submitted!' : 'Add to deduction'}
-                                </Button>
-                            </Flex>
-                        </>
-                    </Tabs.Content>
-                </Tabs.Root>
+                                    {gameState.suspects.map((player) => (
+                                        <RadioCards.Item value={player.id} key={player.id}>
+                                            <SuspectCard suspect={player} variant='ghost' />
+                                        </RadioCards.Item>
+                                    ))}
+                                </RadioCards.Root>
+                                <Flex>
+                                    <Button
+                                        onClick={handleVoteSubmission}
+                                        color={`${killerVote ? 'green' : 'gray'}`}
+                                        style={{ width: '40%', margin: '20px auto' }}
+                                        mt="4"
+                                        size={'4'}
+                                        disabled={!killerVote || voteSubmitted}
+                                    >
+                                        {voteSubmitted ? 'Vote Submitted!' : 'Add to deduction'}
+                                    </Button>
+                                </Flex>
+                            </>
+                        </Tabs.Content>
+                    </Tabs.Root>
                 </Flex>
                 {/* Fourth item: if there is anther round left in the game, and the player has less than 3 leads, show the next interrogation button, else show the submit deduction button */}
             </Flex>
@@ -887,7 +958,7 @@ const SingleGame = () => {
 
     useEffect(() => {
         if (socket) {
-            socket.on('game-state-update', (newState: SingleGameState) => {
+            socket.on('game:updated', (newState: SingleGameState) => {
                 console.log('Received game state update:', newState);
                 setGameState(newState);
                 setInterrogationTranscript([]);
@@ -895,12 +966,16 @@ const SingleGame = () => {
             });
 
             socket.on('game-state-updating', (roundEnd: boolean) => {
-                if(roundEnd) setResultsLoading(true);
+                if (roundEnd) setResultsLoading(true);
             });
 
             socket.on('deduction-analysis-completed', () => {
                 setDeductionSubmitted(false);
             })
+
+            socket.on('game-over', () => {
+                setShowGameOver(true);
+            });
 
             socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
@@ -982,14 +1057,22 @@ const SingleGame = () => {
         emitEvent('submit-deduction', roomId);
     }
 
+    const handleStartGame = () => {
+        emitEvent('game:start', roomId);
+    }
+
     const renderGameContent = (): JSX.Element | null => {
         if (!gameState || !socket) {
             return <></>;
         }
 
+        if (gameState.status === 'setup') {
+            return <OffenseReport offenseReport={gameState.crime?.offenseReport || null}  handleStartGame={handleStartGame}/>
+        }
+
         if (gameIsOver) {
-            if(showGameOver) {
-            return <GameOver oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} gameState={gameState} />;
+            if (showGameOver) {
+                return <GameOver oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} gameState={gameState} />;
             } else {
                 // shwo the most recently complted round
                 const mostRecentRound = gameState.rounds.filter((round) => round.status === 'completed').slice().reverse()[0];
@@ -1035,7 +1118,7 @@ const SingleGame = () => {
             return <ChangingRounds gameState={gameState} />;
         }
 
-        if ( activeRound === 'voting') {
+        if (activeRound === 'voting') {
             return (
                 <VotingRound
                     roundTimer={roundTimer}
@@ -1111,40 +1194,40 @@ const SingleGame = () => {
         <>
             <Box className="flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
-                <Box>
-                <Flex px={'2'} py={'5'} >
-                    <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%' }}>
-                        {/* Round Timer */}
+                {gameState.status === 'active' && (<Box>
+                    <Flex px={'2'} py={'5'} >
+                        <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%' }}>
+                            {/* Round Timer */}
 
-                        {/* Accordion for Identity, Evidence, and Guilt Scores */}
-                        <ScrollArea style={{ height: '700px', padding: '10px' }} type='always'>
-                            <h2 className="text-4xl text-center font-bold mb-4">Case Files</h2>
-                            {gameState.crime && (
-                                <Flex gap="3" direction="column" mb={'6'}>
-                                    <Text size="4">A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported {gameState.crime.description}</Text>
-                                </Flex>
-                            )}
-                            <h3 className="text-2xl font-bold mb-2">Evidence</h3>
-                            <Grid columns="2" gap="4">
-                                {gameState?.allEvidence?.map((item, index) => (
-                                    <Card key={index} variant="surface" className="p-4">
-                                        <Flex gap="2" align="center">
-                                            <Box>
-                                                <Text>{item}</Text>
-                                            </Box>
-                                        </Flex>
-                                    </Card>
-                                )) || (
-                                        <Card variant="surface" className="p-4">
-                                            <Text>No evidence available</Text>
+                            {/* Accordion for Identity, Evidence, and Guilt Scores */}
+                            <ScrollArea style={{ height: '700px', padding: '10px' }} type='always'>
+                                <h2 className="text-4xl text-center font-bold mb-4">Case Files</h2>
+                                {gameState.crime && (
+                                    <Flex gap="3" direction="column" mb={'6'}>
+                                        <Text size="4">A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported {gameState.crime.time}</Text>
+                                    </Flex>
+                                )}
+                                <h3 className="text-2xl font-bold mb-2">Evidence</h3>
+                                <Grid columns="2" gap="4">
+                                    {gameState?.allEvidence?.map((item, index) => (
+                                        <Card key={index} variant="surface" className="p-4">
+                                            <Flex gap="2" align="center">
+                                                <Box>
+                                                    <Text>{item.description}</Text>
+                                                </Box>
+                                            </Flex>
                                         </Card>
-                                    )}
-                            </Grid>
-                            {/* </Container> */}
-                            {/* </Accordion.Content>
+                                    )) || (
+                                            <Card variant="surface" className="p-4">
+                                                <Text>No evidence available</Text>
+                                            </Card>
+                                        )}
+                                </Grid>
+                                {/* </Container> */}
+                                {/* </Accordion.Content>
                 </Accordion.Item> */}
 
-                            {/* <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
+                                {/* <Accordion.Item value="guilt-scores" className="mt-px overflow-hidden first:mt-0 first:rounded-t last:rounded-b focus-within:relative focus-within:z-10 focus-within:shadow-[0_0_0_2px] focus-within:shadow-mauve12">
                   <Accordion.Header>
                     <Accordion.Trigger className="group flex h-[45px] accordionTrigger w-full flex-1 cursor-pointer items-center justify-between px-5 text-[15px] leading-none shadow-[0_1px_0]  outline-none transition duration-200 ease-in-out ">
 
@@ -1152,29 +1235,30 @@ const SingleGame = () => {
                       <FaChevronDown className="text-violet10 transition-transform duration-300 ease-[cubic-bezier(0.87,_0,_0.13,_1)] group-data-[state=open]:rotate-180" />
                     </Accordion.Trigger>
                   </Accordion.Header> */}
-                            {/* <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown"> */}
-                            <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>
-                                <Heading size='7'>Suspects</Heading>
-                                {gameState.suspects.map(suspect => (
-                                    <SuspectCard suspect={suspect} key={suspect.id} variant='surface' />
-                                ))}
+                                {/* <Accordion.Content className="overflow-hidden text-[15px] text-mauve10 data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown"> */}
+                                <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>
+                                    <Heading size='7'>Suspects</Heading>
+                                    {gameState.suspects.map(suspect => (
+                                        <SuspectCard suspect={suspect} key={suspect.id} variant='surface' />
+                                    ))}
 
-                            </Flex>
-                            {/* </Accordion.Content>
+                                </Flex>
+                                {/* </Accordion.Content>
                 </Accordion.Item> */}
 
-                            {/* </Accordion.Root> */}
+                                {/* </Accordion.Root> */}
 
-                        </ScrollArea>
-                    </Card>
-                </Flex>
-                </Box>
-                <Box className="w-full h-[700px]  ">
+                            </ScrollArea>
+                        </Card>
+                    </Flex>
+                </Box>)}
+
+                <Box className="w-full h-[700px] flex justify-center items-center align-center">
                     {/* Main game area */}
-                    <Flex px={'2'} py={'5'} gap={'4'} className='w-full '>
+                    <Flex px={'2'} py={'5'} gap={'4'} className='w-fit' justify={'center'} align={'center'}>
                         {/* Left panel: Crime and Evidence */}
 
-                        <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '1400px' }}>
+                        <Card size="3" variant="ghost" style={{ width: '100%', maxWidth: '1400px' }}>
 
                             <SwitchTransition mode="out-in">
                                 <CSSTransition

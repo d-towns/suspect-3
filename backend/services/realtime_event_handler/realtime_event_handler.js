@@ -1,15 +1,14 @@
 import fs from "fs";
-import { convertAudioMessageDeltasToAudio } from "../utils/convertAudio.js";
+import { convertAudioMessageDeltasToAudio } from "../../utils/audio-helpers.js";
 
 export default class RealtimeEventHandler {
   constructor(ws, gameManager, responder) {
-    super();
     this.ws = ws;
     this.gameManager = gameManager;
     this.responder = responder
     this.lastAudioMessageDeltas = [];
     this.lastAudioMessageTranscript = [];
-
+    this.realtimeInstructions = null
     this.ws.on("message", async (data) => {
       this.handleMessage(data, responder);
     });
@@ -21,12 +20,16 @@ export default class RealtimeEventHandler {
     });
   }
 
+  createRealtimeInstructions() {
+
+  }
+
   handleOpen() {
-    this.gameManager.emit("realtime-connected", {  });
+    this.gameManager.emit("realtime:connected", {  });
   }
 
   handleDisconnect() {
-    this.gameManager.emit("realtime-disconnected", {  });
+    this.gameManager.emit("realtime:disconnected", {  });
   }
 
   async handleMessage(data, responder) {
@@ -91,7 +94,6 @@ export default class RealtimeEventHandler {
     session.instructions = this.gameManager.realtimeInstructions;
     session.input_audio_transcription = { model: "whisper-1" };
     session.voice = this.gameManager.assignVoiceToSuspect(responder);
-    session.turn_detection = null;
     delete session.id;
     delete session.object;
     delete session.expires_at;
@@ -118,7 +120,7 @@ export default class RealtimeEventHandler {
       content: `Detective: ${event.transcript}`,
     });
 
-    this.gameManager.emit("user-audio-transcript", playerConversationItem);
+    this.gameManager.emit("realtime:transcript:done:user", playerConversationItem);
 
     this.ws.send(JSON.stringify({ type: "response.create" }));
   }
@@ -142,7 +144,7 @@ export default class RealtimeEventHandler {
       audioTranscript
     );
     this.gameManager.emit(
-      "realtime-audio-message",
+      "realtime:audio:done:assistant",
       conversationItem
     );
     this.lastAudioMessageDeltas = [];
@@ -172,7 +174,7 @@ export default class RealtimeEventHandler {
 
   audioDeltaListener(event) {
     console.log("Realtime audio delta received");
-    this.gameManager.emit("realtime-audio-delta", {
+    this.gameManager.emit("realtime:audio:delta:assistant", {
       audio: base64ToPCM(event.delta),
       speaker: "assistant",
       currentRoundTime:
@@ -182,7 +184,7 @@ export default class RealtimeEventHandler {
 
   audioTranscriptDetlaListener(event) {
     console.log("Realtime audio transcript delta received");
-    this.gameManager.emit("realtime-audio-transcript-delta", {
+    this.gameManager.emit("realtime:transcript:delta:assistant", {
       transcript: event.delta,
       speaker: "assistant",
       currentRoundTime: this.gameManager.roun,

@@ -119,7 +119,13 @@ export const Lobby: React.FC = () => {
             gameStarting: true
           }));
         });
-        socket.on('game-created', () => navigate(`/game/${roomId}`));
+        socket.on('game:creating', () => {
+          setLobbyState(prevState => ({
+            ...prevState,
+            gameStarting: true
+          }));
+        });
+        socket.on('game:created', () => navigate(`/game/${roomId}`));
 
         socket.on('player-left', removePlayer);
         socket.on('player-joined', addPlayer);
@@ -236,10 +242,6 @@ export const Lobby: React.FC = () => {
 
   const handleStartGameClick = () => {
     if(!lobbyState.room) { return ;}
-    setLobbyState(prevState => ({
-      ...prevState,
-      gameStarting: true
-    }));
     startGame(lobbyState.room.mode);
   };
 

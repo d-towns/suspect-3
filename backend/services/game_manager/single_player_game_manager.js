@@ -1,7 +1,10 @@
-import { GameRoomService } from "../game-room.service.js";
+import { GameRoomService } from "../game_room/game_room.service.js";
+import { LeaderboardService } from "../leaderboard/leaderboard.service.js";
 import { GameManager } from "./game_manager.js";
 import OpenAIGameService from "../llm/openai_game_service.js";
-import RealtimeEventHandler from "../realtime_event_handler/realtime_event_handler.js";
+import OpenAIEloService from "../llm/elo/openai-elo.service.js";
+
+import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player_realtime_handler.js";
 import {SinglePlayerGameStateSchema, AnalysisSchema} from "../../models/game-state-schema.js";
 import dotenv from 'dotenv'
 
@@ -23,48 +26,29 @@ import dotenv from 'dotenv'
    *
    **/
 
-  const singlePlayerSessionInstructions = `You are AI who is acting as a suspect in a co-operative criminal mystery game. Remember to always talk as quickly as you possibly can.
-  Here are the details of the crime:
-   
-  ${JSON.stringify(gameState.crime.description)}. 
-  Time of the crime: ${gameState.crime.time}.
-  Location of the crime: ${gameState.crime.location}.
 
-  Here are the suspects of the crime:
-  ${gameState.suspects
-    .map((suspect) => `${suspect.identity}`)
-    .join("\n")}
-
-  YOU ARE the following identity. adpot this personality:
-  ${activeSuspect.identity}
-  Adpot this temperment in your responses:
-  ${activeSuspect.temperment}
-
-  
-  Create an alibi for yourself that explains your experience of the crime, and keep it consistent as you are questioned by the detective
-  Use 'detective' when referring to the player you are responsing to.  
-  when it makes sense, you should try to deflect questions to the other suspects of the crime in order to avoid suspicion
-  `;
 
   dotenv.config({path: '../../.env'});
   
 
 export class SinglePlayerGameManager extends GameManager {
-  constructor(socketServer, playerId) {
+
+  constructor(roomId, player, gameState) {
+    console.log('\n\n', roomId, player, gameState, '\n\n');
     super();
-    this.socketServer = socketServer;
     this.llmGameService = new OpenAIGameService();
+    this.llmEloService = OpenAIEloService
     this.currentPhase = null;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 5 * 60; // 5 minutes in seconds
     this.roundTimer = 0
     this.clearRoundTimer = null;
-    this.realtimeInstructions = singlePlayerSessionInstructions;
     this.realtimeHandler = null
     // TODO: on construction, the game manager should try to pull the game state from the database
-    this.gameState = null;
+    this.gameState = gameState;
     this.threadId = null;
-    this.playerId = playerId;
+    this.playerId = player.id;
+    this.roomId = roomId;
   }
 
   createCrime() {
@@ -87,8 +71,6 @@ export class SinglePlayerGameManager extends GameManager {
 
     this.threadId = thread.id;
 
-    // save the thread id to the game room
-    await GameRoomService.updateGameRoom(roomId, { thread_id: thread.id });
 
     // run the thread to get the initial game state
     this.gameState = await this.llmGameService.runGameThread(process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID, thread.id);
@@ -96,33 +78,46 @@ export class SinglePlayerGameManager extends GameManager {
       console.error("Error creating initial game state");
       return null;
     } else {
-      await GameRoomService.updateGameRoom(roomId, {
+      // add the game state and thread id to the database
+      await GameRoomService.updateGameRoom(this.roomId, {
+        thread_id: this.threadId,
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
       
       // tell the socket server that the game has been created
       // TODO #io.js: the socket server needs to listen for the game-created event and emit that event to the client so that it can route to the correct game screen
-      this.emit('game-created', { gameState });
+      this.emit('game:created', { gameState:this.gameState });
     }
 
   }
 
   emitRoundTick(number) {
-    this.emit('round-tick', { countdown: number });
+    this.emit('round:tick', { countdown: number });
     this.roundTimer = number;
   }
 
 
-  startGame(roomId) {
-    this.emit('game-started', { roomId });
-    this.startInterrogationPhase(roomId);
+  startGame() {
+    // use the llm service to create a message in the thread that says the game has started
+    this.llmGameService.addMessageToThread(this.threadId, {
+      role: "assistant",
+      content: "The game has started. set the game_state status to active",
+    });
+    // get the game room from the database and set the game state to active
+    this.gameState.status = 'active';
+    GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    // emit the game started event
+    this.emit('game:started', { });
+    this.startInterrogationPhase();
   }
 
-  startInterrogationPhase(roomId) {
+  startInterrogationPhase() {
     this.currentPhase = 'interrogation';
-    this.emit('phase-started', { phase: this.currentPhase, roomId });
+    this.emit('phase:started', { phase: this.currentPhase });
     // ... set up a 10-minute timer. On expire, go to next phase ...
-    const {clear} = startInterval(this.interrogationTimer, this.emitRoundTick, this.endInterrogationPhase);
+    const {clear} = startInterval(this.interrogationTimer, this.emitRoundTick.bind(this), this.endInterrogationPhase);
     this.clearRoundTimer = clear;
   }
 
@@ -131,7 +126,16 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
 
-
+  startNextPhase() {
+    if (this.currentPhase === 'interrogation') {
+      this.endInterrogationPhase();
+    } else if (this.currentPhase === 'deduction') {
+      this.endDeductionPhase();
+    } else {
+      console.error("Game is not started, cannot move phases", this.currentPhase
+      );
+    }
+  }
 
   /**
    * Open a realtime session using the llmService to start an interrogation with a suspect
@@ -139,8 +143,7 @@ export class SinglePlayerGameManager extends GameManager {
   startInterrogation(suspectId) {
     const realtimeSocket = this.llmGameService.openRealtimeConversation()
     const activeSuspect = this.gameState.suspects.find(suspect => suspect.id === suspectId);
-
-    this.realtimeHandler = new RealtimeEventHandler(realtimeSocket, this, activeSuspect)
+    this.realtimeHandler = new SinglePlayerRealtimeHandler(realtimeSocket, this, activeSuspect)
   }
 
   async endInterrogation() {
@@ -181,7 +184,7 @@ export class SinglePlayerGameManager extends GameManager {
           this.realtimeHandler.removeCustomMessageListener(responseListener);
     
           // Emit that the realtime session ended
-          this.emit("realtime-session-ended", { roomId, suspectId });
+          this.emit("realtime:ended", { suspectId });
           
           resolve();
         }
@@ -197,8 +200,12 @@ export class SinglePlayerGameManager extends GameManager {
     });
   }
 
-  async endInterrogationPhase(roomId) {
-    this.emit('phase-ended', { phase: this.currentPhase, roomId });
+  /**
+   * 
+   *
+   */
+  async endInterrogationPhase() {
+    this.emit('phase:ended', { phase: this.currentPhase });
 
     if(this.realtimeHandler) {
       this.endInterrogation();
@@ -206,21 +213,22 @@ export class SinglePlayerGameManager extends GameManager {
     // run the game thread to process the conversation and generate the next game state
     this.gameState = await this.llmGameService.runGameThread(process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID, this.threadId);
     // save the game state to the database
-    await GameRoomService.updateGameRoom(roomId, {
+    await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
+    this.emit('game:updated', { gameState: this.gameState });
     // if the game is not over, start the deduction phase
     if (this.gameState.status !== 'finished') {
 
-    this.startDeductionPhase(roomId);
+      this.startDeductionPhase();
     } else {
-      this.emit('game-finished', { roomId, result: 'win-or-lose' });
+      this.emit('game:finished', { });
     }
   }
 
-  startDeductionPhase(roomId) {
+  startDeductionPhase() {
     this.currentPhase = 'deduction';
-    this.emit('phase-started', { phase: this.currentPhase, roomId });
+    this.emit('phase:started', { phase: this.currentPhase });
     // ... set up deduce window ...
     // start the round timer for the deduction phase
 
@@ -228,17 +236,27 @@ export class SinglePlayerGameManager extends GameManager {
     this.clearRoundTimer = clear;
   }
 
-  endDeductionPhase(roomId) {
-    this.emit('phase-ended', { phase: this.currentPhase, roomId });
-    // run the thread to process the deduction and generate the next game state
+  async endDeductionPhase() {
+    // tell listeners that the deduction phase has ended
+    this.emit('phase:ended', { phase: this.currentPhase});
+    // run the thread to process the deduction and generate the finished game state
+    this.gameState = await this.llmGameService.runGameThread(process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID, this.threadId);
+
     // save the game state to the database
-    // check if the game is over
-    this.checkWinCondition(roomId);
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+
+    this.emit('game:updated', { gameState: this.gameState });
+
+    // check if the game is over ( is should be ) and then run the elo rating calculation
+    this.checkWinCondition();
   }
 
-  async runDeductionAnalysis( gameState) {
+  async runDeductionAnalysis( ) {
       try {
-        const { crime, evidence, suspects, deduction } = gameState;
+        this.emit("deduction:started", result);
+        const { crime, evidence, suspects, deduction } =this.gameState;
         // delete the isCulprit property from the suspects
         suspects.forEach((suspect) => delete suspect.isCulprit);
 
@@ -277,7 +295,7 @@ export class SinglePlayerGameManager extends GameManager {
   
         console.log("Deduction analysis completed:", result);
   
-        this.emit("deduction-analysis-completed", result);
+        this.emit("deduction:completed", result);
   
         // add the result to the game thread as an assistant message
         console.log(
@@ -290,14 +308,15 @@ export class SinglePlayerGameManager extends GameManager {
         });
   
         this.gameState = await this.llmGameService.runGameThread(process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID, this.threadId)
-
-        await GameRoomService.updateGameRoom(roomId, {
+        this.emit('game:updated', { gameState: this.gameState });
+        await GameRoomService.updateGameRoom(this.roomId, {
           game_state: GameRoomService.encryptGameState(this.gameState),
         });
         // check the win condition
         this.checkWinCondition();
   
       } catch (error) {
+        this.emit("deduction:error", error);
         console.error("Error running deduction analysis:", error);
         throw error;
       }
@@ -375,11 +394,33 @@ export class SinglePlayerGameManager extends GameManager {
       return analysisResults;
     }
 
-  checkWinCondition() {
+  async checkWinCondition() {
     // ... if deduction accepted -> check culprit 
     // if correct -> emit('game-won'), else -> emit('game-lost')
     if(this.gameState.status === 'finished') {
-    this.emit('game-finished', { roomId, result: 'win-or-lose' });
+
+      this.emit('game:finished', {});
+      this.emit('leaderboard:started', {});
+      console.log("Game finished, calculating ELO changes...");
+      const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
+       this.playerId
+      );
+
+      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats);
+      const leaderboardUpdates = await this.llmEloService.processGameThread(threadId);
+
+      // update the leaderboard table
+      await LeaderboardService.updatePlayerStats(leaderboardUpdates.playerResults);
+
+      //emit the leaderboard updates to the client
+      this.emit( "leaderboard:finished", {
+        oldRating,
+         newRating,
+        badges,
+      })
+      
+      console.log("Game results and ELO changes processed successfully");
+
     } else {
       return false
     }

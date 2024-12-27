@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createSupabaseClient } from "../db/supabase.js";
-import { GameRoomService } from "../services/game-room.service.js";
+import { GameRoomService } from "../services/game_room/game_room.service.js";
 
 const router = Router();
 
