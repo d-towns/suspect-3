@@ -5,10 +5,7 @@
     border: 1px solid var(--accent-6);
 }
 .timerBox {
-    border-right: 1px solid var(--accent-6);
-    border-bottom: 1px solid var(--accent-6);
-    border-top: none;
-    border-left: none;
+    font-family: 'Special Elite', cursive;
 }
 
 .accordionTrigger:hover {

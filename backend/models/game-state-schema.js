@@ -153,6 +153,7 @@ export const SinglePlayerGameStateSchema = z
           conversations: z.array(
             z.object({
               suspect: z.string(),
+              active: z.boolean(),
               responses: z.array(ConversationResponseSchema),
             })
           ),

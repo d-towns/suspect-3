@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 interface AnimatedTextProps {
   message: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   animationSpeed?: number;
 }
 
 const AnimatedText: React.FC<AnimatedTextProps> = ({
   message,
+  size = 'md',
   animationSpeed = 100,
+
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
@@ -33,9 +36,9 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   }, [animateText]);
 
   return (
-    <span>
+    <span className='text-left'>
       {displayedText}
-      {!isAnimationComplete && <span className="animate-pulse">|</span>}
+      {!isAnimationComplete && <span className={`animate-pulse`}>|</span>}
     </span>
   );
 };

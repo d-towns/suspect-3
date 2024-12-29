@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import LLMGameService from "./llm_game_service.js";
+import Websocket from "ws";
+
 export default class OpenAIGameService extends LLMGameService {
   constructor() {
     super();
@@ -24,9 +26,9 @@ export default class OpenAIGameService extends LLMGameService {
    * @param {{ role: string, content: string }} message
    * @returns {Promise<any>}
    */
-  async addMessageToThread(roomId, message) {
+  async addMessageToThread(threadId, message) {
     try {
-      if (!roomId) {
+      if (!threadId) {
         console.error("addMessageToThread error: roomId is required.");
         return null;
       }
@@ -34,10 +36,11 @@ export default class OpenAIGameService extends LLMGameService {
         console.error("addMessageToThread error: invalid message.");
         return null;
       }
-      const result = await this.client.beta.threads.messages.create(roomId, {
+      const result = await this.client.beta.threads.messages.create(threadId, {
         role: message.role,
         content: message.content,
       });
+      console.log(`Message added to thread ${threadId}:`, result);
       return result;
     } catch (error) {
       console.error("Error in addMessageToThread:", error);

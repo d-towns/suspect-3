@@ -1,5 +1,5 @@
 import fs from "fs";
-import { convertAudioMessageDeltasToAudio } from "../../utils/audio-helpers.js";
+import { convertAudioMessageDeltasToAudio, base64ToPCM } from "../../utils/audio-helpers.js";
 
 export default class RealtimeEventHandler {
   constructor(ws, gameManager, responder) {
@@ -65,7 +65,7 @@ export default class RealtimeEventHandler {
           break;
 
         case "response.audio_transcript.done":
-          await this.handleAudioTranscriptDone(event, activeSuspect);
+          await this.handleAudioTranscriptDone(event, responder);
           break;
 
         case "response.audio.delta":
@@ -91,7 +91,15 @@ export default class RealtimeEventHandler {
 
   handleSessionCreated(event, responder) {
     const session = event.session;
-    session.instructions = this.gameManager.realtimeInstructions;
+    session.instructions = this.realtimeInstructions;
+    session.turn_detection = {
+      type: 'server_vad',
+      threshold: 0.5,
+      prefix_padding_ms: 300,
+      silence_duration_ms: 500,
+      create_response: true,
+
+    }
     session.input_audio_transcription = { model: "whisper-1" };
     session.voice = this.gameManager.assignVoiceToSuspect(responder);
     delete session.id;

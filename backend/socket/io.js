@@ -65,6 +65,8 @@ export class GameRoomSocketServer {
         this.handleStartNextRound.bind(this, socket)
       );
 
+      socket.on("realtime:start", this.handleStartInterrogation.bind(this, socket));
+
       socket.on("chat-message", this.handleChatMessage.bind(this, socket));
 
       socket.on(
@@ -73,13 +75,11 @@ export class GameRoomSocketServer {
       );
       
       socket.on(
-        "realtime-audio-response",
+        "realtime:audio:delta:user",
         this.handleRealtimeAudioResponse.bind(this, socket)
       );
-      // socket.on(
-      //   "realtime-audio-response-end",
-      //   this.handleRealtimeAudioResponseEnd.bind(this, socket)
-      // );
+
+      socket.on("realtime:end", this.handleEndInterrogation.bind(this, socket));
 
       // Multiplayer only
       socket.on(
@@ -128,6 +128,7 @@ export class GameRoomSocketServer {
 
   // TODO: these attributes should be set on the socket.data object
   handleSetUserDetails(socket, userEmail, userName, userId, roomId) {
+    console.log(`User details: ${userEmail}, ${userName}, ${userId}, ${roomId}`);
     socket.userEmail = userEmail;
     socket.userName = userName;
     socket.isReady = false;
@@ -181,7 +182,6 @@ export class GameRoomSocketServer {
 
     this.roomGameManagers.get(roomId).startGame();
   }
-
   /**
    * Handles the submission of a deduction by a user.
    *
@@ -191,33 +191,20 @@ export class GameRoomSocketServer {
    */
   async handleSubmitDeduction(socket, roomId, deduction) {
     this.roomGameManagers.get(socket.roomId).runDeductionAnalysis(deduction);
+  }
 
-    // if (!socket) {
-    //   console.error('handleSubmitDeduction: Socket is undefined.');
-    //   return;
-    // }
+  async handleStartInterrogation(socket, suspectId) {
+    if(!socket.roomId) {
+      console.log("Socket room id is undefined");
+      return;
+    }
+    console.log("Starting interrogation for suspect:", suspectId);
+    this.roomGameManagers.get(socket.roomId).startInterrogation(suspectId);
+  }
 
-    // if (!roomId) {
-    //   console.error('handleSubmitDeduction: roomId is undefined.');
-    //   return;
-    // }
-
-    // // if (!deduction) {
-    // //   console.error('handleSubmitDeduction: Deduction data is missing.');
-    // //   return;
-    // // }
-
-    // try {
-
-    //   // get the most recent game state
-    //   const gameRoom = await GameRoomService.getGameRoom(roomId);
-    //   const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
-
-    //   await OpenaiGameService.runDeductionAnalysis(roomId, gameRoom.thread_id, gameState);
-    //   console.log(`Deduction analysis sent to room ${roomId} by user ${socket.userEmail}.`);
-    // } catch (error) {
-    //   console.error('handleSubmitDeduction: Error during deduction analysis.', error);
-    // }
+  async handleEndInterrogation(socket) {
+    console.log("Ending interrogation...");
+    this.roomGameManagers.get(socket.roomId).endInterrogation();
   }
 
   async handleStartNextRound(socket, roomId) {
@@ -254,11 +241,6 @@ export class GameRoomSocketServer {
     const manager = this.roomGameManagers.get(socket.roomId);
     manager.addUserAudioToInputBuffer(audioData.audioBuffer);
   }
-
-  // TODO: this shouldn't be needed once we move to turn detection on in the realtime API
-  // async handleRealtimeAudioResponseEnd(socket) {
-  //   await OpenaiGameService.createInterrogationResponse(socket.roomId);
-  // }
 
   handleChatMessage(socket, roomId, userEmail, userName, message) {
     console.log(`New message in room ${roomId}: ${message}`);
@@ -422,14 +404,20 @@ export class GameRoomSocketServer {
       manager.on('realtime:disconnected', (data) => {
         this.emitToRoom(roomId, 'realtime:disconnected', data);
       });
+      manager.on('realtime:started', (data) => {
+        this.emitToRoom(roomId, 'realtime:started', data);
+      });
+      manager.on('realtime:message', (data) => {
+        this.emitToRoom(roomId, 'realtime:message', data);
+      });
       manager.on("realtime:transcript:done:user", (data) => {
-        this.emitToRoom(roomId, 'realtime:transcript:user', data);
+        this.emitToRoom(roomId, 'realtime:transcript:done:user', data);
       });
       manager.on('realtime:audio:delta:assistant', (data) => {
-        this.emitToRoom(roomId, 'realtime:transcript:assistant', data);
+        this.emitToRoom(roomId, 'realtime:audio:delta:assistant', data);
       });
       manager.on('realtime:transcript:delta:assistant', (data) => {
-        this.emitToRoom(roomId, 'realtime:transcript:assistant', data);
+        this.emitToRoom(roomId, 'realtime:transcript:delta:assistant', data);
       });
   
       // Add more listeners as needed based on game manager events
@@ -472,7 +460,7 @@ export class GameRoomSocketServer {
             };
           });
           
-          gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom.mode, roomId, playerIds, game_state);
+          gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, game_state);
           this.attachGameManagerListeners(gameManager,roomId);
         
           this.roomGameManagers.set(roomId, gameManager);
@@ -482,8 +470,9 @@ export class GameRoomSocketServer {
           allInGame &&
           gameRoom.host_id === socket.userId &&
           gameManager &&
-          game_state.status !== "finished"
+          game_state.status === 'active'
         ) {
+          gameManager.startGame();
           console.log(
             `All players in room ${socket.roomId} have joined the game. Game is eligible to start...`
           );  

@@ -47,7 +47,7 @@ export const useSocket = () => {
 
   const emitEvent = useCallback((event: string, data: any) => {
     if (socket && isConnected) {
-      console.log(`Emitting event: ${event} with data: ${JSON.stringify(data)}`);
+      // console.log(`Emitting event: ${event} with data: ${JSON.stringify(data)}`);
       socket.emit(event, data);
     }
   } , [socket, isConnected]);
@@ -75,7 +75,7 @@ export const useSocket = () => {
     if (socket && isConnected) {
       const interval = setInterval(() => {
         if (user) {
-          socket.emit('set-user', user.email, user.username, user.id);
+          socket.emit('set-user', user.email, user.username, user.id, roomId);
         socket.emit('heartbeat', roomId || 'global');
         }
       }, HEARTBEAT_INTERVAL);

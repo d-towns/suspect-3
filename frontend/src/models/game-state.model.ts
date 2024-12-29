@@ -1,6 +1,13 @@
+
 export interface ConversationExhange {
   speaker: string,
   message: string
+}
+
+export interface Conversation {
+  suspect: string,
+  active: boolean,
+  responses: ConversationItem[]
 }
 
 export interface ConversationItem {
@@ -18,7 +25,7 @@ export interface Round {
   player: string,
   suspect?: string,
   type: 'interrogation' | 'voting',
-  conversation: ConversationExhange[],
+  conversations: Conversation[],
   results: {
     guiltScoreUpdate?: number
     votingResults?: VotingRoundVote[]
@@ -74,6 +81,7 @@ export interface GameState {
     temperment: string;
     interrogated: boolean;
     isCulprit: boolean;
+    imgSrc: string;
   }
 
   export interface Lead {

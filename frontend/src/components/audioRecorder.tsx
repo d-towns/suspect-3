@@ -52,7 +52,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
       
         // Encode binary string to Base64
         const base64String = btoa(binary);
-        emitEvent('realtime-audio-response', { audioBuffer: base64String });
+        emitEvent('realtime:audio:delta:user', { audioBuffer: base64String });
       
       }, 32000 );
 
