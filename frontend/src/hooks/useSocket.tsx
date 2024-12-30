@@ -27,8 +27,13 @@ export const useSocket = () => {
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
-      
+      startHeartbeat()
       setIsConnected(true);
+    });
+
+    newSocket.on('reconnect_error', (error: any) => {
+      console.error('Socket reconnection error', error);
+      addToast('Failed to reconnect to game server, trying again...',  );
     });
 
     newSocket.on('disconnect', () => {
@@ -129,6 +134,14 @@ export const useSocket = () => {
       navigate(`/lobby/${invite.game_id}`);
     });
   }, [addToast, navigate]);
+  
+  useEffect(() => {
+    if (isConnected) {
+      addToast('Connected to game server');
+    } else {
+      addToast('Disconnected from game server');
+    }
+  }, [isConnected, addToast, connectSocket]);
 
   useEffect(() => {
     const cleanup = connectSocket();

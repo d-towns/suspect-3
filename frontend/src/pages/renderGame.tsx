@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import SingleGame from './SingleplayerGame';
-import MultiplayerGame from './MultiplayerGame';
+import SingleGame from './SinglePlayerGame/SingleplayerGame';
+import MultiplayerGame from './MultiplayerGame/MultiplayerGame';
 import { roomsService } from '../services/rooms.service';
 import { GameRoom } from '../models';
 

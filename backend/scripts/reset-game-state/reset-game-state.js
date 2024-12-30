@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { GameRoomService } from '../../services/game-room.service.js';
+import { GameRoomService } from '../../services/game_room/game_room.service.js';
 import OpenAI from "openai";
 // read in the uuid from args
 export const resetGameState = async (gameRoomId) => {
@@ -28,9 +28,12 @@ export const resetGameState = async (gameRoomId) => {
         }
 
         gameState.rounds[0].status = "active"
+        gameState.rounds[0].conversations = []
         for(let i = 1; i < gameState.rounds.length; i++) {
             gameState.rounds[i].status = "inactive"
+            gameState.rounds[i].conversations = []
             gameState.rounds[i].conversation = []
+
         }
         gameState.status = 'setup'
 

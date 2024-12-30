@@ -7,13 +7,14 @@ export interface ConversationExhange {
 export interface Conversation {
   suspect: string,
   active: boolean,
-  responses: ConversationItem[]
+  responses: ConversationExhange[]
 }
 
 export interface ConversationItem {
   audioTranscript: string
   timestamp: number
   speaker: 'user' | 'assistant'
+  responseId: string
 }
 
 export interface VotingRoundVote {
@@ -94,18 +95,29 @@ export interface GameState {
     accepted: boolean;
   }
 
+  
   export interface Deduction {
-    submitted: boolean;
-    active: boolean;
-    leads: Lead[];
-    culpritVote: string;
-    analysis: DeductionAnalysis
+    nodes: DeductionNode[];
+    edges: DeductionEdge[];
+    submissions : DeductionAnalysis[];
+  }
+
+  export interface DeductionNode {
+    id: string;
+    type: "statement" | "evidence" | "suspect";
+    data: any;
+  }
+
+  export interface DeductionEdge {
+    source_node: string;
+    target_node: string;
+    type: "supports" | "contradicts" | "implicates";
   }
 
   export interface SingleGameState extends GameState {
     player: string;
     suspects: Suspect[];
-    deductions: Deduction[];
+    deduction: Deduction;
     culpritVote: string;
   }
 

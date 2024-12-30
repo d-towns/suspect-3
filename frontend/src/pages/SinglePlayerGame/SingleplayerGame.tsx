@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useSocketContext } from '../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem } from '../models/game-state.model';
+import { useSocketContext } from '../../context/SocketContext/socket.context';
+import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode } from '../../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
-import { roomsService } from '../services/rooms.service';
-import { useAuth } from '../context/auth.context';
-import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar } from 'react-icons/fi';
-import AudioRecorder from '../components/audioRecorder';
-import ResponseLoading from '../components/responseLoading';
+import { roomsService } from '../../services/rooms.service';
+import { useAuth } from '../../context/auth.context';
+import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus } from 'react-icons/fi';
+import AudioRecorder from '../../components/audioRecorder';
+import ResponseLoading from '../../components/responseLoading';
 import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
-import { decryptGameState } from '../utils/decrypt';
-import AnimatedChatBubble from '../components/chatBubble';
-import AnimatedText from '../components/animatedText';
+import { decryptGameState } from '../../utils/decrypt';
+import AnimatedChatBubble from '../../components/chatBubble';
+import AnimatedText from '../../components/animatedText';
 
 /**
  * TODO:
@@ -50,49 +50,59 @@ const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStar
     const currentItem = offenseReport[currentIndex];
 
     return (
-        <Flex direction="column" align="center" justify="center" gap="4" className='offenseReport '>
-            <div onClick={handleNext} style={{ cursor: 'pointer' }}>
-                <SwitchTransition mode="out-in">
-                    <CSSTransition
-                        key={currentIndex}
-                        nodeRef={nodeRef}
-                        classNames="fade"
-                        timeout={500}
-                        unmountOnExit
-                    >
-                        <div ref={nodeRef}>
-                            <Card className="p-8" style={{ width: '700px' }}>
-                                <Inset clip="padding-box" side="top" pb="current">
-                                    <img
-                                        src={currentItem.imgSrc}
-                                        className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
-                                    />
-                                </Inset>
+        <SwitchTransition mode="out-in">
+            <CSSTransition
+                key={currentIndex}
+                nodeRef={nodeRef}
+                classNames="fade"
+                timeout={500}
+                unmountOnExit
+            >
+                <Flex direction="column" align="center" justify="center" gap="4" className='offenseReport '>
+                    <div onClick={handleNext} style={{ cursor: 'pointer' }}>
+                        <SwitchTransition mode="out-in">
+                            <CSSTransition
+                                key={currentIndex}
+                                nodeRef={nodeRef}
+                                classNames="fade"
+                                timeout={500}
+                                unmountOnExit
+                            >
+                                <div ref={nodeRef}>
+                                    <Card className="p-8" style={{ width: '700px' }}>
+                                        <Inset clip="padding-box" side="top" pb="current">
+                                            <img
+                                                src={currentItem.imgSrc}
+                                                className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
+                                            />
+                                        </Inset>
 
-                                <div>
-                                    <Text size="6" as="span" align="center" mt="2" mr={'4'}>
-                                        Time:
-                                    </Text>
-                                    <AnimatedText message={currentItem.time} animationSpeed={300} />
+                                        <div>
+                                            <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                                                Time:
+                                            </Text>
+                                            <AnimatedText message={currentItem.time} animationSpeed={300} />
+                                        </div>
+                                        <div>
+                                            <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                                                Location:
+                                            </Text>
+                                            <AnimatedText message={currentItem.location} animationSpeed={150} />
+                                        </div>
+                                        <div className='min-w-[600px] min-h-[100px]'>
+                                            <AnimatedText message={currentItem.description} animationSpeed={50} />
+                                        </div>
+                                        <div className='w-full text-center mt-9' >
+                                            <Text as='span' size='3' >Click to continue</Text>
+                                        </div>
+                                    </Card>
                                 </div>
-                                <div>
-                                    <Text size="6" as="span" align="center" mt="2" mr={'4'}>
-                                        Location:
-                                    </Text>
-                                    <AnimatedText message={currentItem.location} animationSpeed={150} />
-                                </div>
-                                <div className='min-w-[600px] min-h-[100px]'>
-                                    <AnimatedText message={currentItem.description} animationSpeed={50} />
-                                </div>
-                                <div className='w-full text-center mt-9' >
-                                    <Text as='span' size='3' >Click to continue</Text>
-                                </div>
-                            </Card>
-                        </div>
-                    </CSSTransition>
-                </SwitchTransition>
-            </div>
-        </Flex>
+                            </CSSTransition>
+                        </SwitchTransition>
+                    </div>
+                </Flex>
+            </CSSTransition>
+        </SwitchTransition>
     );
 };
 
@@ -149,8 +159,8 @@ interface ChiefCardProps {
 
 const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction }) => {
     return (
-        <Card variant='ghost' className='w-full min-w-[100px] text-center ' >
-            <Flex gap="4" direction="row" align={'center'}>
+        <Card variant='ghost' className='w-full min-w-[100px] text-center h-full border-gray-700 border' >
+            <Flex gap="4" direction="column" align={'center'}>
                 <Box>
 
                     <Avatar
@@ -163,8 +173,8 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     </Text>
                 </Box>
                 <Flex direction={'column'} gap={'2'}>
-                    <AnimatedChatBubble message={gameState.deductions.find((deduction) => deduction.submitted)?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
-                    <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                    <AnimatedChatBubble message={defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
+                    {/* <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} /> */}
                 </Flex>
                 {/* {deduction?.submitted && (
                     <Callout.Root
@@ -197,9 +207,9 @@ const RoundTimer: React.FC<RoundTimerProps> = ({ roundTimer, activeRoundType }: 
     return (
 
         <Card className="flex gap-4 justify-center items-center timerBox my-4 px-4 py-2 rounded text-center max-w-[400px] m-auto">
-                <Text as='p' mt={'3'} size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
+            <Text as='p' mt={'3'} size={'8'}>{Math.floor(roundTimer / 60)}:{roundTimer % 60 < 10 && '0'}{roundTimer % 60}</Text>
             <Separator orientation={'vertical'} size="2" />
-            
+
             <SegmentedControl.Root defaultValue={activeRoundType} radius="full" className='my-3 w-full'>
                 <SegmentedControl.Item value="interrogation">Interrogation</SegmentedControl.Item>
                 <SegmentedControl.Item value="voting">Deduction</SegmentedControl.Item>
@@ -283,7 +293,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
                 if (onClick) onClick()
             }}
         >
-            <Avatar fallback={suspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" radius='full' className='min-w-[300px] min-h-[300px]'/>
+            <Avatar fallback={suspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
             <Text as="p" weight="bold" size="8" mt="3">
                 {suspect.name}
             </Text>
@@ -333,10 +343,10 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
 interface VotingRoundProps {
     gameState: SingleGameState;
     killerVote: string | undefined;
-    roundTimer: number
+    roundTimer: number;
     deductionSubmitted: boolean;
     handleStartNextRound: () => void;
-    handleCreateNewLead: (evidence: string) => void;
+    handleCreateNewLead: (sourceNode: DeductionNode, targetNode: DeductionNode) => void;
     setKillerVote: React.Dispatch<React.SetStateAction<string | undefined>>;
     handleSubmitDeduction: () => void;
     handleShowGameOver: () => void;
@@ -356,160 +366,224 @@ const VotingRound: React.FC<VotingRoundProps> = ({
     handleStartNextRound,
     voteSubmitted,
 }) => {
-    let cheifMessage
+    const cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?";
 
-    const mostRecentConvesation = gameState.rounds.filter((round) => round.type === 'interrogation').slice().reverse().find((round) => round.status === 'completed')?.conversation || [];
-    const currentDeduction = gameState.deductions.find((deduction) => (deduction.active == true)) || null;
-    if (!currentDeduction) { return (<Text> No deductions available </Text>) }
-    if (currentDeduction && currentDeduction.leads.length < 3) {
-        cheifMessage = "Your gonna need at least a few leads before we can make a case against our culprit, Detective!"
-    }
-    else if (currentDeduction && currentDeduction.culpritVote === '') {
-        cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?"
-    } else if (currentDeduction && currentDeduction.culpritVote !== '' && !deductionSubmitted) {
-        cheifMessage = "You've made your choice, Detective. I'll take a look at this and get back to you shortly."
-    } else {
-        cheifMessage = "*Chief Gordon is reviewing your deduction*"
-    }
+    const [activeConversation, setActiveConversation] = useState<Conversation | undefined>(undefined);
+
+    const [creatingEdge, setCreatingEdge] = useState(false);
+    const [sourceNode, setSourceNode] = useState<DeductionNode | null>(null);
+    const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [nodePositions, setNodePositions] = useState<{ [id: string]: { x: number; y: number } }>({});
+
+    const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+    const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+
+    useEffect(() => {
+        if (!gameState?.deduction?.nodes) return;
+        const spacing = 150;
+        const newPositions: { [id: string]: { x: number; y: number } } = {};
+        gameState.deduction.nodes.forEach((node, i) => {
+            const row = Math.floor(i / 4);
+            const col = i % 4;
+            newPositions[node.id] = { x: col * spacing + 50, y: row * spacing + 50 };
+        });
+        setNodePositions(newPositions);
+    }, [gameState]);
+
+    const handleContainerMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (creatingEdge) {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        }
+    };
+
+    const handleMouseDown = (nodeId: string, e: React.MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        setDraggingNodeId(nodeId);
+        setDragOffset({
+            x: e.clientX - (nodePositions[nodeId]?.x || 0),
+            y: e.clientY - (nodePositions[nodeId]?.y || 0),
+        });
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!draggingNodeId || !dragOffset) return;
+        e.preventDefault();
+        const newX = e.clientX - dragOffset.x;
+        const newY = e.clientY - dragOffset.y;
+
+        setNodePositions((prev) => ({
+            ...prev,
+            [draggingNodeId]: { x: newX, y: newY },
+        }));
+    };
+
+    const handleMouseUp = () => {
+        setDraggingNodeId(null);
+        setDragOffset(null);
+    };
+
     return (
         <>
-            <Flex gap={'4'} direction={'column'}>
-                {/* First item: ChiefCard */}
-                <Flex direction={'column'} justify={'center'} align={'center'}>
-
-                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={currentDeduction} />
-                    <Flex direction={'row'} justify={'between'} className='w-full'>
-                        <Button
-                            onClick={handleSubmitDeduction}
-                            style={{ margin: '20px auto' }}
-                            mt="4"
-                            size="4"
-                            disabled={currentDeduction.leads.length < 3 || currentDeduction.culpritVote === ''}
-                        >
-                            {deductionSubmitted ? <Spinner /> : 'Submit Deduction'}
-                        </Button>
-                        <Button
-                            onClick={gameState.status == 'finished' ? () => handleShowGameOver() : handleStartNextRound}
-                            style={{ margin: '20px auto', padding: '10px 20px' }}
-                            mt="4"
-                            size="4"
-                            disabled={gameState.rounds[gameState.rounds.length - 1].status === 'active'}
-                        >
-                            {gameState.status == 'finished' && !deductionSubmitted ? 'Go to court' : 'Start Next Round'}
-                        </Button>
-                    </Flex>
+            <Flex direction="row" gap="4" className="h-full">
+                <Flex direction="column" justify="center" align="center" gap="4" className="w-1/2 h-full">
+                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={gameState.deduction} />
                 </Flex>
-                {/* Second item: List of Leads */}
+                <Tabs.Root defaultValue="deduction" className="w-full h-full">
+                    <Tabs.List className="w-full text-center justify-center mb-2 text-xl">
+                        <Tabs.Trigger value="deduction">"Deduction"</Tabs.Trigger>
+                        <Tabs.Trigger value="interrogations">Interrogations</Tabs.Trigger>
+                    </Tabs.List>
 
-                <Flex direction='row' gap={'4'}>
-                    <Flex direction='column' justify='center' align='center' gap='4' className='max-w-xs'>
-                        <Card variant='surface' className=' flex flex-col'>
-                            <Text align={'center'} mb={'2'}> Culprit </Text>
-                            {currentDeduction.culpritVote ?
-                                <SuspectCard suspect={gameState.suspects.find((suspect) => suspect.id === currentDeduction.culpritVote)} variant='ghost' />
-                                : <Text> No vote submitted </Text>
-                            }
-                        </Card>
-                        <Flex direction="column" gap="2" className='w-full'>
-
-                            {Array.from({ length: 3 }).map((_, index) => (
-                                <React.Fragment key={index}>
-                                    <LeadCard
-                                        lead={currentDeduction.leads[index]}
-                                        suspects={gameState.suspects}
-                                        index={index}
-                                    />
-                                    {index < 2 && <Separator orientation="horizontal" size="4" />}
-                                </React.Fragment>
-                            ))}
-                        </Flex>
-                    </Flex>
-
-
-                    {/* Third item: Tabs component */}
-                    <Tabs.Root defaultValue='conversation' className='w-full h-full'>
-                        <Tabs.List className='w-full text-center justify-center mb-2 text-xl'>
-                            <Tabs.Trigger value='conversation'>Transcript</Tabs.Trigger>
-                            <Tabs.Trigger value='evidence'>Evidence</Tabs.Trigger>
-                            {currentDeduction.leads.length === 3 && (
-                                <Tabs.Trigger value='vote'>Culprit</Tabs.Trigger>
-                            )}
-                        </Tabs.List>
-                        <Tabs.Content value='conversation' className='h-full'>
-                            <Box className='interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full'>
-                                {mostRecentConvesation.responses.map((conversationItem, index) => (
-                                    <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this statement</Text>} className='p-1'>
-                                        <Flex className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.message)}>
-                                            <Box ml="2" mb="2">
-                                                <Text as="p" weight="bold" size="3">
-                                                    {conversationItem.speaker === 'detective' ? 'You' : conversationItem.speaker}
+                    <Tabs.Content value="interrogations" className="h-full">
+                        <Flex gap="4">
+                            <Box className="w-1/4 p-2 border-r flex flex-col gap-4">
+                                {gameState.rounds
+                                    .find((round) => round.type === "interrogation")
+                                    ?.conversations.map((conversation, index) => (
+                                        <Flex direction="column" gap="4" key={conversation.suspect + index}>
+                                            <Card
+                                                variant="surface"
+                                                className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
+                                                onClick={() => setActiveConversation(conversation)}
+                                            >
+                                                <Text size="2" weight="bold">
+                                                    {gameState.suspects.find((suspect) => suspect.id === conversation.suspect)?.name}
                                                 </Text>
-                                            </Box>
-                                            <Box className="col-span-7">
-                                                <Text align="left" as="span">
-                                                    {conversationItem.message}
+                                                <Text size="1" weight="light" ml="4">
+                                                    #{conversation.suspect}
                                                 </Text>
-                                            </Box>
+                                            </Card>
+                                            {index <
+                                                (gameState?.rounds
+                                                    ?.find((round) => round.type === "interrogation")
+                                                    ?.conversations.length || 1) -
+                                                    1 && <Separator orientation="horizontal" size="4" />}
                                         </Flex>
-                                    </Tooltip>
-                                ))}
-                            </Box>
-                        </Tabs.Content>
-                        <Tabs.Content value='evidence'>
-                            <Grid columns="2" gap="4">
-                                {gameState?.allEvidence?.map((item, index) => (
-                                    <Tooltip key={index} content={<Text size={'2'}>Create a new lead from this evidence</Text>} className='p-1'>
-                                        <Card variant="surface" className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer" onClick={() => handleCreateNewLead(item.description)}>
-                                            <Flex gap="2" align="center">
-                                                <Box>
-                                                    <Text>{item.description}</Text>
-                                                </Box>
-                                            </Flex>
-                                        </Card>
-                                    </Tooltip>
-                                )) || (
-                                        <Card variant="surface" className="p-4">
-                                            <Text>No evidence available</Text>
-                                        </Card>
-                                    )}
-                            </Grid>
-                        </Tabs.Content>
-                        <Tabs.Content value='vote'>
-                            <>
-                                <Heading size='4' my={'5'} >Based on your deduction, the culprit is...</Heading>
-                                <RadioCards.Root
-                                    className="w-full"
-                                    value={killerVote}
-                                    onValueChange={(vote) => setKillerVote(vote)}
-                                    disabled={voteSubmitted}
-                                >
-                                    {gameState.suspects.map((player) => (
-                                        <RadioCards.Item value={player.id} key={player.id}>
-                                            <SuspectCard suspect={player} variant='ghost' />
-                                        </RadioCards.Item>
                                     ))}
-                                </RadioCards.Root>
-                                <Flex>
-                                    <Button
-                                        onClick={handleVoteSubmission}
-                                        color={`${killerVote ? 'green' : 'gray'}`}
-                                        style={{ width: '40%', margin: '20px auto' }}
-                                        mt="4"
-                                        size={'4'}
-                                        disabled={!killerVote || voteSubmitted}
-                                    >
-                                        {voteSubmitted ? 'Vote Submitted!' : 'Add to deduction'}
-                                    </Button>
-                                </Flex>
-                            </>
-                        </Tabs.Content>
-                    </Tabs.Root>
-                </Flex>
-                {/* Fourth item: if there is anther round left in the game, and the player has less than 3 leads, show the next interrogation button, else show the submit deduction button */}
+                            </Box>
+                            <Box className="w-3/4 p-2">
+                                {activeConversation && (
+                                    <Box className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full">
+                                        {activeConversation.responses.map((response, index) => (
+                                            <Tooltip
+                                                key={index}
+                                                content={<Text size="2">Create a new lead from this statement</Text>}
+                                                className="p-1"
+                                            >
+                                                <Flex
+                                                    className="gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
+                                                    onClick={() =>
+                                                        handleCreateNewLead(
+                                                            { id: response.responseId } as DeductionNode,
+                                                            { id: response.responseId + "_target" } as DeductionNode
+                                                        )
+                                                    }
+                                                >
+                                                    <Box ml="2" mb="2">
+                                                        <Text as="p" weight="bold" size="3">
+                                                            {response.speaker}
+                                                        </Text>
+                                                    </Box>
+                                                    <Box className="col-span-7">
+                                                        <Text align="left" as="span">
+                                                            {response.message}
+                                                        </Text>
+                                                    </Box>
+                                                </Flex>
+                                            </Tooltip>
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+                        </Flex>
+                    </Tabs.Content>
+
+                    <Tabs.Content 
+                        value="deduction" 
+                        className="relative w-full h-full" 
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        onMouseMoveCapture={handleContainerMouseMove}
+                    >
+                        {creatingEdge && sourceNode && (
+                            <svg
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    pointerEvents: "none",
+                                }}
+                            >
+                                <line
+                                    x1={nodePositions[sourceNode.id]?.x + 25 || 0}
+                                    y1={nodePositions[sourceNode.id]?.y + 10 || 0}
+                                    x2={mousePos.x}
+                                    y2={mousePos.y}
+                                    stroke="red"
+                                    strokeWidth="2"
+                                />
+                            </svg>
+                        )}
+                        {gameState.deduction?.nodes?.map((node) => {
+                            const { x, y } = nodePositions[node.id] || { x: 0, y: 0 };
+                            const isHovered = hoveredNode === node.id && creatingEdge && sourceNode?.id !== node.id;
+                            return (
+                                <Box
+                                    key={node.id}
+                                    style={{
+                                        position: "absolute",
+                                        left: x,
+                                        top: y,
+                                        opacity: isHovered ? 0.6 : 1,
+                                        maxWidth: 300,
+                                        height: 200,
+                                        cursor: "grab",
+                                    }}
+                                    onMouseEnter={() => creatingEdge && setHoveredNode(node.id)}
+                                    onMouseLeave={() => creatingEdge && setHoveredNode(null)}
+                                    onMouseDown={(e) => handleMouseDown(node.id, e)}
+
+                                >
+
+                                    {isHovered && (
+                                        <Text size="2" weight="bold" style={{ position: "absolute", top: 0, left: 0 }}>
+                                            connect evidence?
+                                        </Text>
+                                    )}
+                                    <Card variant="surface" className={`p-2 w-full h-full flex flex-col gap-4 relative hover:scale-105 hover:border duration-200 ease-in-out transition-all` + `${sourceNode?.id == node.id ? 'border-green-300 border scale-105 ' : ''}`}>
+                                        <Text size="1" as='p' weight="bold" className=''>
+                                            #{node.id} - {node.type}
+                                        </Text>
+                                        <Flex direction="row" gap="2" justify={'center'}>
+                                            <Avatar className='w-24 h-24' fallback={node.data?.identity?.charAt(0)} src={node.data.imgSrc || '/backdoor.webp'} size="4" />
+                                            <Text size="2">{node.data.description || node.data.identity}</Text>
+                                        </Flex>
+                                        <Button
+                                            size="2"
+                                            variant="outline"
+                                            onClick={() => {
+                                                if (creatingEdge && sourceNode) {
+                                                    handleCreateNewLead(sourceNode, node);
+                                                    setCreatingEdge(false);
+                                                } else {
+                                                    setCreatingEdge(true);
+                                                    setSourceNode(node);
+                                                }
+                                            }}
+                                        >
+                                            {(creatingEdge && sourceNode && node.id == sourceNode.id) ? "Cancel" : "Create Lead"}
+                                        </Button>
+                                    </Card>
+                                </Box>
+                            );
+                        })}
+                    </Tabs.Content>
+                </Tabs.Root>
             </Flex>
-
-            {/* Additional content if leads.length > 3 */}
-
         </>
     );
 };
@@ -517,7 +591,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
 
 interface ChooseInterrogationProps {
     gameState: SingleGameState;
-    handleStartInterrogation: (suspectId:string) => void;
+    handleStartInterrogation: (suspectId: string) => void;
 }
 
 const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, handleStartInterrogation }) => {
@@ -526,7 +600,7 @@ const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, ha
             <Heading size="7">Choose a Suspect to Interrogate</Heading>
             <Grid columns="3" gap="4">
                 {gameState.suspects.map((suspect) => (
-                    <SuspectCard key={suspect.id} suspect={suspect} variant="surface" size='large' onClick={() => handleStartInterrogation(suspect.id)}/>
+                    <SuspectCard key={suspect.id} suspect={suspect} variant="surface" size='large' onClick={() => handleStartInterrogation(suspect.id)} />
                 ))}
             </Grid>
         </Flex>
@@ -542,6 +616,7 @@ interface InterrogationProps {
     roundTimer: number
     responseLoading: boolean;
     audioTranscribing: boolean;
+    loadingSessionEnd: boolean;
     socket: Socket; // Adjust this type based on your socket implementation
     emitEvent: (event: string, data: any) => void;
     handleAudioRecorded: (arrayBuffer: ArrayBuffer) => void;
@@ -568,6 +643,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
     handleAudioRecorded,
     handleEndInterrogation,
     handleCreateNewLead,
+    loadingSessionEnd,
 }) => {
     return (
         <>
@@ -578,36 +654,36 @@ const Interrogation: React.FC<InterrogationProps> = ({
                     className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-[550px]"
                 >
                     <Flex className='h-full'>
-                    <Flex className='min-w-[400px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
-                        <Avatar fallback={currentSuspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" className='min-w-[300px] min-h-[300px]'/>
-                    </Flex>
+                        <Flex className='min-w-[400px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
+                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" className='min-w-[300px] min-h-[300px]' />
+                        </Flex>
                         <Box>
-                    <Flex className='w-full' justify={'center'} align={'center'} direction={'column'}>
-                    {/* <SuspectCard suspect={currentSuspect} variant='surface' size='small' /> */}
-                     <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.'/>
-                     </Flex>
-                    <Grid mb="2" columns="8" flow="dense" gap="5">
-                       
-                        {interrogationTranscript.map((conversationItem, index) => (
-                            <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
-                                <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.audioTranscript)}>
-                                    <Box ml="2" mb="2">
-                                        <Text as="p" weight="bold" size="3">
-                                            {Math.floor(conversationItem.timestamp / 60)}:
-                                            {conversationItem.timestamp % 60 < 10 ? '0' : ''}
-                                            {conversationItem.timestamp % 60}
-                                        </Text>
-                                    </Box>
-                                    <Box className="col-span-7">
-                                        <Text align="left" as="span">
-                                            {conversationItem.audioTranscript}
-                                        </Text>
-                                    </Box>
-                                </Flex>
-                            </Tooltip>
-                        ))}
-                    </Grid>
-                    </Box>
+                            <Flex className='w-full' justify={'center'} align={'center'} direction={'column'}>
+                                {/* <SuspectCard suspect={currentSuspect} variant='surface' size='small' /> */}
+                                <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
+                            </Flex>
+                            <Grid mb="2" columns="8" flow="dense" gap="5">
+
+                                {interrogationTranscript.map((conversationItem, index) => (
+                                    <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
+                                        <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.audioTranscript)}>
+                                            <Box ml="2" mb="2">
+                                                <Text as="p" weight="bold" size="3">
+                                                    {Math.floor(conversationItem.timestamp / 60)}:
+                                                    {conversationItem.timestamp % 60 < 10 ? '0' : ''}
+                                                    {conversationItem.timestamp % 60}
+                                                </Text>
+                                            </Box>
+                                            <Box className="col-span-7">
+                                                <Text align="left" as="span">
+                                                    {conversationItem.audioTranscript}
+                                                </Text>
+                                            </Box>
+                                        </Flex>
+                                    </Tooltip>
+                                ))}
+                            </Grid>
+                        </Box>
                     </Flex>
                     {responseLoading && (
                         <ResponseLoading label={`${currentSuspect?.name}...`} />
@@ -617,25 +693,25 @@ const Interrogation: React.FC<InterrogationProps> = ({
                     )}
                 </Box>
                 <div className="flex gap-4 justify-center">
-                {socket && (
-                    <AudioRecorder
-                        socket={socket}
-                        emitEvent={emitEvent}
-                        onAudioRecorded={handleAudioRecorded}
-                    />
-                )}
-                <Button
-                    size="4"
-                    variant='outline'
-                    radius='small'
-                    mt={'5'}
-                    className='py-6'
-                    disabled={roundTimer === 0}
-                    onClick={() => handleEndInterrogation()}
-                >
-                    End Interrogation
-                </Button>
-            </div>
+                    {socket && (
+                        <AudioRecorder
+                            socket={socket}
+                            emitEvent={emitEvent}
+                            onAudioRecorded={handleAudioRecorded}
+                        />
+                    )}
+                    <Button
+                        size="4"
+                        variant='outline'
+                        radius='small'
+                        mt={'5'}
+                        className='py-6'
+                        disabled={loadingSessionEnd}
+                        onClick={() => handleEndInterrogation()}
+                    >
+                        {loadingSessionEnd ? <Spinner /> : 'End Interrogation'}
+                    </Button>
+                </div>
             </div>
         </>
     );
@@ -926,6 +1002,7 @@ const SingleGame = () => {
     const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
     const [showSidebar, setShowSidebar] = useState<boolean>(false);
     const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
+    const [loadingSessionEnd, setLoadingSessionEnd] = useState<boolean>(false);
     const [playerElo, setPlayerElo] = useState<{ oldRating: number, newRating: number }>({ oldRating: 0, newRating: 0 });
     const [playerBadges, setPlayerBadges] = useState<string[]>([]);
 
@@ -939,24 +1016,24 @@ const SingleGame = () => {
     }, [gameState])
 
     const activeRound = useMemo(() => {
-        if(!gameState) return null;
+        if (!gameState) return null;
         console.log("updating active round");
         const activeRound = gameState?.rounds?.find((round) => round.status === 'active')
         console.log(gameState);
         return activeRound;
-        // return 'voting'
+        // return {type: 'voting'}
     }, [gameState]);
 
     const activeConversation = useMemo(() => {
-        if(!gameState) return null;
+        if (!gameState) return null;
         const activeConversation = gameState?.rounds?.find((round) => round?.type === "interrogation")
-        ?.conversations.find((conversation) => conversation.active);
+            ?.conversations.find((conversation) => conversation.active);
         return activeConversation;
     }, [gameState]);
 
     const activeSuspect = useMemo(() => {
         const activeSuspectId = gameState?.rounds?.find((round) => round?.type === "interrogation")
-        ?.conversations.find((conversation) => conversation.active)?.suspect;
+            ?.conversations.find((conversation) => conversation.active)?.suspect;
         return gameState?.suspects?.find((suspect) => suspect.id === activeSuspectId);
     }, [gameState]);
 
@@ -981,29 +1058,33 @@ const SingleGame = () => {
 
     const handleUserAudioTranscriptEvent = useCallback((params: any) => {
         console.log('Received audio transcript:', params);
-        const { speaker, audioTranscript, currentRoundTime } = params;
-        setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker }]);
+        const { speaker, audioTranscript, responseId, currentRoundTime } = params;
+        setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker, responseId }]);
         setAudioTranscribing(false);
     }, [roundTimer]);
 
     const handleRealtimeAudioTranscriptEvent = (params: any) => {
-        const { speaker, transcript, currentRoundTime } = params;
+        const { speaker, transcript, currentRoundTime, responseId } = params;
         console.log('Received audio transcript:', params);
         setInterrogationTranscript(prev => {
             const lastItem = prev[prev.length - 1];
             if (!lastItem) {
-                // If there's no last item, create a new one and add the delta as the first text of the transcript
-                return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
-            } else if (lastItem.speaker !== speaker) {
-                // If the speaker has changed, create a new item
-                return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
+                // If there's no last item, create a new one
+                return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }];
             }
-            const updatedItem = {
-                ...lastItem,
-                audioTranscript: lastItem.audioTranscript + transcript,
-                speaker
-            };
-            return [...prev.slice(0, prev.length - 1), updatedItem];
+
+            if (!prev.find((item) => item.responseId === responseId)) {
+                // If the responseId is different, add as new item
+                return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }];
+            }
+
+            // Append to existing item
+            return prev.map((item) => {
+                if (item.responseId === responseId) {
+                    return { ...item, audioTranscript: item.audioTranscript + ' ' + transcript };
+                }
+                return item;
+            });
         });
     };
 
@@ -1032,8 +1113,16 @@ const SingleGame = () => {
         emitEvent('start-next-round', {});
     }
 
-    const handleCreateNewLead = (evidence: string) => {
-        console.log('Creating new lead with evidence:', evidence);
+    const handleCreateNewLead = (sourceNode :DeductionNode, targetNode: DeductionNode ) => {
+
+        if (!gameState || !socket || !roomId || !sourceNode || !targetNode) {
+            console.error('Invalid parameters when creating lead:', gameState, socket, roomId, sourceNode, targetNode);
+            return;
+        }
+
+        emitEvent('deduction:lead:created', { sourceNode, targetNode });
+
+
         // log current suspect
         // console.log(currentSuspect);
         // if (!currentSuspect || !gameState || !roomId) {
@@ -1057,7 +1146,7 @@ const SingleGame = () => {
             return;
         }
         console.log('Starting interrogation with suspect:', suspectId);
-        emitEvent('realtime:start', suspectId );
+        emitEvent('realtime:start', suspectId);
     }
 
 
@@ -1079,7 +1168,7 @@ const SingleGame = () => {
                 setDeductionSubmitted(false);
             })
 
-            socket.on('deduction:started', () => {  
+            socket.on('deduction:started', () => {
                 setDeductionSubmitted(true);
             })
 
@@ -1093,6 +1182,10 @@ const SingleGame = () => {
             socket.on('realtime:transcript:delta:assistant', handleRealtimeAudioTranscriptEvent);
 
             socket.on('realtime:message', handleRealtimeAudioTranscriptEvent);
+
+            socket.on('realtime:ended', () => {
+                setLoadingSessionEnd(false);
+            });
 
             socket.on('round:tick', (params: any) => {
                 setRoundTimer(params.countdown);
@@ -1179,6 +1272,7 @@ const SingleGame = () => {
         if (!socket || !roomId) {
             return;
         }
+        setLoadingSessionEnd(true);
         emitEvent('realtime:end', roomId);
     }
 
@@ -1212,6 +1306,7 @@ const SingleGame = () => {
                                 audioTranscribing={audioTranscribing}
                                 socket={socket}
                                 emitEvent={emitEvent}
+                                loadingSessionEnd={loadingSessionEnd}
                                 handleEndInterrogation={handleEndInterrogation}
                                 handleAudioRecorded={handleAudioRecorded}
                                 handleCreateNewLead={handleCreateNewLead}
@@ -1262,12 +1357,13 @@ const SingleGame = () => {
         }
 
         if (activeRound?.type === 'interrogation') {
-            if(activeRound?.conversations.find((conversation) => {
+            if (activeRound?.conversations.find((conversation) => {
                 return conversation.active
             })) {
                 return (
                     <Interrogation
                         wavStreamPlayerRef={wavStreamPlayerRef}
+                        loadingSessionEnd={loadingSessionEnd}
                         gameState={gameState}
                         roundTimer={roundTimer}
                         currentSuspect={activeSuspect}
@@ -1332,9 +1428,9 @@ const SingleGame = () => {
             <Box className=" flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
                 {!showSidebar && (
-                <Button  variant="surface"size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
+                    <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
                 )}
-                {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4" >
+                {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4 z-10" >
                     <Flex px={'2'} py={'5'} >
                         <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%' }}>
                             {/* Round Timer */}
@@ -1364,8 +1460,20 @@ const SingleGame = () => {
                                     {gameState.crime && (
                                         <Flex gap="3" direction="column" mb={'6'}>
                                             <Text size="4">
-                                                A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported {gameState.crime.time}
+                                                A <Strong>{gameState.crime.type}</Strong> occurred at <Strong>{gameState.crime.location}</Strong> around <Strong>{gameState.crime.time}</Strong>. Witnesses reported the following:
                                             </Text>
+                                            <Flex direction="column" gap="4">
+                                                {gameState.crime.offenseReport?.map((item, index) => (
+                                                    <Card key={index} className="flex items-center p-4 gap-4">
+                                                        <Avatar size="6" fallback={item.time.charAt(0)} src='/backdoor.webp' className='w-32 h-32' />
+                                                        <Flex direction="column">
+                                                            <Text size="2" weight="bold">{item.time} @ {item.location}</Text>
+                                                            <Text size="3">{item.description}</Text>
+
+                                                        </Flex>
+                                                    </Card>
+                                                )) || <Text>No event reports available.</Text>}
+                                            </Flex>
                                         </Flex>
                                     )}
                                 </Tabs.Content>
@@ -1381,10 +1489,10 @@ const SingleGame = () => {
                                                 </Flex>
                                             </Card>
                                         )) || (
-                                            <Card variant="surface" className="p-4">
-                                                <Text>No evidence available</Text>
-                                            </Card>
-                                        )}
+                                                <Card variant="surface" className="p-4">
+                                                    <Text>No evidence available</Text>
+                                                </Card>
+                                            )}
                                     </Grid>
                                 </Tabs.Content>
                                 <Tabs.Content value="suspects">
@@ -1402,11 +1510,11 @@ const SingleGame = () => {
 
                 <Box className="w-full flex-col h-full">
                     {/* Main game area */}
-                    {gameState.status == 'active' && <RoundTimer roundTimer={roundTimer} activeRoundType={activeRound?.type || 'interrogation'}/>}
-                    <Flex px={'2'} py={'5'} gap={'4'} className='w-full' justify={'center'} align={'center'}>
+                    {gameState.status == 'active' && <RoundTimer roundTimer={roundTimer} activeRoundType={activeRound?.type || 'interrogation'} />}
+                    <Flex px={'2'} py={'5'} gap={'4'} className='w-full h-full' justify={'center'} align={'center'}>
                         {/* Left panel: Crime and Evidence */}
 
-                        <Box style={{ width: '100%', maxWidth: '1400px' }}>
+                        <Box style={{ width: '100%', maxWidth: '1400px', height: '100%' }}>
 
                             <SwitchTransition mode="out-in">
                                 <CSSTransition

@@ -40,7 +40,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmEloService = OpenAIEloService;
     this.currentPhase = null;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
-    this.deductionTimer = 5 * 60; // 5 minutes in seconds
+    this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
@@ -111,16 +111,30 @@ export class SinglePlayerGameManager extends GameManager {
     GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
+    
     // emit the game started event
     this.emit("game:started", {});
+    this.emit("game:updated", this.gameState);
+    const activeRound = this.gameState.rounds.find(
+      (round) => round.status === "active"
+    );
+    if (activeRound.type === "interrogation") {
     this.startInterrogationPhase();
+    } else {
+      this.startDeductionPhase();
+    }
   }
 
   startInterrogationPhase() {
+    if(this.roundTimer > 0) {
+      console.log("Round timer is still running, cannot start new phase");
+      return;
+    }
     this.currentPhase = "interrogation";
     this.emit("phase:started", { phase: this.currentPhase });
     // ... set up a 10-minute timer. On expire, go to next phase ...
     // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
+    
     const { clear } = startInterval(
       this.interrogationTimer,
       this.emitRoundTick.bind(this),
@@ -147,6 +161,10 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   startNextPhase() {
+    if(this.roundTimer == null) {
+      console.log("game hasnt started, cannot start new phase");
+      return;
+    }
     if (this.currentPhase === "interrogation") {
       this.endInterrogationPhase();
     } else if (this.currentPhase === "deduction") {
@@ -236,22 +254,16 @@ export class SinglePlayerGameManager extends GameManager {
         const parsed = JSON.parse(data);
         if (parsed.type === "response.audio.done") {
           console.log("Response done event received");
-          await this.llmGameService.addMessageToThread(this.threadId, {
-            role: "assistant",
-            content: `The interrogation of ${this.realtimeHandler.responder.name}, ${this.realtimeHandler.responder.identity} has concluded.`,
-          });
           setTimeout(() => {
             this.realtimeHandler.closeRealtimeConversation();
             this.realtimeHandler = null;
           }, 10000);
 
           // Remove this listener so we only handle one final response
-          this.realtimeHandler.removeCustomMessageListener(responseListener);
-          this.gameState.rounds.find(
-            (round) => round.type === "interrogation"
-          ).conversations.find(
-            (conversation) => conversation.active
-          ).active = false;
+          
+          this.gameState = await this.llmGameService.runGameThread(
+            process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+            this.threadId);
 
           await GameRoomService.updateGameRoom(this.roomId, {
             game_state: GameRoomService.encryptGameState(this.gameState),
@@ -260,16 +272,27 @@ export class SinglePlayerGameManager extends GameManager {
           setTimeout(() => {
             this.emit("game:updated", this.gameState );
           }, 5000);
-
           // Emit that the realtime session ended
-          this.emit("realtime:ended", {});
+          
 
+          
+        }
+        if (parsed.type === "response.audio_transcript.done") {
+          await this.llmGameService.addMessageToThread(this.threadId, {
+            role: "assistant",
+            content: `The interrogation of ${this.realtimeHandler.responder.name}, ID:${this.realtimeHandler.responder.id} has concluded.`,
+          });
+          this.emit("realtime:ended", {});
+          this.realtimeHandler.removeCustomMessageListener(responseListener);
           resolve();
         }
+
       };
 
       // Attach the custom listener
       this.realtimeHandler.addCustomMessageListener(responseListener);
+
+
 
       // Send the "end interrogation" message
       this.realtimeHandler.sendMessage(event);
@@ -309,15 +332,52 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   startDeductionPhase() {
+    if(this.roundTimer > 0) {
+      console.log("Round timer is still running, cannot start new phase");
+      return;
+    }
     this.currentPhase = "deduction";
     this.emit("phase:started", { phase: this.currentPhase });
     // ... set up deduce window ...
     // start the round timer for the deduction phase
 
+    // if the game state deduction object is empty, we should places nodes in the graph for each suspect and evidence
+    if (this.gameState.deduction.nodes.length === 0) {
+      this.gameState.suspects.forEach((suspect) => {
+        this.gameState.deduction.nodes.push({
+          id: suspect.id,
+          type: "suspect",
+          data: {
+            identity: suspect.identity,
+            name: suspect.name,
+            temperment: suspect.temperment,
+          },
+        });
+      });
+
+      this.gameState.allEvidence.forEach((evidence) => {
+        this.gameState.deduction.nodes.push({
+          id: evidence.id,
+          type: "evidence",
+          data: {
+            id: evidence.id,
+            description: evidence.description,
+          },
+        });
+      });
+
+      // update the game state with the new nodes
+      GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+
+      this.emit("game:updated", this.gameState );
+
+    }
     const { clear } = startInterval(
       this.deductionTimer,
-      this.emitRoundTick,
-      this.endDeductionPhase
+      this.emitRoundTick.bind(this),
+      this.endDeductionPhase.bind(this)
     );
     this.clearRoundTimer = clear;
   }

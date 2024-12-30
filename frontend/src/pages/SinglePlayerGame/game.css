@@ -1,0 +1,32 @@
+.interrogationChat {
+    border: 3px solid var(--accent-6);
+}
+.accordionTrigger {
+    border: 1px solid var(--accent-6);
+}
+.timerBox {
+    font-family: 'Special Elite', cursive;
+}
+
+.accordionTrigger:hover {
+
+        background-color: var(--accent-6);
+}
+.offenseReport span {
+    font-family: 'Special Elite', cursive;
+}
+
+.fade-enter {
+    opacity: 0;
+  }
+.fade-enter-active {
+opacity: 1;
+transition: opacity 500ms ease-in;
+}
+.fade-exit {
+opacity: 1;
+}
+.fade-exit-active {
+opacity: 0;
+transition: opacity 500ms ease-out;
+}

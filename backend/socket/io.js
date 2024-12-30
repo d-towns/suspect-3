@@ -80,6 +80,7 @@ export class GameRoomSocketServer {
       );
 
       socket.on("realtime:end", this.handleEndInterrogation.bind(this, socket));
+      socket.on("deduction:lead:created", this.handleDeductionLeadCreated.bind(this, socket));
 
       // Multiplayer only
       socket.on(
@@ -211,6 +212,11 @@ export class GameRoomSocketServer {
     this.roomGameManagers.get(socket.roomId).startNextPhase();
   }
 
+  async handleDeductionLeadCreated(socket, nodes) {
+    const { sourceNode, targetNode } = nodes;
+    this.roomGameManagers.get(socket.roomId).creteNewLead(sourceNode, targetNode);
+  }
+
   async handleVotingRoundVote(socket, vote) {
     console.log("Voting round vote received:", vote);
     try {
@@ -239,6 +245,10 @@ export class GameRoomSocketServer {
 
   async handleRealtimeAudioResponse(socket, audioData) {
     const manager = this.roomGameManagers.get(socket.roomId);
+    if (!manager) {
+      console.error("Game manager not found for room:", socket.roomId);
+      return;
+    }
     manager.addUserAudioToInputBuffer(audioData.audioBuffer);
   }
 

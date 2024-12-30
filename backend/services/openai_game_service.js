@@ -159,7 +159,8 @@ Remember to be impartial but thorough in your investigation.`,
 - the interrogation round is the first round of the game and should start as active
    - conversations between the player acting as the detective and the suspects who are LLM's will take place in the interrogation round
     - the interrogation round object should be updated with the conversations between the detective ( player ) and the suspect.
-    - there will be multiple individual interrogation conversations between the detective and each suspect, they should
+    - there will be multiple individual interrogation conversations between the detective and each suspect, they should have at least one conversation with each suspect before the interrogation round is set to completed.
+    - Be sure to track both detective and suspect responses in the game state round conversation for that suspect
     - After the interrogation round is complete, START THE NEXT VOTING ROUND OF THE GAME. IF THERE IS NO ROUND AFTER THE INTERROGATION ROUND, THE GAME IS FINISHED AND THE CULPRIT WINS.
     - DO NOT REMOVE ANY ROUNDS FROM THE PREVIOUS GAME STATE IN THE NEXT STATE UPDATE. 
 

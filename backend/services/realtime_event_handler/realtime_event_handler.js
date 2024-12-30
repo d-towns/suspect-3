@@ -52,7 +52,7 @@ export default class RealtimeEventHandler {
         case "conversation.item.input_audio_transcription.completed":
           await this.handleAudioTranscriptionCompleted(
             event,
-            activeSuspect
+            responder
           );
           break;
 
@@ -119,11 +119,12 @@ export default class RealtimeEventHandler {
 
     const playerConversationItem = {
       audioTranscript: event.transcript,
+      responseId:`${event.message_id}_${event.response_id}`,
       speaker: "user",
       currentRoundTime: this.gameManager.roundTimer,
     };
 
-    await this.gameManager.llmGameService.addMessageToThread(this.gameManager.theadId, {
+    await this.gameManager.llmGameService.addMessageToThread(this.gameManager.threadId, {
       role: "user",
       content: `Detective: ${event.transcript}`,
     });
@@ -184,6 +185,7 @@ export default class RealtimeEventHandler {
     console.log("Realtime audio delta received");
     this.gameManager.emit("realtime:audio:delta:assistant", {
       audio: base64ToPCM(event.delta),
+      responseId:`${event.message_id}_${event.response_id}`,
       speaker: "assistant",
       currentRoundTime:
         this.gameManager.roundTimer,
@@ -194,8 +196,9 @@ export default class RealtimeEventHandler {
     console.log("Realtime audio transcript delta received");
     this.gameManager.emit("realtime:transcript:delta:assistant", {
       transcript: event.delta,
+      responseId:`${event.message_id}_${event.response_id}`,
       speaker: "assistant",
-      currentRoundTime: this.gameManager.roun,
+      currentRoundTime: this.gameManager.roundTimer,
     });
   }
 
