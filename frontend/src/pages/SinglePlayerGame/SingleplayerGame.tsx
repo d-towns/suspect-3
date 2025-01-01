@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode, DeductionEdge, EdgeType } from '../../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode, EdgeType } from '../../models/game-state.model';
+import { Badge as GameResultBadge } from '../../models/gameResults.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../../services/rooms.service';
 import { useAuth } from '../../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus, FiInfo } from 'react-icons/fi';
 import AudioRecorder from '../../components/audioRecorder';
 import ResponseLoading from '../../components/responseLoading';
-import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress } from '@radix-ui/themes';
+import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, HoverCard, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import { WavStreamPlayer } from 'wavtools';
 import { decryptGameState } from '../../utils/decrypt';
-import AnimatedChatBubble from '../../components/chatBubble';
 import AnimatedText from '../../components/animatedText';
-import { ReactFlow, ReactFlowProvider, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
+import { ReactFlow, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
 import Dagre from '@dagrejs/dagre';
 import '@xyflow/react/dist/style.css';
 
@@ -33,16 +33,31 @@ import '@xyflow/react/dist/style.css';
 interface OffenseReportCardProps {
     offenseReport: OffenseReportItem;
     handleNext?: () => void;
-    size?: 'small' | 'large';
+    size?: 'small' | 'large' | 'mini'
 }
 
-const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseReport, handleNext, size }) => {
+export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseReport, handleNext, size }) => {
+    function calculateWidth() {
+        switch (size) {
+            case 'small':
+                return '300px'
+            case 'large':
+                return '700px'
+            case 'mini':
+                return '200px'
+            default:
+                return '400px'
+        }
+
+    }
+    const width = calculateWidth();
+
     return (
-        <Card className="p-8 offenseReport" style={{ width: size === 'large' ? '700px' : '400px' }} onClick={handleNext}>
+        <Card className="p-8 offenseReport" style={{ width:width }} onClick={handleNext}>
             <Inset clip="padding-box" side="top" pb="current">
                 <img
                     src={offenseReport.imgSrc}
-                    className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
+                    className="block object-cover w-full h-64 sm:h-80 md:h-90 bg-gray-200"
                 />
             </Inset>
 
@@ -906,7 +921,7 @@ const ChangingRounds: React.FC<ChangingRoundsProps> = ({ gameState }) => {
 interface ResultsSummaryProps {
     elo: number;
     newElo: number | 0;
-    badges: string[];
+    badges: GameResultBadge[];
     leaderboardUpdating: boolean;
 }
 
@@ -956,7 +971,20 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
                 </Flex>
                 <Flex gap={'2'}>
                     {badges.map((badge, index) => (
-                        <Badge key={index} size='2' variant='surface'>{badge}</Badge>
+<>
+                    <HoverCard.Root key={index}>
+                        <HoverCard.Trigger>
+                            <Badge key={index} size='2' variant='surface' className="cursor-pointer">
+                                {badge.badge}
+                            </Badge>
+                        </HoverCard.Trigger>
+                        <HoverCard.Content asChild side="top" align="center">
+                            <Box className="p-2 rounded">
+                                {badge.explanation}
+                            </Box>
+                        </HoverCard.Content>
+                    </HoverCard.Root>
+                    </>
                     ))}
                 </Flex>
             </Flex>
@@ -969,7 +997,7 @@ interface GameOverProps {
     gameState: SingleGameState;
     oldRating: number;
     newRating: number | 0
-    badges: string[];
+    badges: GameResultBadge[];
     leaderboardUpdating: boolean;
 }
 
@@ -982,7 +1010,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
                     {gameState.outcome === 'win' ? (
                         <>
 
-                            <Flex gap="4" mt={'9'} direction={{ sm: 'column', md: 'row' }} width={'50%'} justify={'between'} align={'center'}>
+                            <Flex gap="4" mt={'9'} direction={{ sm: 'column', md: 'row' }} width={'70%'} justify={'between'} align={'center'}>
                                 <Flex direction={'column'}>
                                     <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
                                     <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
@@ -1111,7 +1139,7 @@ const SingleGame = () => {
     const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
     const [loadingSessionEnd, setLoadingSessionEnd] = useState<boolean>(false);
     const [playerElo, setPlayerElo] = useState<{ oldRating: number, newRating: number }>({ oldRating: 0, newRating: 0 });
-    const [playerBadges, setPlayerBadges] = useState<string[]>([]);
+    const [playerBadges, setPlayerBadges] = useState<GameResultBadge[]>([]);
 
 
     const wavStreamPlayerRef = useRef<WavStreamPlayer>(
@@ -1290,6 +1318,7 @@ const SingleGame = () => {
             });
 
             socket.on('leaderboard:finished', (leaderboardData: any) => {
+                console.log('Leaderboard data:', leaderboardData);
                 setLeaderboardUpdating(false);
 
                 setPlayerBadges(leaderboardData.badges);
@@ -1616,7 +1645,7 @@ const SingleGame = () => {
                                 >
 
                                     <div ref={nodeRef} className='h-full'>
-                                    <Button onClick={updateLeaderboard}> Updated Leaderboard</Button>
+                                    {/* <Button onClick={updateLeaderboard}> Updated Leaderboard</Button> */}
                                         {renderGameContent()}
                                     </div>
                                 </CSSTransition>

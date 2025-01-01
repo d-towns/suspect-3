@@ -406,8 +406,8 @@ export class GameRoomSocketServer {
         this.emitToRoom(roomId, 'leaderboard:started', data);
         // Optionally, remove listeners if the game has ended
       });
-      manager.on('leaderboard:ended', (data) => {
-        this.emitToRoom(roomId, 'leaderboard:ended', data);
+      manager.on('leaderboard:finished', (data) => {
+        this.emitToRoom(roomId, 'leaderboard:finished', data);
         // Optionally, remove listeners if the game has ended
       });
 

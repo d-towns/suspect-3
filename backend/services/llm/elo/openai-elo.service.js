@@ -21,7 +21,7 @@ class EventHandler extends EventEmitter {
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
       if (event.event === "thread.run.requires_action") {
-        await this.handleRequiresAction(
+        const response = await this.handleRequiresAction(
           event.data,
           event.data.id,
           event.data.thread_id
@@ -53,7 +53,9 @@ class EventHandler extends EventEmitter {
   
       console.log("Filtered tool outputs:", toolOutputs);
       // Make sure to await if 'submitToolOutputs' is async
-      await this.submitToolOutputs(toolOutputs, runId, threadId);
+      this.submitToolOutputs(toolOutputs, runId, threadId).then(() => {
+        console.log("Tool outputs submitted successfully");
+      });
     } catch (error) {
       console.error("Error processing required action:", error);
     }
@@ -61,18 +63,19 @@ class EventHandler extends EventEmitter {
   }
 
   async submitToolOutputs(toolOutputs, runId, threadId) {
+    let stream;
     try {
       // Use the submitToolOutputsStream helper
-      const stream = await this.client.beta.threads.runs.submitToolOutputsStream(
+      stream = await this.client.beta.threads.runs.submitToolOutputsStream(
         threadId,
         runId,
         { tool_outputs: toolOutputs }
       );
-      console.log("Submitting tool outputs:", stream);
       for await (const event of stream) {
+        // console.log("Tool output event received:", event);
         this.emit("event", event);
       }
-      
+
     } catch (error) {
       console.error("Error submitting tool outputs:", error);
     }
@@ -217,9 +220,14 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       );
 
       for await (const event of stream) {
+        console.log("Event received:", event);
         eventHandler.emit("event", event);
       }
 
+      while (eventHandler.results === null) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      // console.log(stream);
 
 
       const leaderboardData = eventHandler.results;

@@ -31,7 +31,7 @@ const ThemedApp: React.FC = () => {
     <Theme accentColor="purple" grayColor="sand" radius="large" scaling="95%" appearance={theme}>
       <div className="flex flex-col min-h-screen">
         <Navbar />
-        <main className='min-h-[85vh] flex justify-center '>
+        <main className='min-h-[85vh] flex justify-center overflow-hidden '>
           <Outlet />
         </main>
         <Footer />

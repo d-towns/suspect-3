@@ -688,26 +688,28 @@ export class SinglePlayerGameManager extends GameManager {
       // update the leaderboard table
       console.log("Leaderboard updates:", leaderboardUpdates);
 
-      // leaderboardUpdates.playerResults = leaderboardUpdates.playerResults.filter((result) => {
-      //   // check if the result.playerId is a valid uuid
-      //   console.log("Checking player ID:", result.playerId, uuidValidate(result.playerId));
-      //   return uuidValidate(result.playerId);
-      // })
-      // console.log("Updating player stats:", leaderboardUpdates.playerResults);
-      // await LeaderboardService.updatePlayerStats(
-      //   leaderboardUpdates.playerResults
-      // );
+      leaderboardUpdates.playerResults = leaderboardUpdates.playerResults.filter((result) => {
+        // check if the result.playerId is a valid uuid
+        console.log("Checking player ID:", result.playerId, uuidValidate(result.playerId));
+        return uuidValidate(result.playerId);
+      })
+      console.log("Updating player stats:", leaderboardUpdates.playerResults);
+      await LeaderboardService.updatePlayerStats(
+        leaderboardUpdates.playerResults
+      );
 
-      // const { oldRating, newRating, badges } = leaderboardUpdates.playerResults.find(
-      //   (result) => result.playerId === this.playerId
-      // );
+      const { oldRating, newRating, badges } = leaderboardUpdates.playerResults.find(
+        (result) => result.playerId === this.playerId
+      );
 
-      //emit the leaderboard updates to the client
-      // this.emit("leaderboard:finished", {
-      //   oldRating,
-      //   newRating,
-      //   badges,
-      // });
+      console.log(oldRating, newRating, badges);
+
+      // emit the leaderboard updates to the client
+      this.emit("leaderboard:finished", {
+        oldRating,
+        newRating,
+        badges,
+      });
 
       console.log("Game results and ELO changes processed successfully");
     } else {

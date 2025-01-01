@@ -65,11 +65,11 @@ export class LeaderboardService {
           }
     
           const newElo = newRating;
-          const newWins = won ? data.multi_wins + 1 : data.multi_wins;
+          const newWins = won ? data.single_wins + 1 : data.single_wins;
     
           const { error: updateError } = await supabase
             .from("leaderboard")
-            .update({ elo: newElo, multi_wins: newWins })
+            .update({ elo: newElo, single_wins: newWins })
             .eq("user_id", playerId);
     
           console.log("Player stats updated:", playerId, newElo, newWins);
