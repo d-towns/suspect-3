@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth.context';
 import { useNavigate } from 'react-router-dom';
 import { Link as RouterLink } from 'react-router-dom';
+import './home.css';
 
 import {
   Button,
@@ -14,7 +15,9 @@ import {
   Tabs,
   Checkbox,
   Spinner,
+  Separator,
 } from '@radix-ui/themes';
+import AnimatedText from '../components/animatedText';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -116,57 +119,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <Flex
-      direction={{ initial: 'column', md: 'row' }}
-      className='xxs:flex-col h-full w-full min-h-[600px]'
-      align="center"
-      justify="center"
-      px="4"
-      gap='9'
-      mt={'6'}
-    >
-      <Card size="3" variant="surface" style={{ width: '100%', maxWidth: '600px', textAlign: 'center' }}>
-        <Heading size="9" mb="4" style={{ fontFamily: "Special Elite"}}>
-          Suspect
-        </Heading>
-        <Flex direction="column" gap="4" mt="4" style={{ margin: 'auto' }}>
-          <Text size="6" weight="bold" style={{fontFamily:"Special Elite"}}>
-            Deduction and Deception
-          </Text>
-          <Text size="3">
-            Suspect is a online game where players use their deduction skills to solve a mystery. Players can choose to play as the detective or a suspect in a multiplayer setting.
-          </Text>
-          <Flex direction="row" gap="4" justify="center">
-            <RouterLink to="/faq">
-            <Card
-              size="2"
-              variant="surface"
-              className="flex-1 text-center cursor-pointer transition-transform duration-300 hover:scale-105 border border-transparent hover:border-orange-500"
-            >
-              <Heading size="5">Single Player</Heading>
-              <Text size="3">
-                Play as the dectective and solve the mystery by gathering evidence and questioning AI suspects via real-time voice conversation.
-              </Text>
-            </Card>
-            </RouterLink>
-            <RouterLink to="/faq">
-            <Card
-              size="2"
-              variant="surface"
-              className="flex-1 text-center cursor-pointer transition-transform duration-300 hover:scale-105 border border-transparent hover:border-orange-500"
-            >
-              <Heading size="5">Multiplayer</Heading>
-              <Text size="3">
-                Enter the interrogation room as a suspect or the culprit. Use your wit to deceive the detective and other suspects to avoid getting framed...or caught!
-              </Text>
-            </Card>
-            </RouterLink>
-          </Flex>
-          <Text size="6" weight={'medium'}>
-            Join Suspect now and put your deductive skills to the test!
-          </Text>
-        </Flex>
-      </Card>
+      <Flex justify={'center'} align={'center'} style={{ minHeight: '100vh', width: '100%' }}>
       <Card size="3" variant="surface" style={{ width: '100%', padding: '60px', maxWidth: '600px' }}>
         <Tabs.Root defaultValue="account" className='w-full flex flex-col justify-center'>
           <Tabs.List className='mb-6 flex justify-center text-xl'>
@@ -277,7 +230,7 @@ const Login: React.FC = () => {
           </div>
         </Tabs.Root>
       </Card>
-    </Flex>
+      </Flex>
   );
 };
 

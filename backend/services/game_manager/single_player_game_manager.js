@@ -10,7 +10,9 @@ import {
   AnalysisSchema,
 } from "../../models/game-state-schema.js";
 import dotenv from "dotenv";
-import { set } from "zod";
+import { z } from "zod";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { validate as uuidValidate } from 'uuid';
 
 /** the game loop
  * Single Player:
@@ -34,18 +36,22 @@ dotenv.config({ path: "../../.env" });
 
 export class SinglePlayerGameManager extends GameManager {
   constructor(gameRoom, player, gameState) {
-    console.log("\n\n", gameRoom, player, gameState, "\n\n");
+    // console.log("\n\n", gameRoom, player, gameState, "\n\n");
     super();
     this.llmGameService = new OpenAIGameService();
     this.llmEloService = OpenAIEloService;
     this.currentPhase = null;
-    this.interrogationTimer = 10 * 60; // 10 minutes in seconds
+    this.interrogationTimer = 1 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
     // TODO: on construction, the game manager should try to pull the game state from the database
+    if(typeof gameState === 'string') {
+      this.gameState = JSON.parse(gameState);
+    } else {
     this.gameState = gameState;
+    }
     this.threadId = gameRoom.thread_id;
     this.playerId = player.id;
     this.roomId = gameRoom.id;
@@ -111,22 +117,23 @@ export class SinglePlayerGameManager extends GameManager {
     GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
-    
+
     // emit the game started event
     this.emit("game:started", {});
     this.emit("game:updated", this.gameState);
     const activeRound = this.gameState.rounds.find(
       (round) => round.status === "active"
     );
+    console.log(JSON.stringify(this.gameState));
     if (activeRound.type === "interrogation") {
-    this.startInterrogationPhase();
+      this.startInterrogationPhase();
     } else {
       this.startDeductionPhase();
     }
   }
 
   startInterrogationPhase() {
-    if(this.roundTimer > 0) {
+    if (this.roundTimer > 0) {
       console.log("Round timer is still running, cannot start new phase");
       return;
     }
@@ -134,7 +141,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("phase:started", { phase: this.currentPhase });
     // ... set up a 10-minute timer. On expire, go to next phase ...
     // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
-    
+
     const { clear } = startInterval(
       this.interrogationTimer,
       this.emitRoundTick.bind(this),
@@ -152,6 +159,98 @@ export class SinglePlayerGameManager extends GameManager {
     this.clearRoundTimer = clear;
   }
 
+  async createNewLead(sourceNode, targetNode, type) {
+    const newLead = {
+      source_node: sourceNode,
+      target_node: targetNode,
+      type: type,
+    };
+    this.gameState.deduction.edges.push(newLead);
+    await this.#calculateWarmth();
+  }
+
+  async removeLead(edgeId) {
+    try {
+      const index = this.gameState.deduction.edges.findIndex((edge) => {
+        const [sourceNodeId, targetNodeId] = edgeId.split("_");
+        console.log("sourceNodeId", sourceNodeId, "targetNodeId", targetNodeId);
+        return (
+          edge.source_node.id === sourceNodeId && edge.target_node.id === targetNodeId
+        );
+      });
+      if (index !== -1) {
+        this.gameState.deduction.edges.splice(index, 1);
+
+        await this.#calculateWarmth();
+      } else {
+        throw new Error("Edge not found in deduction graph");
+      }
+    } catch (error) {
+      console.error("Error removing edge from deduction graph:", error);
+      this.emit("deduction:error", error);
+    }
+  }
+
+  async #calculateWarmth() {
+    // Analyze the deduction graph to determine warmth
+    const messages = [
+      {
+        role: "system",
+        content:
+          "You are an expert detective analyzing a deduction graph to determine the progress of a player's investigation.",
+      },
+      {
+        role: "assistant",
+        content:
+          "Analyze the current deduction graph, which consists of nodes representing suspect statements, evidence, and suspects, and edges describing the relationships between them. Each edge type indicates how the source node relates to the target node (e.g., supports, contradicts, implicates).",
+      },
+      {
+        role: "user",
+        content: `Given the real story: ${
+          this.gameState.crime.realStory
+        }\n\nAnd the current deduction graph: ${JSON.stringify(
+          this.gameState.deduction
+        )}`,
+      },
+      {
+        role: "user",
+        content:
+          "Based on this information, provide a warmth score between 0 and 100 indicating how close the player is to solving the crime. with 0 being no progress and 100 being the case is solved. if the player is on the right track, provide a score closer to 100. if the player is far off, provide a score closer to 0. if the player has made no edges in the graph, provide a score of 0.",
+      },
+    ];
+
+    const responseFormat = zodResponseFormat(
+      z.object({
+        warmth: z
+          .number()
+          .describe(
+            "A number between 0 and 100 that represents how close the player's analysis is to the correct answer"
+          ),
+      }),
+      "warmth"
+    );
+
+    try {
+      const result = await this.llmGameService.createChatCompletion(
+        messages,
+        responseFormat
+      );
+      console.log("Warmth analysis result:", result);
+      this.gameState.deduction.warmth = result.warmth;
+
+
+    } catch (error) {
+      console.error("Error analyzing deduction graph:", error);
+      this.emit("deduction:error", error);
+      // this.gameState.deduction.warmth = 0;
+    }
+
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    this.emit("game:updated", this.gameState);
+  }
+
   addUserAudioToInputBuffer(audioBuffer) {
     if (!this.realtimeHandler) {
       console.error("No realtime session.");
@@ -160,8 +259,17 @@ export class SinglePlayerGameManager extends GameManager {
     this.realtimeHandler.addAudioToInputBuffer(audioBuffer);
   }
 
+  async createNewDeductionNode(node) {
+    console.log("Creating new deduction node", this.gameState);
+    this.gameState.deduction.nodes.push(node);
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    this.emit("game:updated", this.gameState);
+  }
+
   startNextPhase() {
-    if(this.roundTimer == null) {
+    if (this.roundTimer == null) {
       console.log("game hasnt started, cannot start new phase");
       return;
     }
@@ -181,7 +289,7 @@ export class SinglePlayerGameManager extends GameManager {
    * Open a realtime session using the llmService to start an interrogation with a suspect
    */
   async startInterrogation(suspectId) {
-    console.log("Starting interrogation with suspect", suspectId + '\n\n');
+    console.log("Starting interrogation with suspect", suspectId + "\n\n");
     const realtimeSocket = await this.llmGameService.openRealtimeConversation();
     const activeSuspect = this.gameState.suspects.find(
       (suspect) => suspect.id === suspectId
@@ -196,9 +304,7 @@ export class SinglePlayerGameManager extends GameManager {
       .find((round) => round.type === "interrogation")
       .conversations.find((conversation) => conversation.active);
 
-
     if (!activeConversation) {
-
       this.llmGameService.addMessageToThread(this.threadId, {
         role: "assistant",
         content: `The interrogation of ${activeSuspect.name}, ${activeSuspect.identity} has begun.`,
@@ -213,18 +319,17 @@ export class SinglePlayerGameManager extends GameManager {
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
-
     }
     // update the game state and set the conversation status to active
 
-    this.emit("game:updated", this.gameState );
+    this.emit("game:updated", this.gameState);
 
-  //   this.emit("realtime:message", {
-  //     transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
-  //     speaker: "assistant",
-  //     currentRoundTime:
-  //       this.roundTimer
-  // })
+    //   this.emit("realtime:message", {
+    //     transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
+    //     speaker: "assistant",
+    //     currentRoundTime:
+    //       this.roundTimer
+    // })
 
     this.emit("realtime:started", { suspectId });
   }
@@ -260,22 +365,28 @@ export class SinglePlayerGameManager extends GameManager {
           }, 10000);
 
           // Remove this listener so we only handle one final response
-          
+
           this.gameState = await this.llmGameService.runGameThread(
             process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-            this.threadId);
+            this.threadId
+          );
+
+          // set the most recent conversation to active false
+          const mostRecentConversation = this.gameState.rounds
+            .find((round) => round.type == "interrogation")
+            .conversations.find((conversation) => conversation.active);
+          if (mostRecentConversation) {
+            mostRecentConversation.active = false;
+          }
 
           await GameRoomService.updateGameRoom(this.roomId, {
             game_state: GameRoomService.encryptGameState(this.gameState),
           });
 
           setTimeout(() => {
-            this.emit("game:updated", this.gameState );
+            this.emit("game:updated", this.gameState);
           }, 5000);
           // Emit that the realtime session ended
-          
-
-          
         }
         if (parsed.type === "response.audio_transcript.done") {
           await this.llmGameService.addMessageToThread(this.threadId, {
@@ -286,21 +397,16 @@ export class SinglePlayerGameManager extends GameManager {
           this.realtimeHandler.removeCustomMessageListener(responseListener);
           resolve();
         }
-
       };
 
       // Attach the custom listener
       this.realtimeHandler.addCustomMessageListener(responseListener);
-
-
 
       // Send the "end interrogation" message
       this.realtimeHandler.sendMessage(event);
       // Then send a response.create event
       this.realtimeHandler.sendMessage({ type: "response.create" });
     });
-
-
   }
 
   /**
@@ -322,7 +428,7 @@ export class SinglePlayerGameManager extends GameManager {
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
-    this.emit("game:updated", this.gameState );
+    this.emit("game:updated", this.gameState);
     // if the game is not over, start the deduction phase
     if (this.gameState.status !== "finished") {
       this.startDeductionPhase();
@@ -331,18 +437,27 @@ export class SinglePlayerGameManager extends GameManager {
     }
   }
 
-  startDeductionPhase() {
-    if(this.roundTimer > 0) {
+  async startDeductionPhase() {
+    if (this.roundTimer > 0) {
       console.log("Round timer is still running, cannot start new phase");
       return;
     }
     this.currentPhase = "deduction";
     this.emit("phase:started", { phase: this.currentPhase });
+    // if the game state dosent have a voting round object, we should create one
+
     // ... set up deduce window ...
     // start the round timer for the deduction phase
+    // this.gameState.deduction.submissions = [];
+    // await GameRoomService.updateGameRoom(this.roomId, {
+    //   game_state: GameRoomService.encryptGameState(this.gameState),
+    // });
 
     // if the game state deduction object is empty, we should places nodes in the graph for each suspect and evidence
     if (this.gameState.deduction.nodes.length === 0) {
+      this.gameState.deduction.nodes = [];
+      this.gameState.deduction.edges = [];
+
       this.gameState.suspects.forEach((suspect) => {
         this.gameState.deduction.nodes.push({
           id: suspect.id,
@@ -366,13 +481,13 @@ export class SinglePlayerGameManager extends GameManager {
         });
       });
 
+
       // update the game state with the new nodes
-      GameRoomService.updateGameRoom(this.roomId, {
+      await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
 
-      this.emit("game:updated", this.gameState );
-
+      this.emit("game:updated", this.gameState);
     }
     const { clear } = startInterval(
       this.deductionTimer,
@@ -396,83 +511,80 @@ export class SinglePlayerGameManager extends GameManager {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
 
-    this.emit("game:updated", this.gameState );
+    this.emit("game:updated", this.gameState);
 
     // check if the game is over ( is should be ) and then run the elo rating calculation
     this.checkWinCondition();
   }
 
   async runDeductionAnalysis() {
-    try {
-      this.emit("deduction:started", result);
-      const { crime, evidence, suspects, deduction } = this.gameState;
-      // delete the isCulprit property from the suspects
-      suspects.forEach((suspect) => delete suspect.isCulprit);
+    console.log("Running deduction analysis...");
+    this.emit("deduction:started", {});
 
-      const deductionMessage = {
-        role: "user",
-        content: `Crime Offense Report:\n${JSON.stringify(
-          crime.offenseReport.map((report) => JSON.stringify(report))
-        )}\n\nEvidence:\n${JSON.stringify(
-          evidence
-        )}\n\nSuspects:\n${JSON.stringify(
-          suspects
-        )}\n\nDetective's deduction${this.analyzeDeductionGraph(deduction)}
-          \n\nPlease analyze the evidence like a seasoned police chief would and decide whether to accept the deduction as highly plausible. make your anaylsis based on the evidence and the suspect's responses to the detective's questions. repsond in a speaking language, like a police cheif would in a real conversation.`,
-      };
-
-      const messages = [
-        {
-          role: "system",
-          content: "You are a police chief analyzing a detective's deduction.",
-        },
-        deductionMessage,
-      ];
-
-      const responseFormat = zodResponseFormat(
-        AnalysisSchema,
-        "analysis_result"
-      );
-      console.log("Running deduction analysis...");
-      const completion = this.llmGameService.createChatCompletion(
-        messages,
-        responseFormat
-      );
-
-      const result = completion.choices[0].message.content;
-
-      console.log("Deduction analysis completed:", result);
-
-      this.emit("deduction:completed", result);
-
-      // add the result to the game thread as an assistant message
-      console.log(
-        "Adding deduction analysis to game thread...",
-        JSON.stringify(result)
-      );
-      await this.llmGameService.addMessageToThread(this.threadId, {
-        role: "assistant",
-        content: `Here is the police chief analysis of the current deduction: ${JSON.stringify(
-          result
-        )}`,
-      });
-
-      this.gameState = await this.llmGameService.runGameThread(
-        process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-        this.threadId
-      );
-      this.emit("game:updated",  this.gameState );
-      await GameRoomService.updateGameRoom(this.roomId, {
-        game_state: GameRoomService.encryptGameState(this.gameState),
-      });
-      // check the win condition
-      this.checkWinCondition();
-    } catch (error) {
-      this.emit("deduction:error", error);
-      console.error("Error running deduction analysis:", error);
-      throw error;
+    let adj = {}
+    console.log("Deduction graph", this.gameState.deduction.edges)
+    for(const edge of this.gameState.deduction.edges) {
+      if (!adj[edge.source_node.id]) {
+        adj[edge.source_node.id] = []
+      }
+      adj[edge.source_node.id].push({
+        target: edge.target_node.id,
+        type: edge.type
+      })
     }
+    let implicatedSuspect = null
+    let suspectImplications = {}
+    let visited = new Set()
+
+    console.log("Adjacency list", JSON.stringify(adj))
+
+    function dfs(currentNode, path, edgeTypes) {
+      if (visited.has(currentNode)) return
+      visited.add(currentNode)
+      path.push(currentNode)
+      // when we reach a node 
+      console.log("Current node", currentNode)
+      if(!adj[currentNode] || adj[currentNode].length === 0) {
+        return
+      }
+      for(const edge of adj[currentNode]) {
+        if (edge.type === "implicates") {
+          if (!suspectImplications[edge.target]) {
+            suspectImplications[edge.target] = 0
+          }
+          suspectImplications[edge.target]++
+        }
+        dfs(edge.target, [...path], [...edgeTypes, edge.type])
+      }
+      visited.delete(currentNode)
+    }
+
+    for(const node of Object.keys(adj)) {
+      dfs(node, [], [])
+    }
+
+    for(const [suspectId, implications] of Object.entries(suspectImplications)) {
+      if (implications > implicatedSuspect) {
+        implicatedSuspect = suspectId
+      }
+    }
+    const culprit = this.gameState.suspects.find(suspect => suspect.isCulprit)
+    console.log("Implicated suspect", implicatedSuspect, culprit.id)
+    if (culprit.id === implicatedSuspect) {
+      this.gameState.status = "finished"
+      this.gameState.outcome = 'win'
+      
+    } else {
+      this.gameState.status = "finished"
+      this.gameState.outcome = 'lose'
+    }
+    this.calculateGameResults();
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    this.emit("game:updated", this.gameState);
   }
+
 
   /**
    * Take the deduction graph and traverse in a depth-first search from each statement node in order to build the dedudction analysis that will be sent to the chat completion.
@@ -554,7 +666,7 @@ export class SinglePlayerGameManager extends GameManager {
     return analysisResults;
   }
 
-  async checkWinCondition() {
+  async calculateGameResults() {
     // ... if deduction accepted -> check culprit
     // if correct -> emit('game-won'), else -> emit('game-lost')
     if (this.gameState.status === "finished") {
@@ -565,22 +677,37 @@ export class SinglePlayerGameManager extends GameManager {
         this.playerId
       );
 
+      console.log("Player stats:", playerStats);
+
       await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats);
       const leaderboardUpdates = await this.llmEloService.processGameThread(
-        threadId
+        this.threadId
       );
+
 
       // update the leaderboard table
-      await LeaderboardService.updatePlayerStats(
-        leaderboardUpdates.playerResults
-      );
+      console.log("Leaderboard updates:", leaderboardUpdates);
+
+      // leaderboardUpdates.playerResults = leaderboardUpdates.playerResults.filter((result) => {
+      //   // check if the result.playerId is a valid uuid
+      //   console.log("Checking player ID:", result.playerId, uuidValidate(result.playerId));
+      //   return uuidValidate(result.playerId);
+      // })
+      // console.log("Updating player stats:", leaderboardUpdates.playerResults);
+      // await LeaderboardService.updatePlayerStats(
+      //   leaderboardUpdates.playerResults
+      // );
+
+      // const { oldRating, newRating, badges } = leaderboardUpdates.playerResults.find(
+      //   (result) => result.playerId === this.playerId
+      // );
 
       //emit the leaderboard updates to the client
-      this.emit("leaderboard:finished", {
-        oldRating,
-        newRating,
-        badges,
-      });
+      // this.emit("leaderboard:finished", {
+      //   oldRating,
+      //   newRating,
+      //   badges,
+      // });
 
       console.log("Game results and ELO changes processed successfully");
     } else {

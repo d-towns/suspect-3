@@ -177,10 +177,11 @@ export default class OpenAIGameService extends LLMGameService {
         model: "gpt-4o-2024-08-06",
         messages: messages,
         response_format: responseFormat,
+        max_completion_tokens: 500
       });
 
       const result = completion.choices[0].message.content;
-      return responseFormat.parse(result);
+      return JSON.parse(result);
     } catch (error) {
       console.error("Error in createChatCompletion:", error);
       return null;

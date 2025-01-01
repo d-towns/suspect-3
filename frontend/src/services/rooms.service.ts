@@ -34,8 +34,13 @@ export const roomsService = {
       const response = await axiosInstance.get(`/games/get-room/${roomId}`);
       if (response.data.room) {
         const decryptedGameState = await decryptGameState(response.data.room.game_state);
-
+        console.log('decryptedGameState:', decryptedGameState);
+        if(typeof decryptedGameState === 'string'){
+          return { ...response.data.room, game_state: JSON.parse(decryptedGameState) };
+        }
+        else {
         return { ...response.data.room, game_state: decryptedGameState };
+        }
       }
       throw new Error('Failed to fetch room');
     } catch (error) {

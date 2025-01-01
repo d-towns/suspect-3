@@ -143,6 +143,7 @@ Remember to be impartial but thorough in your investigation.`,
    - Time of occurrence
    - an offense reports that is a 3 part description of the crime and how the authroies currently understand the order of events. the offense reports should be detailed and provide a clear picture of the crime scene
    - the crime scenario has a culprit, and the goal of the game is to determine who the culprit is
+   - realStory is a 3 part description of the crime and how it actually happened. the real story should be detailed and provide a clear picture of the crime scene. it should align with the evidence and the suspects created in the game. it will not be revealed to the player until the end of the game.
 
 2. Create suspects:
     - Create 3 suspects for the crime scenario
@@ -167,7 +168,7 @@ Remember to be impartial but thorough in your investigation.`,
 5. Analyze voting rounds:
     - There should only ever be 2 rounds, the interrogation round and the voting round
     - there is one voting round where the player creates a deduction graph which implicates the culprit
-    - the players deduction, which includes 3 leads and a vote for who the culprit is, along with the analysis from their police chief, should be placed in the game thread
+    - the players deduction, which is a graph of nodes that can either be a suspect statement, a piece of evidence, or a suspect themselves. it should start with a warmth of 0 when the game state is first created
     - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
     - if the active deduction is accepted, but the vote is incorrect, the player loses the game, change the game status to finished and change the outcome to the player losing
     - if the active deduction is rejected, and the player has two deductions that are rejected, the player loses the game, change the game status to finished and change the outcome to the player losing
@@ -181,14 +182,11 @@ Remember to be impartial but thorough in your investigation.`,
       - The suspect attribute for each round should be the suspect ID
       - When the game state is first created, the first round should be an interrogation round.
       - Each round has a status, it is either inactive, active, or completed
-      - if both deductions have not been submitted, then at least one deduction should always be  active
     - voting round Rules:
       - the voting round involves the player creating leads and determining a culprit vote
       - At the each interrogation round, there should be a voting round where the player makes a deduction graph that will represent the players deduction
-      - the players deduction, which is a graph of nodes that can either be a suspect statement, a piece of evidence, or a suspect themselves, should be placed in the game thread
-      - the deduction.analysis.accepted value will be either true or false, depending on whether the police chief accepts the deduction as highly plausible
+      - the players deduction, which is a graph of nodes that can either be a suspect statement, a piece of evidence, or a suspect themselves.
       - if the players deduction is accepted, but the vote is incorrect, the player loses the game
-      - if the players had two deductions that are rejected (false), the player loses the game
       - if the players deduction is accepted and is correct, the player wins the game
 
   7. Determine if the game is finished:

@@ -18,7 +18,6 @@ class EventHandler extends EventEmitter {
 
   async onEvent(event) {
     try {
-      console.log(event);
       // Retrieve events that are denoted with 'requires_action'
       // since these will have our tool_calls
       if (event.event === "thread.run.requires_action") {
@@ -29,6 +28,7 @@ class EventHandler extends EventEmitter {
         );
       } else if (event.event === "thread.message.completed") {
         // Store the results for later use
+        console.log("Event data:", event.data.content[0].text.value);
         this.results = JSON.parse(event.data.content[0].text.value);
       }
     } catch (error) {
@@ -38,39 +38,41 @@ class EventHandler extends EventEmitter {
 
   async handleRequiresAction(data, runId, threadId) {
     try {
-      const toolOutputs =
-        data.required_action.submit_tool_outputs.tool_calls.map((toolCall) => {
-          if (toolCall.function.name === "calculateEloChanges") {
-            console.log(
-              "Calculating ELO changes for players:",
-              toolCall.function
-            );
-            return {
-              tool_call_id: toolCall.id,
-              output: OpenAIEloService.calculateEloChanges(
-                toolCall.function.arguments.players
-              ),
-            };
-          }
+      const toolCalls = data?.required_action?.submit_tool_outputs?.tool_calls || [];
+      // Only handle calls where function.name === "calculateEloChanges"
+      const toolOutputs = toolCalls
+        .filter(toolCall => toolCall.function?.name === "calculateEloChanges")
+        .map(toolCall => {
+          const parsedArgs = JSON.parse(toolCall.function.arguments);
+          console.log("Calculating ELO changes for players:", parsedArgs.players);
+          return {
+            tool_call_id: toolCall.id,
+            output: OpenAIEloService.calculateEloChanges(parsedArgs.players),
+          };
         });
-      // Submit all the tool outputs at the same time
+  
+      console.log("Filtered tool outputs:", toolOutputs);
+      // Make sure to await if 'submitToolOutputs' is async
       await this.submitToolOutputs(toolOutputs, runId, threadId);
     } catch (error) {
       console.error("Error processing required action:", error);
     }
+
   }
 
   async submitToolOutputs(toolOutputs, runId, threadId) {
     try {
       // Use the submitToolOutputsStream helper
-      const stream = this.client.beta.threads.runs.submitToolOutputsStream(
+      const stream = await this.client.beta.threads.runs.submitToolOutputsStream(
         threadId,
         runId,
         { tool_outputs: toolOutputs }
       );
+      console.log("Submitting tool outputs:", stream);
       for await (const event of stream) {
         this.emit("event", event);
       }
+      
     } catch (error) {
       console.error("Error submitting tool outputs:", error);
     }
@@ -153,7 +155,7 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
     }
   }
 
-  static async calculateEloChanges(players) {
+  static calculateEloChanges(players) {
     console.log("Calculating ELO changes for players:", players);
     const K = 32;
     const averageElo =
@@ -170,7 +172,9 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       };
       return ratingChange;
     });
-    return ratingChanges;
+    console.log("Rating changes:", ratingChanges);
+    console.log("Average Elo:", averageElo);
+    return JSON.stringify(ratingChanges);
   }
 
   /**
@@ -182,7 +186,7 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
   static async addPlayerEloToThread(threadId, players) {
     try {
       const message = `Current player ratings:\n${players
-        .map((p) => `Player ${p.id}: ${p.elo}`)
+        .map((p) => `Player ${p.user_id}: ${p.elo}`)
         .join(
           "\n"
         )}\n\nPlease analyze the game and calculate ELO changes based on player performance.`;
@@ -216,7 +220,11 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
         eventHandler.emit("event", event);
       }
 
+
+
       const leaderboardData = eventHandler.results;
+
+      console.log("Leaderboard data:", leaderboardData);
       
       return leaderboardData;
       // if (leaderboardData) {

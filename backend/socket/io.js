@@ -81,6 +81,10 @@ export class GameRoomSocketServer {
 
       socket.on("realtime:end", this.handleEndInterrogation.bind(this, socket));
       socket.on("deduction:lead:created", this.handleDeductionLeadCreated.bind(this, socket));
+      socket.on('deduction:node:created', this.handleDeductionNodeCreated.bind(this, socket));
+      socket.on('deduction:lead:removed', this.handleDeductionLeadRemoved.bind(this, socket));
+      socket.on("deduction:submit", this.handleSubmitDeduction.bind(this, socket));
+      socket.on("leaderboard:update", this.handleLeaderboardUpdate.bind(this, socket));
 
       // Multiplayer only
       socket.on(
@@ -89,7 +93,6 @@ export class GameRoomSocketServer {
       );
 
       // Single player only
-      socket.on("submit-deduction", this.handleSubmitDeduction.bind(this, socket));
 
       // heartbeat lister for client sockets connected to this server
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
@@ -213,8 +216,20 @@ export class GameRoomSocketServer {
   }
 
   async handleDeductionLeadCreated(socket, nodes) {
-    const { sourceNode, targetNode } = nodes;
-    this.roomGameManagers.get(socket.roomId).creteNewLead(sourceNode, targetNode);
+    const { sourceNode, targetNode, type } = nodes;
+    this.roomGameManagers.get(socket.roomId).createNewLead(sourceNode, targetNode, type);
+  }
+
+  async handleDeductionNodeCreated(socket, node) {
+    this.roomGameManagers.get(socket.roomId).createNewDeductionNode(node);
+  }
+
+  async handleDeductionLeadRemoved(socket, leadId) {
+    this.roomGameManagers.get(socket.roomId).removeLead(leadId);
+  }
+
+  async handleLeaderboardUpdate(socket, leaderboard) {
+    this.roomGameManagers.get(socket.roomId).calculateGameResults(leaderboard);
   }
 
   async handleVotingRoundVote(socket, vote) {
@@ -338,7 +353,8 @@ export class GameRoomSocketServer {
         };
       });
       console.log("Player IDs: ", playerIds + '\n\n\n');
-      const manager =  GameRoomManagerFactory.createGameRoomManager(mode, roomId, playerIds);
+      const gameRoom = await GameRoomService.getGameRoom(roomId);
+      const manager =  GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, null);
 
       this.attachGameManagerListeners(manager,roomId);
       
@@ -475,13 +491,20 @@ export class GameRoomSocketServer {
         
           this.roomGameManagers.set(roomId, gameManager);
         }
-
+        console.log("All in game:", allInGame);
+        console.log("Host ID:", gameRoom.host_id === socket.userId);
+        console.log(
+          "Has GameManager:",
+          gameManager !== undefined
+        );
+        console.log("Game State Status:", game_state.status !== "finished");
         if (
           allInGame &&
           gameRoom.host_id === socket.userId &&
-          gameManager &&
+          gameManager !== undefined &&
           game_state.status === 'active'
         ) {
+          console.log(  "asdfasdf" + game_state.status);
           gameManager.startGame();
           console.log(
             `All players in room ${socket.roomId} have joined the game. Game is eligible to start...`

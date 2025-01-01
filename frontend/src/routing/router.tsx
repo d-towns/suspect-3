@@ -8,6 +8,7 @@ import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Leaderboard from '../pages/leaderboard';
 import Terms from '../pages/terms';
+import Home from '../pages/home';
 
 const router = createBrowserRouter([
   {
@@ -16,6 +17,10 @@ const router = createBrowserRouter([
     children: [
       {
         path: '',
+        element: <Home />,
+      },
+      {
+        path: 'login',
         element: <Login />,
       },
       {

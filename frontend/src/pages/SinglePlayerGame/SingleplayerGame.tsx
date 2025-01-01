@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode } from '../../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode, DeductionEdge, EdgeType } from '../../models/game-state.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../../services/rooms.service';
 import { useAuth } from '../../context/auth.context';
-import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus } from 'react-icons/fi';
+import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus, FiInfo } from 'react-icons/fi';
 import AudioRecorder from '../../components/audioRecorder';
 import ResponseLoading from '../../components/responseLoading';
-import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton } from '@radix-ui/themes';
+import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, RadioCards, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -15,6 +15,9 @@ import { WavStreamPlayer } from 'wavtools';
 import { decryptGameState } from '../../utils/decrypt';
 import AnimatedChatBubble from '../../components/chatBubble';
 import AnimatedText from '../../components/animatedText';
+import { ReactFlow, ReactFlowProvider, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
+import Dagre from '@dagrejs/dagre';
+import '@xyflow/react/dist/style.css';
 
 /**
  * TODO:
@@ -26,6 +29,46 @@ import AnimatedText from '../../components/animatedText';
  * skip voting if there are less than 3 leads created
  * 
  */
+
+interface OffenseReportCardProps {
+    offenseReport: OffenseReportItem;
+    handleNext?: () => void;
+    size?: 'small' | 'large';
+}
+
+const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseReport, handleNext, size }) => {
+    return (
+        <Card className="p-8 offenseReport" style={{ width: size === 'large' ? '700px' : '400px' }} onClick={handleNext}>
+            <Inset clip="padding-box" side="top" pb="current">
+                <img
+                    src={offenseReport.imgSrc}
+                    className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
+                />
+            </Inset>
+
+            <div>
+                <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                    Time:
+                </Text>
+                <AnimatedText message={offenseReport.time} className='w-fit' animationSpeed={300} />
+            </div>
+            <div>
+                <Text size="6" as="span" align="center" mt="2" mr={'4'}>
+                    Location:
+                </Text>
+                <AnimatedText message={offenseReport.location} animationSpeed={150} />
+            </div>
+            <div className='max-w-[600px] min-h-[100px]'>
+                <AnimatedText message={offenseReport.description} animationSpeed={50} />
+            </div>
+            {handleNext && (
+            <div className='w-full text-center mt-9' >
+                <Text as='span' size='3' >Click to continue</Text>
+            </div>
+            )}
+        </Card>
+    );
+};
 
 interface OffenseReportProps {
     offenseReport: OffenseReportItem[] | null;
@@ -69,33 +112,7 @@ const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStar
                                 unmountOnExit
                             >
                                 <div ref={nodeRef}>
-                                    <Card className="p-8" style={{ width: '700px' }}>
-                                        <Inset clip="padding-box" side="top" pb="current">
-                                            <img
-                                                src={currentItem.imgSrc}
-                                                className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
-                                            />
-                                        </Inset>
-
-                                        <div>
-                                            <Text size="6" as="span" align="center" mt="2" mr={'4'}>
-                                                Time:
-                                            </Text>
-                                            <AnimatedText message={currentItem.time} animationSpeed={300} />
-                                        </div>
-                                        <div>
-                                            <Text size="6" as="span" align="center" mt="2" mr={'4'}>
-                                                Location:
-                                            </Text>
-                                            <AnimatedText message={currentItem.location} animationSpeed={150} />
-                                        </div>
-                                        <div className='min-w-[600px] min-h-[100px]'>
-                                            <AnimatedText message={currentItem.description} animationSpeed={50} />
-                                        </div>
-                                        <div className='w-full text-center mt-9' >
-                                            <Text as='span' size='3' >Click to continue</Text>
-                                        </div>
-                                    </Card>
+                                    <OffenseReportCard offenseReport={currentItem} handleNext={handleNext} />
                                 </div>
                             </CSSTransition>
                         </SwitchTransition>
@@ -153,46 +170,52 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, suspects, index }) => {
 
 interface ChiefCardProps {
     gameState: SingleGameState;
+    messages: string[];
     defaultMessage: string;
-    deduction: Deduction;
+    deduction?: Deduction;
 }
 
-const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction }) => {
-    return (
-        <Card variant='ghost' className='w-full min-w-[100px] text-center h-full border-gray-700 border' >
-            <Flex gap="4" direction="column" align={'center'}>
-                <Box>
+const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction, messages = [] }) => {
+    const [isOpen, setIsOpen] = useState(false);
 
+    return (
+        <Card
+            variant='ghost'
+            className={`w-[200px] text-center h-full border-gray-700 border p-4`}
+        >
+            <Flex gap="4" direction="column" align="center">
+                <Box>
                     <Avatar
                         src="https://i.ibb.co/GJWMFtf/chief-1.webp"
                         fallback="C"
                         size="6"
                     />
                     <Text size="2" as="p" align="center" mt={'3'}>
-                        Commisioner Gordon
+                        Commissioner Gordon
                     </Text>
                 </Box>
-                <Flex direction={'column'} gap={'2'}>
-                    <AnimatedChatBubble message={defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} />
-                    {/* <AnimatedChatBubble message={deduction?.analysis.analysis || defaultMessage} maxWidth='max-w-full' tailPosition='topRight' animationSpeed={50} /> */}
-                </Flex>
-                {/* {deduction?.submitted && (
-                    <Callout.Root
-                        className="my-4"
-                        color={deduction.analysis.accepted ? 'green' : 'red'}
-                    >
-                        <Callout.Icon>
-                            <IoAlertCircle />
-                        </Callout.Icon>
-                        <Callout.Text>
-                            <Text size="4">
-                                {deduction.analysis.accepted
-                                    ? 'Deduction accepted'
-                                    : 'Deduction denied'}
+                {isOpen && (
+                    <Flex direction="column" gap="2" style={{ overflowY: 'auto', width: '100%' }}>
+                        {messages.length > 0 ? (
+                            messages.map((msg, index) => (
+                                <Text size='1' key={index}>
+                                    {msg}
+                                </Text>
+                            ))
+                        ) : (
+                            <Text>
+                                {defaultMessage}
                             </Text>
-                        </Callout.Text>
-                    </Callout.Root>
-                )} */}
+                        )}
+                    </Flex>
+                )}
+                <Button
+                    variant="ghost"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="mt-2"
+                >
+                    {isOpen ? <FiChevronDown /> : <FiChevronUp />}
+                </Button>
             </Flex>
         </Card>
     );
@@ -339,26 +362,227 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
 //     }
 // ];
 
+
+function ClueNode({ data }: any) {
+    return (
+        <>
+            {data.type === 'suspect' ? <Handle type="target" id="implicates" position={Position.Left} style={{ height: '20px', width: '20px', zIndex: 10, top: 75, backgroundColor: 'darkred' }} /> : (
+                <>
+                    <Handle type="target" id="supports" position={Position.Left} style={{ height: '20px', width: '20px', zIndex: 10, top: 50, backgroundColor: 'cyan' }} />
+                    <Handle type="target" id="contradicts" position={Position.Left} style={{ height: '20px', width: '20px', zIndex: 10, top: 100, backgroundColor: 'gold' }} />
+                </>
+            )}
+            <Card variant="surface" className={`p-2 w-[400px] h-full flex flex-col gap-4`}>
+                <Text size="2" as='p' weight="bold" className=''>
+                    #{data.id} - {data.type}
+                </Text>
+                <Flex direction="row" gap="2" justify={'center'} align={'center'}>
+                    {data.type !== 'statement' &&
+                        <Avatar className='w-24 h-24' fallback={data.identity?.charAt(0)} src={data.imgSrc || '/backdoor.webp'} size="4" />
+                    }
+                    <Flex direction="column" gap="2" px={'4'}>
+                        <Text size="2" weight="bold">{data.speaker}</Text>
+                        <Text size="3">{data.description || data.identity || data.message}</Text>
+                    </Flex>
+                </Flex>
+
+            </Card>
+            <Handle type="source" position={Position.Right} id="a" style={{ height: '20px', width: '20px' }} />
+        </>
+    )
+}
+
+
+
+
+
+
 // VotingRound Component
+interface DeductionFlowProps {
+    gameState: SingleGameState;
+    handleCreateNewLead?: (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => void;
+    handleRemoveLead?: (id: string) => void;
+    handleSubmitDeduction?: () => void;
+
+    deductionLoading?: boolean;
+}
+
+const getLayoutedElements = (
+    nodes: Node[],
+    edges: Edge[],
+    options: { direction: string },
+) => {
+    const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: options.direction, ranksep: 250, nodesep: 150 });
+
+    edges.forEach((edge) => g.setEdge(edge.source, edge.target));
+    nodes.forEach((node) =>
+        g.setNode(node.id, {
+            ...node,
+            width: node.measured?.width ?? 0,
+            height: node.measured?.height ?? 0,
+        }),
+    );
+
+    Dagre.layout(g);
+
+    return {
+        nodes: nodes.map((node) => {
+            const pos = g.node(node.id);
+            const x = pos.x - (node.measured?.width ?? 0) / 2;
+            const y = pos.y - (node.measured?.height ?? 0) / 2;
+            return { ...node, position: { x, y }, id: node.id };
+        }),
+        edges,
+    };
+};
+
+const DeductionFlow: React.FC<DeductionFlowProps> = ({
+    gameState,
+    handleCreateNewLead,
+    handleRemoveLead,
+    handleSubmitDeduction,
+    deductionLoading = false,
+}) => {
+    const nodeTypes = useMemo(() => ({ clue: ClueNode }), []);
+    const [nodes, setNodes] = useState<Node[]>([]);
+    const [edges, setEdges] = useState<Edge[]>([]);
+
+    useEffect(() => {
+        const initialNodes: Node[] = (gameState.deduction?.nodes || []).map((node, i) => ({
+            id: node.id,
+            position: { x: 100 * i, y: 100 * i },
+            data: { label: node.data?.message, id: node.id, type: node.type, ...node.data, },
+            type: 'clue',
+        }));
+        setNodes(initialNodes);
+
+        const initialEdges: Edge[] = (gameState.deduction?.edges || []).map((edge) => ({
+            id: `${edge.source_node.id}_${edge.target_node.id}`,
+            source: edge.source_node.id,
+            target: edge.target_node.id,
+            label: edge.type,
+        }));
+        setEdges(initialEdges);
+        console.log('Initial nodes', initialNodes);
+        console.log('Initial edges', initialEdges);
+    }, []);
+
+    const onNodesChange = useCallback(
+        (changes: any) => setNodes((nds) => applyNodeChanges(changes, nds)),
+        [],
+    );
+    const onEdgesChange = useCallback(
+        (changes: any) => {
+            console.log("Edge changes", changes);
+            const change = changes[0];
+            if (change.type === 'remove' && handleRemoveLead) {
+                handleRemoveLead(change.id);
+            }
+            setEdges((eds) => applyEdgeChanges(changes, eds));
+
+        },
+        [],
+    );
+
+    const onLayout = useCallback(
+        (direction: string) => {
+            const layouted = getLayoutedElements(nodes, edges, { direction });
+            setNodes([...layouted.nodes]);
+            setEdges([...layouted.edges]);
+        },
+        [nodes, edges],
+    );
+
+    const suspectIsImplicated = useMemo(() => {
+        return gameState.deduction.edges.some((edge) => edge.type === 'implicates');
+    }, [gameState.deduction]);
+
+
+    const warmthBarColor = useMemo(() => {
+        if (gameState.deduction.warmth >= 75) return 'red';
+        if (gameState.deduction.warmth >= 50) return 'yellow';
+        if (gameState.deduction.warmth >= 25) return 'green';
+        return 'blue';
+    }, [gameState.deduction.warmth]);
+
+    const onConnect = useCallback(
+        (params: any) => {
+            setEdges((eds) => addEdge({ ...params, label: params.targetHandle }, eds));
+            const sourceNode = gameState.deduction.nodes.find((n) => n.id === params.source);
+            const targetNode = gameState.deduction.nodes.find((n) => n.id === params.target);
+            if (sourceNode && targetNode && handleCreateNewLead) handleCreateNewLead(sourceNode, targetNode, params.targetHandle);
+        },
+        [gameState, handleCreateNewLead],
+    );
+
+    return (
+        <ReactFlow
+            colorMode='dark'
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            fitView
+        >
+            <Background />
+            <Controls />
+            <Panel position="top-right" className="flex flex-col gap-4">
+                <Heading size="6">Layout Controls</Heading>
+                <Flex gap={'4'}>
+                    <Button variant='outline' onClick={() => onLayout('TB')}>Vertical</Button>
+                    <Button variant='outline' onClick={() => onLayout('LR')}>Horizontal</Button>
+                </Flex>
+            </Panel>
+            <Panel position="bottom-center" className="flex flex-col gap-4">
+                {!suspectIsImplicated && <Callout.Root size="1">
+                    <Callout.Icon>
+                        <FiInfo />
+                    </Callout.Icon>
+                    <Callout.Text>
+                        Implicate a suspect by linking a statement or evidence to them.
+                    </Callout.Text>
+                </Callout.Root>}
+                {handleSubmitDeduction &&
+                    <Button aria-disabled={!suspectIsImplicated || deductionLoading} disabled={!suspectIsImplicated || deductionLoading} onClick={() => handleSubmitDeduction()} variant='classic' size={'4'} > {deductionLoading ? <Spinner /> : 'Submit Deduction'}</Button>}
+            </Panel>
+            <Panel>
+                <Box width={'100px'} height={'200px'} className=' relativ'>
+
+                    <Progress size={'3'} max={100} value={gameState.deduction.warmth} color={warmthBarColor} className='h-32 w-32 rotate-[270deg]' />
+                </Box>
+            </Panel>
+        </ReactFlow>
+    );
+};
+
 interface VotingRoundProps {
     gameState: SingleGameState;
     killerVote: string | undefined;
     roundTimer: number;
     deductionSubmitted: boolean;
     handleStartNextRound: () => void;
-    handleCreateNewLead: (sourceNode: DeductionNode, targetNode: DeductionNode) => void;
+    handleCreateNewLead: (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => void;
+    handleRemoveLead: (id: string) => void;
+    handleCreateNewdeductionNode: (node: DeductionNode) => void;
     setKillerVote: React.Dispatch<React.SetStateAction<string | undefined>>;
     handleSubmitDeduction: () => void;
     handleShowGameOver: () => void;
     handleVoteSubmission: () => void;
     voteSubmitted: boolean;
+    deductionLoading: boolean;
 }
 
 const VotingRound: React.FC<VotingRoundProps> = ({
     gameState,
     killerVote,
     deductionSubmitted,
+    deductionLoading,
     handleCreateNewLead,
+    handleRemoveLead,
+    handleCreateNewdeductionNode,
     setKillerVote,
     handleSubmitDeduction,
     handleShowGameOver,
@@ -367,224 +591,95 @@ const VotingRound: React.FC<VotingRoundProps> = ({
     voteSubmitted,
 }) => {
     const cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?";
-
     const [activeConversation, setActiveConversation] = useState<Conversation | undefined>(undefined);
 
-    const [creatingEdge, setCreatingEdge] = useState(false);
-    const [sourceNode, setSourceNode] = useState<DeductionNode | null>(null);
-    const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [nodePositions, setNodePositions] = useState<{ [id: string]: { x: number; y: number } }>({});
-
-    const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-    const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
-
-    useEffect(() => {
-        if (!gameState?.deduction?.nodes) return;
-        const spacing = 150;
-        const newPositions: { [id: string]: { x: number; y: number } } = {};
-        gameState.deduction.nodes.forEach((node, i) => {
-            const row = Math.floor(i / 4);
-            const col = i % 4;
-            newPositions[node.id] = { x: col * spacing + 50, y: row * spacing + 50 };
-        });
-        setNodePositions(newPositions);
-    }, [gameState]);
-
-    const handleContainerMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (creatingEdge) {
-            setMousePos({ x: e.clientX, y: e.clientY });
-        }
-    };
-
-    const handleMouseDown = (nodeId: string, e: React.MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        setDraggingNodeId(nodeId);
-        setDragOffset({
-            x: e.clientX - (nodePositions[nodeId]?.x || 0),
-            y: e.clientY - (nodePositions[nodeId]?.y || 0),
-        });
-    };
-
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!draggingNodeId || !dragOffset) return;
-        e.preventDefault();
-        const newX = e.clientX - dragOffset.x;
-        const newY = e.clientY - dragOffset.y;
-
-        setNodePositions((prev) => ({
-            ...prev,
-            [draggingNodeId]: { x: newX, y: newY },
-        }));
-    };
-
-    const handleMouseUp = () => {
-        setDraggingNodeId(null);
-        setDragOffset(null);
-    };
-
     return (
-        <>
-            <Flex direction="row" gap="4" className="h-full">
-                <Flex direction="column" justify="center" align="center" gap="4" className="w-1/2 h-full">
-                    <ChiefCard gameState={gameState} defaultMessage={cheifMessage} deduction={gameState.deduction} />
-                </Flex>
-                <Tabs.Root defaultValue="deduction" className="w-full h-full">
-                    <Tabs.List className="w-full text-center justify-center mb-2 text-xl">
-                        <Tabs.Trigger value="deduction">"Deduction"</Tabs.Trigger>
-                        <Tabs.Trigger value="interrogations">Interrogations</Tabs.Trigger>
-                    </Tabs.List>
+        <Flex direction="row" gap="4" className="h-full">
+            <Tabs.Root defaultValue="deduction" className="w-full h-full">
+                <Tabs.List className="w-full text-center justify-center mb-2 text-xl">
+                    <Tabs.Trigger value="deduction">Deduction</Tabs.Trigger>
+                    <Tabs.Trigger value="interrogations">Interrogations</Tabs.Trigger>
+                </Tabs.List>
 
-                    <Tabs.Content value="interrogations" className="h-full">
-                        <Flex gap="4">
-                            <Box className="w-1/4 p-2 border-r flex flex-col gap-4">
-                                {gameState.rounds
-                                    .find((round) => round.type === "interrogation")
-                                    ?.conversations.map((conversation, index) => (
-                                        <Flex direction="column" gap="4" key={conversation.suspect + index}>
-                                            <Card
-                                                variant="surface"
-                                                className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
-                                                onClick={() => setActiveConversation(conversation)}
-                                            >
-                                                <Text size="2" weight="bold">
-                                                    {gameState.suspects.find((suspect) => suspect.id === conversation.suspect)?.name}
-                                                </Text>
-                                                <Text size="1" weight="light" ml="4">
-                                                    #{conversation.suspect}
-                                                </Text>
-                                            </Card>
-                                            {index <
-                                                (gameState?.rounds
-                                                    ?.find((round) => round.type === "interrogation")
-                                                    ?.conversations.length || 1) -
-                                                    1 && <Separator orientation="horizontal" size="4" />}
-                                        </Flex>
-                                    ))}
-                            </Box>
-                            <Box className="w-3/4 p-2">
-                                {activeConversation && (
-                                    <Box className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full">
-                                        {activeConversation.responses.map((response, index) => (
-                                            <Tooltip
-                                                key={index}
-                                                content={<Text size="2">Create a new lead from this statement</Text>}
-                                                className="p-1"
-                                            >
-                                                <Flex
-                                                    className="gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
-                                                    onClick={() =>
-                                                        handleCreateNewLead(
-                                                            { id: response.responseId } as DeductionNode,
-                                                            { id: response.responseId + "_target" } as DeductionNode
-                                                        )
-                                                    }
-                                                >
-                                                    <Box ml="2" mb="2">
-                                                        <Text as="p" weight="bold" size="3">
-                                                            {response.speaker}
-                                                        </Text>
-                                                    </Box>
-                                                    <Box className="col-span-7">
-                                                        <Text align="left" as="span">
-                                                            {response.message}
-                                                        </Text>
-                                                    </Box>
-                                                </Flex>
-                                            </Tooltip>
-                                        ))}
-                                    </Box>
-                                )}
-                            </Box>
-                        </Flex>
-                    </Tabs.Content>
-
-                    <Tabs.Content 
-                        value="deduction" 
-                        className="relative w-full h-full" 
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onMouseMoveCapture={handleContainerMouseMove}
-                    >
-                        {creatingEdge && sourceNode && (
-                            <svg
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    width: "100%",
-                                    height: "100%",
-                                    pointerEvents: "none",
-                                }}
-                            >
-                                <line
-                                    x1={nodePositions[sourceNode.id]?.x + 25 || 0}
-                                    y1={nodePositions[sourceNode.id]?.y + 10 || 0}
-                                    x2={mousePos.x}
-                                    y2={mousePos.y}
-                                    stroke="red"
-                                    strokeWidth="2"
-                                />
-                            </svg>
-                        )}
-                        {gameState.deduction?.nodes?.map((node) => {
-                            const { x, y } = nodePositions[node.id] || { x: 0, y: 0 };
-                            const isHovered = hoveredNode === node.id && creatingEdge && sourceNode?.id !== node.id;
-                            return (
-                                <Box
-                                    key={node.id}
-                                    style={{
-                                        position: "absolute",
-                                        left: x,
-                                        top: y,
-                                        opacity: isHovered ? 0.6 : 1,
-                                        maxWidth: 300,
-                                        height: 200,
-                                        cursor: "grab",
-                                    }}
-                                    onMouseEnter={() => creatingEdge && setHoveredNode(node.id)}
-                                    onMouseLeave={() => creatingEdge && setHoveredNode(null)}
-                                    onMouseDown={(e) => handleMouseDown(node.id, e)}
-
-                                >
-
-                                    {isHovered && (
-                                        <Text size="2" weight="bold" style={{ position: "absolute", top: 0, left: 0 }}>
-                                            connect evidence?
-                                        </Text>
-                                    )}
-                                    <Card variant="surface" className={`p-2 w-full h-full flex flex-col gap-4 relative hover:scale-105 hover:border duration-200 ease-in-out transition-all` + `${sourceNode?.id == node.id ? 'border-green-300 border scale-105 ' : ''}`}>
-                                        <Text size="1" as='p' weight="bold" className=''>
-                                            #{node.id} - {node.type}
-                                        </Text>
-                                        <Flex direction="row" gap="2" justify={'center'}>
-                                            <Avatar className='w-24 h-24' fallback={node.data?.identity?.charAt(0)} src={node.data.imgSrc || '/backdoor.webp'} size="4" />
-                                            <Text size="2">{node.data.description || node.data.identity}</Text>
-                                        </Flex>
-                                        <Button
-                                            size="2"
-                                            variant="outline"
-                                            onClick={() => {
-                                                if (creatingEdge && sourceNode) {
-                                                    handleCreateNewLead(sourceNode, node);
-                                                    setCreatingEdge(false);
-                                                } else {
-                                                    setCreatingEdge(true);
-                                                    setSourceNode(node);
-                                                }
-                                            }}
+                <Tabs.Content value="interrogations" className="h-full">
+                    <Flex gap="4">
+                        <Box className="w-1/4 p-2 border-r flex flex-col gap-4">
+                            {gameState.rounds
+                                .find((round) => round.type === "interrogation")
+                                ?.conversations.map((conversation, index) => (
+                                    <Flex direction="column" gap="4" key={conversation.suspect + index}>
+                                        <Card
+                                            variant="surface"
+                                            className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
+                                            onClick={() => setActiveConversation(conversation)}
                                         >
-                                            {(creatingEdge && sourceNode && node.id == sourceNode.id) ? "Cancel" : "Create Lead"}
-                                        </Button>
-                                    </Card>
+                                            <Text size="2" weight="bold">
+                                                {gameState.suspects.find((suspect) => suspect.id === conversation.suspect)?.name}
+                                            </Text>
+                                            <Text size="1" weight="light" ml="4">
+                                                #{conversation.suspect}
+                                            </Text>
+                                        </Card>
+                                        {index <
+                                            (gameState?.rounds
+                                                ?.find((round) => round.type === "interrogation")
+                                                ?.conversations.length || 1) -
+                                            1 && <Separator orientation="horizontal" size="4" />}
+                                    </Flex>
+                                ))}
+                        </Box>
+                        <Box className="w-3/4 p-2">
+                            {activeConversation && (
+                                <Box className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full">
+                                    {activeConversation.responses.map((response, index) => (
+                                        <Tooltip
+                                            key={index}
+                                            content={<Text size="2">Create a new lead from this statement</Text>}
+                                            className="p-1"
+                                        >
+                                            <Flex
+                                                className="gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
+                                                onClick={() => {
+                                                    handleCreateNewdeductionNode({
+                                                        id: `statement-${index}`,
+                                                        type: "statement",
+                                                        data: {
+                                                            speaker: response.speaker,
+                                                            message: response.message,
+                                                        },
+                                                    });
+                                                }}
+                                            >
+                                                <Box ml="2" mb="2">
+                                                    <Text as="p" weight="bold" size="3">
+                                                        {response.speaker}
+                                                    </Text>
+                                                </Box>
+                                                <Box className="col-span-7">
+                                                    <Text align="left" as="span">
+                                                        {response.message}
+                                                    </Text>
+                                                </Box>
+                                            </Flex>
+                                        </Tooltip>
+                                    ))}
                                 </Box>
-                            );
-                        })}
-                    </Tabs.Content>
-                </Tabs.Root>
-            </Flex>
-        </>
+                            )}
+                        </Box>
+                    </Flex>
+                </Tabs.Content>
+
+                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '90%' }}>
+                    <DeductionFlow
+                        gameState={gameState}
+                        handleRemoveLead={handleRemoveLead}
+                        handleCreateNewLead={handleCreateNewLead}
+                        handleSubmitDeduction={handleSubmitDeduction}
+                        deductionLoading={deductionLoading}
+                    />
+                </Tabs.Content>
+            </Tabs.Root>
+        </Flex>
     );
 };
 
@@ -621,7 +716,6 @@ interface InterrogationProps {
     emitEvent: (event: string, data: any) => void;
     handleAudioRecorded: (arrayBuffer: ArrayBuffer) => void;
     handleEndInterrogation: () => void
-    handleCreateNewLead: (evidence: string) => void;
 }
 
 /**
@@ -642,7 +736,6 @@ const Interrogation: React.FC<InterrogationProps> = ({
     emitEvent,
     handleAudioRecorded,
     handleEndInterrogation,
-    handleCreateNewLead,
     loadingSessionEnd,
 }) => {
     return (
@@ -666,7 +759,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
 
                                 {interrogationTranscript.map((conversationItem, index) => (
                                     <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
-                                        <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer' onClick={() => handleCreateNewLead(conversationItem.audioTranscript)}>
+                                        <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
                                             <Box ml="2" mb="2">
                                                 <Text as="p" weight="bold" size="3">
                                                     {Math.floor(conversationItem.timestamp / 60)}:
@@ -814,9 +907,10 @@ interface ResultsSummaryProps {
     elo: number;
     newElo: number | 0;
     badges: string[];
+    leaderboardUpdating: boolean;
 }
 
-const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) => {
+const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, leaderboardUpdating }) => {
     const eloDiff = newElo == 0 ? 0 : newElo - elo;
     return (
         <Flex direction={'column'} >
@@ -824,7 +918,12 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) 
             <Heading> Results Summary </Heading>
             <Flex gap={'5'} mt='3'>
                 <Flex gap={'3'} >
-
+                    {leaderboardUpdating ? (
+                        <Flex gap={'2'} align={'center'}>
+                       <Text> Updating Leaderboard </Text><Spinner size={'3'} />
+                       </Flex>
+                    ) : (
+                        <>
                     <Text weight='bold' size='9'>{newElo || elo}<Text size={'3'} as='p'> New Rank</Text></Text>
 
                     <Text>
@@ -852,6 +951,8 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges }) 
                             '----'
                         )}
                     </Text>
+                    </>
+                    )}
                 </Flex>
                 <Flex gap={'2'}>
                     {badges.map((badge, index) => (
@@ -869,39 +970,24 @@ interface GameOverProps {
     oldRating: number;
     newRating: number | 0
     badges: string[];
+    leaderboardUpdating: boolean;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRating: newElo, badges }) => {
+const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRating: newElo, badges, leaderboardUpdating }) => {
     return (
         <Flex direction="column" gap="4" >
             <Flex>
+                
                 <Box className="flex flex-col w-full items-center justify-center h-full">
-                    {gameState.outcome?.winner === 'innocents' ? (
+                    {gameState.outcome === 'win' ? (
                         <>
-                            <Heading className="mb-4 text-4xl">Innocents Win!</Heading>
-                            <Flex gap="4" mt={'9'} direction={{ sm: 'column', md: 'row' }} width={'80%'} justify={'between'} >
-                                <Flex gap="4" >
-                                    {gameState.suspects
-                                        .filter((suspect) => !suspect.isCulprit)
-                                        .map((suspect) => (
-                                            <Card
-                                                key={suspect.id}
-                                                size="2"
-                                                variant="surface"
-                                                className="p-4 flex flex-col items-center lg:animate-bounce  "
-                                            >
-                                                <Avatar
-                                                    fallback={suspect.name.charAt(0)}
-                                                    size="6"
-                                                />
-                                                <Text className="mt-2 text-xl">
-                                                    {suspect.identity.split(',')[0]}
 
-                                                </Text>
-                                            </Card>
-                                        ))}
+                            <Flex gap="4" mt={'9'} direction={{ sm: 'column', md: 'row' }} width={'50%'} justify={'between'} align={'center'}>
+                                <Flex direction={'column'}>
+                                    <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
+                                    <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
                                 </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} />
+                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating}/>
                             </Flex>
                         </>
                     ) : (
@@ -931,7 +1017,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
                                             ))}
                                     </Flex>
                                 </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} />
+                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating/>
                             </Flex>
                         </>
                     )}
@@ -939,11 +1025,30 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
             </Flex>
             <Heading>Game Summary</Heading>
             <ScrollArea
-                className="border rounded-lg p-4 h-full"
+                className="border rounded-lg p-4"
                 type="always"
                 scrollbars="vertical"
-                style={{ height: '50vh' }}
+                style={{ height: '80vh' }}
             >
+                <Flex direction="column" gap="4" className='h-full w-full' justify={'center'} align={'center'}> 
+                    <AnimatedText animationSpeed={200} className='text-5xl winnerHeader' message='The real story...' />
+                <Flex direction="row" gap="9" wrap="wrap" justify={'center'} align={'center'}>
+                    {gameState.crime?.realStory.map((storyItem, index) => (
+                        <OffenseReportCard key={index} offenseReport={storyItem} />
+                    ))}
+                </Flex>
+
+
+
+
+                <Flex direction="column" gap="4" className="w-full h-[600px] justify-center align-center">
+                    <AnimatedText animationSpeed={200} className='text-5xl text-center winnerHeader' message='Your Deduction' />
+                    <DeductionFlow
+                        gameState={gameState}
+                    />
+
+                </Flex>
+                </Flex>
             </ScrollArea>
         </Flex>
     );
@@ -994,11 +1099,13 @@ const SingleGame = () => {
     const nodeRef = useRef(null);
     const [roundTimer, setRoundTimer] = useState<number>(0);
     const [resultsLoading, setResultsLoading] = useState<boolean>(false);
+    const [leaderboardUpdating, setLeaderboardUpdating] = useState<boolean>(false);
     const [showGameOver, setShowGameOver] = useState<boolean>(false);
     const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
     const [responseLoading, setResponseLoading] = useState<boolean>(false);
     const [killerVote, setKillerVote] = useState<string>();
     const [deductionSubmitted, setDeductionSubmitted] = useState<boolean>(false);
+    const [deductionLoading, setDeductionLoading] = useState<boolean>(false);
     const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
     const [showSidebar, setShowSidebar] = useState<boolean>(false);
     const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
@@ -1113,31 +1220,14 @@ const SingleGame = () => {
         emitEvent('start-next-round', {});
     }
 
-    const handleCreateNewLead = (sourceNode :DeductionNode, targetNode: DeductionNode ) => {
+    const handleCreateNewLead = (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => {
 
         if (!gameState || !socket || !roomId || !sourceNode || !targetNode) {
             console.error('Invalid parameters when creating lead:', gameState, socket, roomId, sourceNode, targetNode);
             return;
         }
 
-        emitEvent('deduction:lead:created', { sourceNode, targetNode });
-
-
-        // log current suspect
-        // console.log(currentSuspect);
-        // if (!currentSuspect || !gameState || !roomId) {
-        //     return;
-        // }
-        // console.log('Creating new lead with evidence:', evidence);
-
-        // const newLead: Lead = {
-        //     evidence: evidence,
-        //     suspect: currentSuspect?.id || '',
-        // }
-
-        // roomsService.createNewLead(roomId, newLead).then(async (newGameState) => {
-        //     setGameState(await decryptGameState(newGameState));
-        // });
+        emitEvent('deduction:lead:created', { sourceNode, targetNode, type });
 
     }
 
@@ -1187,9 +1277,26 @@ const SingleGame = () => {
                 setLoadingSessionEnd(false);
             });
 
+            socket.on('deduction:completed', () => {
+                setDeductionLoading(false);
+            });
+
             socket.on('round:tick', (params: any) => {
                 setRoundTimer(params.countdown);
             });
+
+            socket.on('leaderboard:started', () => {    
+                setLeaderboardUpdating(true);
+            });
+
+            socket.on('leaderboard:finished', (leaderboardData: any) => {
+                setLeaderboardUpdating(false);
+
+                setPlayerBadges(leaderboardData.badges);
+                setPlayerElo({ oldRating: leaderboardData.oldRating, newRating: leaderboardData.newRating });
+
+            });
+
 
             socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
 
@@ -1223,7 +1330,7 @@ const SingleGame = () => {
     useEffect(() => {
         if (roomId) {
             roomsService.getRoom(roomId).then((room) => {
-
+                console.log('adsjhflaksdjhfkla:', room);
                 if (room.game_state && typeof room.game_state === 'object') {
                     console.log(room);
                     setGameState(room.game_state as SingleGameState);
@@ -1259,12 +1366,28 @@ const SingleGame = () => {
     };
 
     const handleSubmitDeduction = () => {
+        console.log('Submitting deduction');
         setDeductionSubmitted(true);
-        emitEvent('submit-deduction', roomId);
+        setDeductionLoading(true);
+        emitEvent('deduction:submit', roomId);
+    }
+
+    const handleCreateNewdeductionNode = (node: DeductionNode) => {
+        if (!gameState || !socket || !roomId) {
+            console.error('Invalid parameters when creating deduction node:', gameState, socket, roomId);
+            return;
+        }
+
+        emitEvent('deduction:node:created', node);
     }
 
     const handleStartGame = () => {
         emitEvent('game:start', roomId);
+    }
+
+    const handleRemoveLead = (id: string) => {
+        console.log('Removing lead:', id);
+        emitEvent('deduction:lead:removed', id);
     }
 
     const handleEndInterrogation = () => {
@@ -1274,6 +1397,13 @@ const SingleGame = () => {
         }
         setLoadingSessionEnd(true);
         emitEvent('realtime:end', roomId);
+    }
+
+    const updateLeaderboard = () => {
+        if (!socket) {
+            return;
+        }
+        emitEvent('leaderboard:update', {});
     }
 
     const renderGameContent = (): JSX.Element | null => {
@@ -1288,49 +1418,7 @@ const SingleGame = () => {
         }
 
         if (gameIsOver) {
-            if (showGameOver) {
-                return <GameOver oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} gameState={gameState} />;
-            } else {
-                // shwo the most recently complted round
-                const mostRecentRound = gameState.rounds.filter((round) => round.status === 'completed').slice().reverse()[0];
-                if (mostRecentRound) {
-                    if (mostRecentRound.type === 'interrogation') {
-                        return (
-                            <Interrogation
-                                wavStreamPlayerRef={wavStreamPlayerRef}
-                                gameState={gameState}
-                                roundTimer={roundTimer}
-                                currentSuspect={activeSuspect}
-                                interrogationTranscript={interrogationTranscript}
-                                responseLoading={responseLoading}
-                                audioTranscribing={audioTranscribing}
-                                socket={socket}
-                                emitEvent={emitEvent}
-                                loadingSessionEnd={loadingSessionEnd}
-                                handleEndInterrogation={handleEndInterrogation}
-                                handleAudioRecorded={handleAudioRecorded}
-                                handleCreateNewLead={handleCreateNewLead}
-                            />
-                        );
-                    } else if (mostRecentRound.type === 'voting') {
-                        return (
-                            <VotingRound
-                                roundTimer={roundTimer}
-                                gameState={gameState}
-                                handleShowGameOver={() => setShowGameOver(true)}
-                                deductionSubmitted={deductionSubmitted}
-                                handleCreateNewLead={handleCreateNewLead}
-                                handleStartNextRound={handleStartNextRound}
-                                handleVoteSubmission={handleVoteSubmission}
-                                killerVote={killerVote}
-                                setKillerVote={setKillerVote}
-                                handleSubmitDeduction={handleSubmitDeduction}
-                                voteSubmitted={voteSubmitted}
-                            />
-                        );
-                    }
-                }
-            }
+            return <GameOver gameState={gameState} oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} leaderboardUpdating={leaderboardUpdating} />
         }
 
         if (resultsLoading) {
@@ -1345,7 +1433,10 @@ const SingleGame = () => {
                     gameState={gameState}
                     handleShowGameOver={() => setShowGameOver(true)}
                     deductionSubmitted={deductionSubmitted}
+                    deductionLoading={deductionLoading}
                     handleCreateNewLead={handleCreateNewLead}
+                    handleRemoveLead={handleRemoveLead}
+                    handleCreateNewdeductionNode={handleCreateNewdeductionNode}
                     handleStartNextRound={handleStartNextRound}
                     handleVoteSubmission={handleVoteSubmission}
                     killerVote={killerVote}
@@ -1374,7 +1465,6 @@ const SingleGame = () => {
                         socket={socket}
                         emitEvent={emitEvent}
                         handleAudioRecorded={handleAudioRecorded}
-                        handleCreateNewLead={handleCreateNewLead}
                     />
                 );
             } else {
@@ -1427,7 +1517,7 @@ const SingleGame = () => {
         <>
             <Box className=" flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
-                {!showSidebar && (
+                {!showSidebar && !gameIsOver && (
                     <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
                 )}
                 {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4 z-10" >
@@ -1514,7 +1604,7 @@ const SingleGame = () => {
                     <Flex px={'2'} py={'5'} gap={'4'} className='w-full h-full' justify={'center'} align={'center'}>
                         {/* Left panel: Crime and Evidence */}
 
-                        <Box style={{ width: '100%', maxWidth: '1400px', height: '100%' }}>
+                        <Box style={{ width: '100%', maxWidth: '1600px', height: '100%' }}>
 
                             <SwitchTransition mode="out-in">
                                 <CSSTransition
@@ -1526,7 +1616,7 @@ const SingleGame = () => {
                                 >
 
                                     <div ref={nodeRef} className='h-full'>
-
+                                    <Button onClick={updateLeaderboard}> Updated Leaderboard</Button>
                                         {renderGameContent()}
                                     </div>
                                 </CSSTransition>

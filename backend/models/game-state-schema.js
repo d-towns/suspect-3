@@ -8,8 +8,7 @@ export const ConversationResponseSchema = z
   .strict();
 
 export const AnalysisSchema = z.object({
-  analysis: z.string(),
-  accepted: z.boolean(),
+  warmth: z.number().describe("A number between 0 and 1 representing how close the player's analysis is to the correct answer"),
 });
 
 export const SuspectTermpemtmentSchema = z.enum([
@@ -138,6 +137,13 @@ export const SinglePlayerGameStateSchema = z
             description: z.string(),
           })
         ),
+        realStory: z.array(
+          z.object({
+            location: z.string(),
+            time: z.string(),
+            description: z.string(),
+          })
+        ),
       })
       .strict(),
     player: z.string(),
@@ -185,7 +191,7 @@ export const SinglePlayerGameStateSchema = z
             })
             .strict()
         ),
-        submissions: z.array(AnalysisSchema),
+        warmth: z.number().describe("A number between 0 and 100 that represents how close the player's analysis is to the correct answer"),
       })
       .strict(),
     allEvidence: z.array(

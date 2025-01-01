@@ -56,6 +56,7 @@ export interface Crime {
   location: string;
   time: string;
   offenseReport: OffenseReportItem[];
+  realStory: OffenseReportItem[];
 }
 
 export interface Evidence {
@@ -69,10 +70,7 @@ export interface GameState {
     rounds: Round[];
     allEvidence: Evidence[];
     interrogationProgress?: number;
-    outcome?: {
-      winner: "innocents" | "culprit" | "not_yet_determined";
-      averageGuiltScore?: number;
-    };
+    outcome: 'win' | 'lose' | 'not_yet_determined';
   }
 
   export interface Suspect {
@@ -99,7 +97,7 @@ export interface GameState {
   export interface Deduction {
     nodes: DeductionNode[];
     edges: DeductionEdge[];
-    submissions : DeductionAnalysis[];
+    warmth: number;
   }
 
   export interface DeductionNode {
@@ -109,11 +107,12 @@ export interface GameState {
   }
 
   export interface DeductionEdge {
-    source_node: string;
-    target_node: string;
-    type: "supports" | "contradicts" | "implicates";
+    source_node: DeductionNode;
+    target_node: DeductionNode;
+    type: EdgeType;
   }
 
+  export type EdgeType = "supports" | "contradicts" | 'implicates'
   export interface SingleGameState extends GameState {
     player: string;
     suspects: Suspect[];

@@ -40,16 +40,24 @@ export class LeaderboardService {
      * Updates the player stats in the leaderboard.
      * @param {LeaderboardSchema.playerResults} playerResults 
      */
-    static async updatePlayerStats(playerResults) {
+    static async updatePlayerStats(playerResults, roomId) {
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
         console.log("Updating player stats:", playerResults);
         for (const result of playerResults) {
-          const { playerId, newRating, won } = result;
+          const { playerId, newRating, oldRating, won, badges} = result;
     
-          const { data, error } = await this.supabase
+          const { data, error } = await supabase
             .from("leaderboard")
-            .select("elo, multi_wins")
+            .select("elo, single_wins")
             .eq("user_id", playerId)
             .single();
+
+          
+          // insert a reord into the game results table with all of the player results
+          const { data: gameResultsData, error: gameResultsError } = await supabase
+            .from("game_results")
+            .insert([{user_id: playerId, new_rating: newRating, game_room_id: roomId, old_rating: oldRating, won: won, badges: badges.toString()}]).select().single();
+
     
           if (error) {
             console.error("Error fetching player stats:", error);
@@ -59,7 +67,7 @@ export class LeaderboardService {
           const newElo = newRating;
           const newWins = won ? data.multi_wins + 1 : data.multi_wins;
     
-          const { error: updateError } = await this.supabase
+          const { error: updateError } = await supabase
             .from("leaderboard")
             .update({ elo: newElo, multi_wins: newWins })
             .eq("user_id", playerId);

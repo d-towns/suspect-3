@@ -8,6 +8,11 @@
     font-family: 'Special Elite', cursive;
 }
 
+.winnerHeader {
+    font-family: 'Special Elite', cursive;
+}
+
+
 .accordionTrigger:hover {
 
         background-color: var(--accent-6);

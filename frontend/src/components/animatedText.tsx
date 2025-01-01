@@ -4,13 +4,14 @@ interface AnimatedTextProps {
   message: string;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   animationSpeed?: number;
+  className?: string;
 }
 
 const AnimatedText: React.FC<AnimatedTextProps> = ({
   message,
   size = 'md',
   animationSpeed = 100,
-
+  className = '',
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
@@ -36,7 +37,7 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   }, [animateText]);
 
   return (
-    <span className='text-left'>
+    <span className={`text-left ${className}`}>
       {displayedText}
       {!isAnimationComplete && <span className={`animate-pulse`}>|</span>}
     </span>
