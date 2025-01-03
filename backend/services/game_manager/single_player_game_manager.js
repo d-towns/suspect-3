@@ -7,12 +7,12 @@ import OpenAIEloService from "../llm/elo/openai-elo.service.js";
 import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player_realtime_handler.js";
 import {
   SinglePlayerGameStateSchema,
-  AnalysisSchema,
 } from "../../models/game-state-schema.js";
+import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { validate as uuidValidate } from 'uuid';
+import { validate as uuidValidate } from "uuid";
 
 /** the game loop
  * Single Player:
@@ -41,16 +41,16 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmGameService = new OpenAIGameService();
     this.llmEloService = OpenAIEloService;
     this.currentPhase = null;
-    this.interrogationTimer = 1 * 60; // 10 minutes in seconds
+    this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
     // TODO: on construction, the game manager should try to pull the game state from the database
-    if(typeof gameState === 'string') {
+    if (typeof gameState === "string") {
       this.gameState = JSON.parse(gameState);
     } else {
-    this.gameState = gameState;
+      this.gameState = gameState;
     }
     this.threadId = gameRoom.thread_id;
     this.playerId = player.id;
@@ -86,6 +86,16 @@ export class SinglePlayerGameManager extends GameManager {
       console.error("Error creating initial game state");
       return null;
     } else {
+      // TODO: use a chat completion to check for errors in the game state upon inital creation
+      // this.gameState = await this.checkGameState();
+      // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
+      if ( this.gameState.rounds.find((round) => round.type === "interrogation").conversations.length !== 0) {
+        this.gameState.rounds.find((round) => round.type === "interrogation").conversations = [];
+      }
+
+      this.gameState.status = "setup";
+
+
       // add the game state and thread id to the database
       await GameRoomService.updateGameRoom(this.roomId, {
         thread_id: this.threadId,
@@ -96,6 +106,37 @@ export class SinglePlayerGameManager extends GameManager {
       // TODO #io.js: the socket server needs to listen for the game-created event and emit that event to the client so that it can route to the correct game screen
       this.emit("game:created", { gameState: this.gameState });
     }
+  }
+
+  async checkGameState() {
+    // use a chat completion to check the game state. give the ai the current game stte along with the instruction from the game master to determine if the game is in the correct state.
+    // if the game is not in the correct state, the ai should return a new game state that is in the correct state
+    // if the game is in the correct state, the ai should return the current game state
+
+    const result = await this.llmGameService.createChatCompletion(
+      [
+        {
+          role: "system",
+          content:
+            "You are an assistant checking the game state to ensure that the game is in the correct state. Analyze the current game state and determine if the game is in the correct state.",
+        },
+        {
+          role: "user",
+          content: `Given the current game state: ${JSON.stringify(
+            this.gameState
+          )}, and these instructions: ${singlePlayerAssistantInstructions} 
+          determine if the game is in the correct state. If the game is not in the correct state, provide a new game state that is in the correct state.`,
+        },
+      ],
+      zodResponseFormat(
+        SinglePlayerGameStateSchema,
+        "gameState"
+      ), 1500
+    );
+
+    console.log('\n\n\n' + "Game state check result:", result + '\n\n\n' );
+
+    return result;
   }
 
   emitRoundTick(number) {
@@ -124,7 +165,7 @@ export class SinglePlayerGameManager extends GameManager {
     const activeRound = this.gameState.rounds.find(
       (round) => round.status === "active"
     );
-    console.log(JSON.stringify(this.gameState));
+    console.log("Active round:", activeRound);
     if (activeRound.type === "interrogation") {
       this.startInterrogationPhase();
     } else {
@@ -152,6 +193,8 @@ export class SinglePlayerGameManager extends GameManager {
     const activeConversation = this.gameState.rounds
       .find((round) => round.type === "interrogation")
       .conversations.find((conversation) => conversation.active);
+
+      console.log("Active conversation", activeConversation);
     if (activeConversation) {
       this.startInterrogation(activeConversation.suspect);
     }
@@ -167,6 +210,7 @@ export class SinglePlayerGameManager extends GameManager {
     };
     this.gameState.deduction.edges.push(newLead);
     await this.#calculateWarmth();
+    this.emit("deduction:completed", {});
   }
 
   async removeLead(edgeId) {
@@ -175,7 +219,8 @@ export class SinglePlayerGameManager extends GameManager {
         const [sourceNodeId, targetNodeId] = edgeId.split("_");
         console.log("sourceNodeId", sourceNodeId, "targetNodeId", targetNodeId);
         return (
-          edge.source_node.id === sourceNodeId && edge.target_node.id === targetNodeId
+          edge.source_node.id === sourceNodeId &&
+          edge.target_node.id === targetNodeId
         );
       });
       if (index !== -1) {
@@ -215,7 +260,7 @@ export class SinglePlayerGameManager extends GameManager {
       {
         role: "user",
         content:
-          "Based on this information, provide a warmth score between 0 and 100 indicating how close the player is to solving the crime. with 0 being no progress and 100 being the case is solved. if the player is on the right track, provide a score closer to 100. if the player is far off, provide a score closer to 0. if the player has made no edges in the graph, provide a score of 0.",
+          "Based on this information, provide a warmth score between 0 and 100 indicating how close the player is to solving the crime. with 0 being no progress and 100 being the case is solved. if the player is on the right track, provide a score closer to 100. if the player is far off, provide a score closer to 0. if the player has made no edges in the graph, provide a score of 0. Also, provide a brief explanation of your analysis. the explanation should be in the form of a first person statment from the partner of the police detective who is creating the deduction. the explanation should only be a few sentences long.",
       },
     ];
 
@@ -226,6 +271,7 @@ export class SinglePlayerGameManager extends GameManager {
           .describe(
             "A number between 0 and 100 that represents how close the player's analysis is to the correct answer"
           ),
+        explanation: z.string().describe("A brief explanation of the analysis"),
       }),
       "warmth"
     );
@@ -237,8 +283,10 @@ export class SinglePlayerGameManager extends GameManager {
       );
       console.log("Warmth analysis result:", result);
       this.gameState.deduction.warmth = result.warmth;
-
-
+      if (!this.gameState.deduction.feedback) {
+        this.gameState.deduction.feedback = [];
+      }
+      this.gameState.deduction.feedback.push(result.explanation);
     } catch (error) {
       console.error("Error analyzing deduction graph:", error);
       this.emit("deduction:error", error);
@@ -300,6 +348,35 @@ export class SinglePlayerGameManager extends GameManager {
       this,
       activeSuspect
     );
+
+    this.realtimeHandler.addCustomMessageListener(async (data) => {
+      const parsed = JSON.parse(data);
+
+    const activeSuspect = this.gameState.rounds
+    .find((round) => round.type === "interrogation")
+    .conversations?.at(-1)?.suspect;
+      if (parsed.type === "conversation.item.input_audio_transcription.completed") {
+        // add the transcription to the game state active conversation
+        this.gameState.rounds
+    .find((round) => round.type === "interrogation")
+    .conversations?.at(-1)?.responses.push({
+          speaker: "Detective",
+          message: parsed.transcript
+        });
+      } else if (parsed.type === "response.audio_transcript.done") {
+        // add the transcription to the game state active conversation
+        this.gameState.rounds
+    .find((round) => round.type === "interrogation")
+    .conversations?.at(-1)?.responses.push({
+          speaker: activeSuspect,
+          message: parsed.transcript
+        });
+      }
+    });
+
+
+        
+
     const activeConversation = this.gameState.rounds
       .find((round) => round.type === "interrogation")
       .conversations.find((conversation) => conversation.active);
@@ -365,27 +442,32 @@ export class SinglePlayerGameManager extends GameManager {
           }, 10000);
 
           // Remove this listener so we only handle one final response
+          this.gameState.rounds
+            .find((round) => round.type == "interrogation")
+            .conversations.find((conversation) => conversation.active).active = false;
 
-          this.gameState = await this.llmGameService.runGameThread(
-            process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-            this.threadId
-          );
+
+            await GameRoomService.updateGameRoom(this.roomId, {
+              game_state: GameRoomService.encryptGameState(this.gameState),
+            });
+          
+            setTimeout(() => {
+              this.emit("game:updated", this.gameState);
+            }, 5000);
+             
+          // this.gameState = await this.llmGameService.runGameThread(
+          //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+          //   this.threadId
+          // );
 
           // set the most recent conversation to active false
-          const mostRecentConversation = this.gameState.rounds
-            .find((round) => round.type == "interrogation")
-            .conversations.find((conversation) => conversation.active);
-          if (mostRecentConversation) {
-            mostRecentConversation.active = false;
-          }
+          
 
-          await GameRoomService.updateGameRoom(this.roomId, {
-            game_state: GameRoomService.encryptGameState(this.gameState),
-          });
 
-          setTimeout(() => {
-            this.emit("game:updated", this.gameState);
-          }, 5000);
+
+          // setTimeout(() => {
+          //   this.emit("game:updated", this.gameState);
+          // }, 5000);
           // Emit that the realtime session ended
         }
         if (parsed.type === "response.audio_transcript.done") {
@@ -481,7 +563,6 @@ export class SinglePlayerGameManager extends GameManager {
         });
       });
 
-
       // update the game state with the new nodes
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
@@ -521,62 +602,68 @@ export class SinglePlayerGameManager extends GameManager {
     console.log("Running deduction analysis...");
     this.emit("deduction:started", {});
 
-    let adj = {}
-    console.log("Deduction graph", this.gameState.deduction.edges)
-    for(const edge of this.gameState.deduction.edges) {
+    let adj = {};
+    console.log("Deduction graph", this.gameState.deduction.edges);
+    for (const edge of this.gameState.deduction.edges) {
       if (!adj[edge.source_node.id]) {
-        adj[edge.source_node.id] = []
+        adj[edge.source_node.id] = [];
       }
       adj[edge.source_node.id].push({
         target: edge.target_node.id,
-        type: edge.type
-      })
+        type: edge.type,
+      });
     }
-    let implicatedSuspect = null
-    let suspectImplications = {}
-    let visited = new Set()
+    let implicatedSuspect = null;
+    let maxImplications = 0;
+    let suspectImplications = {};
+    let visited = new Set();
 
-    console.log("Adjacency list", JSON.stringify(adj))
+    console.log("Adjacency list", JSON.stringify(adj));
 
     function dfs(currentNode, path, edgeTypes) {
-      if (visited.has(currentNode)) return
-      visited.add(currentNode)
-      path.push(currentNode)
-      // when we reach a node 
-      console.log("Current node", currentNode)
-      if(!adj[currentNode] || adj[currentNode].length === 0) {
-        return
+      if (visited.has(currentNode)) return;
+      visited.add(currentNode);
+      path.push(currentNode);
+      // when we reach a node
+      console.log("Current node", currentNode);
+      if (!adj[currentNode] || adj[currentNode].length === 0) {
+        return;
       }
-      for(const edge of adj[currentNode]) {
+      for (const edge of adj[currentNode]) {
         if (edge.type === "implicates") {
           if (!suspectImplications[edge.target]) {
-            suspectImplications[edge.target] = 0
+            suspectImplications[edge.target] = 0;
           }
-          suspectImplications[edge.target]++
+          suspectImplications[edge.target]++;
         }
-        dfs(edge.target, [...path], [...edgeTypes, edge.type])
+        dfs(edge.target, [...path], [...edgeTypes, edge.type]);
       }
-      visited.delete(currentNode)
+      visited.delete(currentNode);
     }
 
-    for(const node of Object.keys(adj)) {
-      dfs(node, [], [])
+    for (const node of Object.keys(adj)) {
+      dfs(node, [], []);
     }
 
-    for(const [suspectId, implications] of Object.entries(suspectImplications)) {
-      if (implications > implicatedSuspect) {
-        implicatedSuspect = suspectId
+    for (const [suspectId, implications] of Object.entries(
+      suspectImplications
+    )) {
+      if (implications > maxImplications) {
+        maxImplications = implications;
+        implicatedSuspect = suspectId;
       }
     }
-    const culprit = this.gameState.suspects.find(suspect => suspect.isCulprit)
-    console.log("Implicated suspect", implicatedSuspect, culprit.id)
+    const culprit = this.gameState.suspects.find(
+      (suspect) => suspect.isCulprit
+    );
+    console.log("Implicated suspect", implicatedSuspect, culprit.id);
+    this.emit("deduction:completed", {});
     if (culprit.id === implicatedSuspect) {
-      this.gameState.status = "finished"
-      this.gameState.outcome = 'win'
-      
+      this.gameState.status = "finished";
+      this.gameState.outcome = "win";
     } else {
-      this.gameState.status = "finished"
-      this.gameState.outcome = 'lose'
+      this.gameState.status = "finished";
+      this.gameState.outcome = "lose";
     }
     this.calculateGameResults();
     await GameRoomService.updateGameRoom(this.roomId, {
@@ -584,7 +671,6 @@ export class SinglePlayerGameManager extends GameManager {
     });
     this.emit("game:updated", this.gameState);
   }
-
 
   /**
    * Take the deduction graph and traverse in a depth-first search from each statement node in order to build the dedudction analysis that will be sent to the chat completion.
@@ -684,23 +770,29 @@ export class SinglePlayerGameManager extends GameManager {
         this.threadId
       );
 
-
       // update the leaderboard table
       console.log("Leaderboard updates:", leaderboardUpdates);
 
-      leaderboardUpdates.playerResults = leaderboardUpdates.playerResults.filter((result) => {
-        // check if the result.playerId is a valid uuid
-        console.log("Checking player ID:", result.playerId, uuidValidate(result.playerId));
-        return uuidValidate(result.playerId);
-      })
+      leaderboardUpdates.playerResults =
+        leaderboardUpdates.playerResults.filter((result) => {
+          // check if the result.playerId is a valid uuid
+          console.log(
+            "Checking player ID:",
+            result.playerId,
+            uuidValidate(result.playerId)
+          );
+          return uuidValidate(result.playerId);
+        });
       console.log("Updating player stats:", leaderboardUpdates.playerResults);
       await LeaderboardService.updatePlayerStats(
-        leaderboardUpdates.playerResults
+        leaderboardUpdates.playerResults,
+        this.roomId
       );
 
-      const { oldRating, newRating, badges } = leaderboardUpdates.playerResults.find(
-        (result) => result.playerId === this.playerId
-      );
+      const { oldRating, newRating, badges } =
+        leaderboardUpdates.playerResults.find(
+          (result) => result.playerId === this.playerId
+        );
 
       console.log(oldRating, newRating, badges);
 

@@ -56,7 +56,12 @@ export class LeaderboardService {
           // insert a reord into the game results table with all of the player results
           const { data: gameResultsData, error: gameResultsError } = await supabase
             .from("game_results")
-            .insert([{user_id: playerId, new_rating: newRating, game_room_id: roomId, old_rating: oldRating, won: won, badges: badges.toString()}]).select().single();
+            .upsert([{user_id: playerId, new_rating: newRating, game_room_id: roomId, old_rating: oldRating, won: won, badges: badges}]).select().single();
+
+          console.log("Game results inserted:", gameResultsData);
+          if (gameResultsError) {
+            console.error("Error inserting game results:", gameResultsError);
+          }
 
     
           if (error) {
@@ -78,6 +83,24 @@ export class LeaderboardService {
             console.error("Error updating player stats:", updateError);
           }
         }
+      }
+
+
+      static async getGameResultsForUser(userId, gameId) {
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        const { data, error } = await supabase
+          .from("game_results")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("game_room_id", gameId).single();
+
+          console.log("Game results for user:", data);
+      
+        if (error) {
+          throw new Error(`Error fetching game results: ${error.message}`);
+        }
+      
+        return { data, error };
       }
 
     

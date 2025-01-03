@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
-import OpenaiGameService from "../services/openai_game_service.js";
 import { GameRoomService } from "../services/game_room/game_room.service.js";
 import { GameRoomManagerFactory } from "../services/game_manager/game_manager_factory.js";
 
@@ -15,7 +14,7 @@ export class GameRoomSocketServer {
       return GameRoomSocketServer.instance;
     }
 
-    this.openaiGameService = new OpenaiGameService();
+    // this.openaiGameService = new OpenaiGameService();
     if (!httpServer) {
       this.io = new Server(3001, {
         cors: {
@@ -87,10 +86,10 @@ export class GameRoomSocketServer {
       socket.on("leaderboard:update", this.handleLeaderboardUpdate.bind(this, socket));
 
       // Multiplayer only
-      socket.on(
-        "voting-round-vote",
-        this.handleVotingRoundVote.bind(this, socket)
-      );
+      // socket.on(
+      //   "voting-round-vote",
+      //   this.handleVotingRoundVote.bind(this, socket)
+      // );
 
       // Single player only
 
@@ -183,9 +182,14 @@ export class GameRoomSocketServer {
   }
 
   handleStartGame(socket, roomId) {
-
-    this.roomGameManagers.get(roomId).startGame();
+    try {
+      this.roomGameManagers.get(roomId).startGame();
+    } catch (error) {
+      console.error(`Error in handleStartGame: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
+
   /**
    * Handles the submission of a deduction by a user.
    *
@@ -194,69 +198,109 @@ export class GameRoomSocketServer {
    * @param {Object} deduction - The deduction submitted by the user.
    */
   async handleSubmitDeduction(socket, roomId, deduction) {
-    this.roomGameManagers.get(socket.roomId).runDeductionAnalysis(deduction);
+    try {
+      this.roomGameManagers.get(socket.roomId).runDeductionAnalysis(deduction);
+    } catch (error) {
+      console.error(`Error in handleSubmitDeduction: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleStartInterrogation(socket, suspectId) {
-    if(!socket.roomId) {
-      console.log("Socket room id is undefined");
-      return;
+    try {
+      if(!socket.roomId) {
+    console.log("Socket room id is undefined");
+    return;
+      }
+      console.log("Starting interrogation for suspect:", suspectId);
+      this.roomGameManagers.get(socket.roomId).startInterrogation(suspectId);
+    } catch (error) {
+      console.error(`Error in handleStartInterrogation: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
     }
-    console.log("Starting interrogation for suspect:", suspectId);
-    this.roomGameManagers.get(socket.roomId).startInterrogation(suspectId);
   }
 
   async handleEndInterrogation(socket) {
-    console.log("Ending interrogation...");
-    this.roomGameManagers.get(socket.roomId).endInterrogation();
+    try {
+      console.log("Ending interrogation...");
+      this.roomGameManagers.get(socket.roomId).endInterrogation();
+    } catch (error) {
+      console.error(`Error in handleEndInterrogation: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleStartNextRound(socket, roomId) {
-    this.roomGameManagers.get(socket.roomId).startNextPhase();
+    try {
+      this.roomGameManagers.get(socket.roomId).startNextPhase();
+    } catch (error) {
+      console.error(`Error in handleStartNextRound: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleDeductionLeadCreated(socket, nodes) {
-    const { sourceNode, targetNode, type } = nodes;
-    this.roomGameManagers.get(socket.roomId).createNewLead(sourceNode, targetNode, type);
+    try {
+      const { sourceNode, targetNode, type } = nodes;
+      this.roomGameManagers.get(socket.roomId).createNewLead(sourceNode, targetNode, type);
+    } catch (error) {
+      console.error(`Error in handleDeductionLeadCreated: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleDeductionNodeCreated(socket, node) {
-    this.roomGameManagers.get(socket.roomId).createNewDeductionNode(node);
+    try {
+      this.roomGameManagers.get(socket.roomId).createNewDeductionNode(node);
+    } catch (error) {
+      console.error(`Error in handleDeductionNodeCreated: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleDeductionLeadRemoved(socket, leadId) {
-    this.roomGameManagers.get(socket.roomId).removeLead(leadId);
+    try {
+      this.roomGameManagers.get(socket.roomId).removeLead(leadId);
+    } catch (error) {
+      console.error(`Error in handleDeductionLeadRemoved: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
   }
 
   async handleLeaderboardUpdate(socket, leaderboard) {
-    this.roomGameManagers.get(socket.roomId).calculateGameResults(leaderboard);
-  }
-
-  async handleVotingRoundVote(socket, vote) {
-    console.log("Voting round vote received:", vote);
     try {
-      await OpenaiGameService.addVotingRoundVote(socket.roomId, vote);
-
-      // check to see if all players have voted
-
-      const currentRoundVotes =
-        (this.roomGameManagers.get(socket.roomId).currentRoundVotes || 0) + 1;
-
-      this.roomGameManagers.set(socket.roomId, {
-        ...this.roomGameManagers.get(socket.roomId),
-        currentRoundVotes,
-      });
-      const numberOfPlayers = this.getPlayersInRoom(socket.roomId).length;
-
-      // if all players have voted, clear the round timer and start the next round
-
-      if (currentRoundVotes === numberOfPlayers) {
-        this.roomGameManagers.get(socket.roomId).clearRoundTimer();
-      }
+      this.roomGameManagers.get(socket.roomId).calculateGameResults(leaderboard);
     } catch (error) {
-      console.error("Error adding voting round vote:", error);
+      console.error(`Error in handleLeaderboardUpdate: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
     }
   }
+
+  // async handleVotingRoundVote(socket, vote) {
+  //   console.log("Voting round vote received:", vote);
+  //   try {
+  //     await OpenaiGameService.addVotingRoundVote(socket.roomId, vote);
+
+  //     // check to see if all players have voted
+
+  //     const currentRoundVotes =
+  //       (this.roomGameManagers.get(socket.roomId).currentRoundVotes || 0) + 1;
+
+  //     this.roomGameManagers.set(socket.roomId, {
+  //       ...this.roomGameManagers.get(socket.roomId),
+  //       currentRoundVotes,
+  //     });
+  //     const numberOfPlayers = this.getPlayersInRoom(socket.roomId).length;
+
+  //     // if all players have voted, clear the round timer and start the next round
+
+  //     if (currentRoundVotes === numberOfPlayers) {
+  //       this.roomGameManagers.get(socket.roomId).clearRoundTimer();
+  //     }
+  //   } catch (error) {
+  //     console.error("Error adding voting round vote:", error);
+  //   }
+  // }
 
   async handleRealtimeAudioResponse(socket, audioData) {
     const manager = this.roomGameManagers.get(socket.roomId);

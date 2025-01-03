@@ -319,7 +319,9 @@ export const Lobby: React.FC = () => {
                 </Flex>
               ))}
               <Box className='mt-4'>
-{ lobbyState.players.size < 2 && lobbyState.room?.mode == 'multi'      &&         <Callout.Root size='1' className='my-2 flex items-center'>
+                {lobbyState.room?.mode == 'multi' && (
+                  <>{
+lobbyState.players.size < 2    &&        <Callout.Root size='1' className='my-2 flex items-center'>
                   <Callout.Icon>
                     <IoAlertCircle />
                   </Callout.Icon>
@@ -327,6 +329,7 @@ export const Lobby: React.FC = () => {
                     {lobbyState.players.size < 2 && 'A minimum of 2 players are required to start the game. Invite your friends to join!'}
                   </Callout.Text>
                 </Callout.Root>}
+
                 <Flex align="center" gap="2" mt='4'>
                   <TextField.Root
                     placeholder="Invite other players by email"
@@ -336,6 +339,7 @@ export const Lobby: React.FC = () => {
                   />
                   <Button onClick={handleSendInvite}>Send Invite</Button>
                 </Flex>
+                </>)}
               </Box>
             </Box>
           </Box>

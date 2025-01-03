@@ -97,7 +97,7 @@ const Home: React.FC = () => {
 
       >
       <Flex direction="row" gap="4" mb="6" className='h-full z-10'>
-        <Link to='/play'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link>
+        <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link>
         <Separator orientation="vertical" size={'2'} />
         <Link to='/faq'> <Text size={'8'} as='span' className='main-link z-10'>How To Play</Text></Link>
         <Separator orientation="vertical" size={'2'} />
@@ -107,7 +107,7 @@ const Home: React.FC = () => {
 
       </Flex>
             {sampleOffenses.map((offense, index) => (
-        <div className='absolute' key={index}>
+        <div className='absolute h-fit top-0 left-0 z-[-10]' key={index}>
           <AnimatePresence>
 {cardsRendered[index].rendered &&
         <motion.div
@@ -131,20 +131,20 @@ const Home: React.FC = () => {
         ))}
                 <>
         {sampleAnimatedTexts.map((text, i) => (
-          <div className='absolute' key={i}>
+          <div className='absolute h-fit z-[-10]' key={i}>
           <AnimatePresence key={i}>
             {animatedTextsState[i].rendered && (
               <motion.div
                 initial={{
                   opacity: 0,
                   ...(Math.random() > 0.5
-                    ? { x: Math.random() * 200 }
-                    : { y: Math.random() * 200 })
+                    ? { x: Math.random() * 500 }
+                    : { y: Math.random() * 700 })
                 }}
                 animate={{
                   opacity: 0.2,
-                  x: Math.random() * 200,
-                  y: Math.random() * 200
+                  x: Math.random() * 500,
+                  y: Math.random() * 700
                 }}
                 exit={{
                   opacity: 0,

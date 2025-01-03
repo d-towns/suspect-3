@@ -98,6 +98,7 @@ export interface GameState {
     nodes: DeductionNode[];
     edges: DeductionEdge[];
     warmth: number;
+    feedback: string[];
   }
 
   export interface DeductionNode {

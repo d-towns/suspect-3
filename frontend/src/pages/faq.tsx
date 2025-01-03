@@ -1,11 +1,11 @@
 import React from 'react';
-import { Box, Heading, Text, Card, Grid, Tabs } from '@radix-ui/themes';
+import { Box, Heading, Text, Card, Grid, Tabs, Flex } from '@radix-ui/themes';
 import './faq.css';
 
 const FAQ: React.FC = () => {
 
     return (
-        <Box as="div" className="max-w-7xl mx-auto">
+        <Box as="div" className="max-w-7xl mx-auto faq-container">
             <Box className=" p-6 rounded-lg shadow-lg game-heading">
                 <Heading as="h2" size="8" mb="4" className='game-heading'>
                     Game Overview
@@ -15,52 +15,67 @@ const FAQ: React.FC = () => {
                 </Text>
             </Box>
             <Box className=" p-6 rounded-lg shadow-lg mt-6 w-full">
-                <Heading as="h2" size="6" mb="4">
-                    How to Play
-                </Heading>
                 <Tabs.Root defaultValue="single" aria-label="Game Mode Tabs">
-                    <Tabs.List>
-                        <Tabs.Trigger value="single">Single Player</Tabs.Trigger>
-                        <Tabs.Trigger value="multi">Multiplayer</Tabs.Trigger>
+                    <Tabs.List className='w-full flex justify-center'>
+                        <Tabs.Trigger value="single" className='text-3xl game-heading'>Single Player</Tabs.Trigger>
+                        <Tabs.Trigger value="multi" className='text-3xl game-heading'>Multiplayer</Tabs.Trigger>
                     </Tabs.List>
                     <Tabs.Content value="single">
-                        <Grid columns={{ sm: '2' }} gap="4" mt={'5'}>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
+                        <Grid columns={{ sm: '1' }} gap="9" mt={'5'}>
+                            <Flex>
+                                <Box width={'50%'}>
+                                <Heading as="h3" size="6" mb="2">
                                     Step 1
                                 </Heading>
-                                <Text>Join a game room and wait for the game to start.</Text>
-                            </Card>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
+                                <Text size={'8'}>Once the game is started, you will be shown an offense report. This is what the authorities currently know about the crime</Text>
+                                </Box>
+                                <img src="/offense-report.gif" alt="Single Player" className="w-1/2" />
+                                
+                            </Flex>
+                            <Flex>
+                                <Box width={'50%'}>
+                                <Heading as="h3" size="6" mb="2">
                                     Step 2
                                 </Heading>
-                                <Text>Once the game starts, you will be assigned an identity and 3 pieces of evidence.</Text>
-                            </Card>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
+                                <Text size={'8'}>You will then have 10 minutes to interrogate any suspects you want, one at a time. Ask them about the crime and their involvement in it</Text>
+                                </Box>
+                                <img src="/interrogation.gif" alt="Single Player" className="w-1/2" />
+                                
+                            </Flex>
+                            <Flex>
+                                <Box width={'50%'}>
+                                <Heading as="h3" size="6" mb="2">
                                     Step 3
                                 </Heading>
-                                <Text>When it's your turn, enter the room and interact with the interrogator.</Text>
-                            </Card>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
+                                <Flex direction={'column'} gap={'6'}>
+                                <Text as='p' size={'6'} >
+                                    All of the evidence, suspects, and pieces of the offense report will be available to you, as well as all the transcripts of all suspect interrogations.
+                                </Text>
+                                <Text as='p' size={'6'} >
+                                    Connect these pieces of information to form a deduction: who you think is the suspect, and why.
+                                </Text>
+                                <Text as='p' size={'6'} >
+                                    Use the warmth meter and your partner, Jr. Detective Gordon to help you make your deduction.
+                                </Text>
+                                </Flex>
+                                </Box>
+                                <img src="/deduction.gif" alt="Single Player" className="w-1/2" />
+                                
+                            </Flex>
+                            <Flex>
+                                <Box width={'50%'}>
+                                <Heading as="h3" size="6" mb="2">
                                     Step 4
                                 </Heading>
-                                <Text>Use the evidence to interrogate each Ai suspect that enters the room.</Text>
-                            </Card>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
-                                    Step 5
-                                </Heading>
-                                <Text>After all players have been interrogated, make your final guess as to who the culprit is</Text>
-                            </Card>
-                            <Card variant="surface" className="p-4 rounded-lg">
-                                <Heading as="h3" size="3" mb="2">
-                                    Step 6
-                                </Heading>
-                                <Text>If your choice is correct, you win! If you don't...hand in your badge detective!</Text>
-                            </Card>
+                                <Flex direction={'column'} gap={'6'}>
+                                <Text size={'8'}>Submit Your deduction and find out if you solved the crime!</Text>
+                                <Text size={'8'}>If you are correct, you win! If you are incorrect, you lose.</Text>
+                                <Text size={'8'}>You will get a updated leaderboard rating as well as custom badges that describe how you play</Text>
+                                </Flex>
+                                </Box>
+                                <img src="/results.gif" alt="Single Player" className="w-1/2" />
+                                
+                            </Flex>
                         </Grid>
                     </Tabs.Content>
                     <Tabs.Content value="multi" mt={'5'}>

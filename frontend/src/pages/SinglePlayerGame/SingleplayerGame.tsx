@@ -4,11 +4,12 @@ import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseRep
 import { Badge as GameResultBadge } from '../../models/gameResults.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../../services/rooms.service';
+import { leaderboardService } from '../../services/leaderboard.service';
 import { useAuth } from '../../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus, FiInfo } from 'react-icons/fi';
 import AudioRecorder from '../../components/audioRecorder';
 import ResponseLoading from '../../components/responseLoading';
-import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, Tooltip, Avatar, Separator, HoverCard, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress } from '@radix-ui/themes';
+import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, RadioCards, Tooltip, Avatar, Separator, HoverCard, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress, Container } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -17,6 +18,7 @@ import { decryptGameState } from '../../utils/decrypt';
 import AnimatedText from '../../components/animatedText';
 import { ReactFlow, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
 import Dagre from '@dagrejs/dagre';
+import { findImplicatedSuspect } from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
 
 /**
@@ -33,10 +35,11 @@ import '@xyflow/react/dist/style.css';
 interface OffenseReportCardProps {
     offenseReport: OffenseReportItem;
     handleNext?: () => void;
-    size?: 'small' | 'large' | 'mini'
+    size?: 'small' | 'large' | 'mini' | 'xl'
+    index?: number;
 }
 
-export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseReport, handleNext, size }) => {
+export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseReport, handleNext, size, index }) => {
     function calculateWidth() {
         switch (size) {
             case 'small':
@@ -50,13 +53,58 @@ export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseRep
         }
 
     }
+
+    const sampleImage = [
+        '/backdoor.webp',
+        '/thief-stealing.webp',
+        '/multi-player-splash.webp'
+    ]
     const width = calculateWidth();
 
+    if (size === 'xl') {
+        return (
+            <Card className="p-8 offenseReport flex h-full" style={{ width: '1400px' }} onClick={handleNext}>
+                <Flex direction={'column'} className='w-full'>
+                    <Flex className='w-full'>
+                        <img
+                            src={offenseReport.imgSrc || sampleImage[index || 0]}
+                            className="block object-cover w-full max-h-[800px] bg-gray-200 rounded"
+                        />
+
+                        <Flex direction='column' gap='9' className='w-full ml-5'>
+                            <div>
+                                <Text size="9" as="span" align="center" mt="2" mr={'4'}>
+                                    Time:
+                                </Text>
+                                <AnimatedText message={offenseReport.time} className='w-fit text-3xl' animationSpeed={300} />
+                            </div>
+                            <div>
+                                <Text size="9" as="span" align="center" mt="2" mr={'4'}>
+                                    Location:
+                                </Text>
+                                <AnimatedText className='w-fit text-xl' message={offenseReport.location} animationSpeed={150} />
+                            </div>
+                            <div className='max-w-[600px] min-h-[100px] self-start'>
+                                <AnimatedText className='w-fit text-3xl text-left self-start' message={offenseReport.description} animationSpeed={50} />
+                            </div>
+
+                        </Flex>
+                    </Flex>
+                    {handleNext && (
+                        <div className='w-full text-center mt-6 justify-self-end' >
+                            <Text as='span' className='w-full' size='7' >Click to continue</Text>
+                        </div>
+                    )}
+                </Flex>
+            </Card>
+        );
+    }
+
     return (
-        <Card className="p-8 offenseReport" style={{ width:width }} onClick={handleNext}>
+        <Card className="p-8 offenseReport" style={{ width: width }} onClick={handleNext}>
             <Inset clip="padding-box" side="top" pb="current">
                 <img
-                    src={offenseReport.imgSrc}
+                    src={offenseReport.imgSrc || sampleImage[index || 0]}
                     className="block object-cover w-full h-64 sm:h-80 md:h-90 bg-gray-200"
                 />
             </Inset>
@@ -77,12 +125,14 @@ export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseRep
                 <AnimatedText message={offenseReport.description} animationSpeed={50} />
             </div>
             {handleNext && (
-            <div className='w-full text-center mt-9' >
-                <Text as='span' size='3' >Click to continue</Text>
-            </div>
+                <div className='w-full text-center mt-9' >
+                    <Text as='span' size='3' >Click to continue</Text>
+                </div>
             )}
         </Card>
     );
+
+
 };
 
 interface OffenseReportProps {
@@ -116,8 +166,8 @@ const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStar
                 timeout={500}
                 unmountOnExit
             >
-                <Flex direction="column" align="center" justify="center" gap="4" className='offenseReport '>
-                    <div onClick={handleNext} style={{ cursor: 'pointer' }}>
+                <Flex direction="column" align="center" justify="center" gap="4" className='offenseReport h-full'>
+                    <div onClick={handleNext} style={{ cursor: 'pointer' }} className='h-full flex justify-center items-center'>
                         <SwitchTransition mode="out-in">
                             <CSSTransition
                                 key={currentIndex}
@@ -126,8 +176,8 @@ const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStar
                                 timeout={500}
                                 unmountOnExit
                             >
-                                <div ref={nodeRef}>
-                                    <OffenseReportCard offenseReport={currentItem} handleNext={handleNext} />
+                                <div ref={nodeRef} className='h-full'>
+                                    <OffenseReportCard offenseReport={currentItem} index={currentIndex} size='xl' handleNext={handleNext} />
                                 </div>
                             </CSSTransition>
                         </SwitchTransition>
@@ -192,37 +242,83 @@ interface ChiefCardProps {
 
 const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction, messages = [] }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(messages.length);
+    const [openMessage, setOpenMessage] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            setUnreadCount(0);
+        }
+    }, [isOpen]);
+
+    const handleMessageClick = (index: number) => {
+        setOpenMessage(index);
+    };
+
+    const handleBackClick = () => {
+        setOpenMessage(null);
+    };
 
     return (
         <Card
             variant='ghost'
-            className={`w-[200px] text-center h-full border-gray-700 border p-4`}
+            className={`w-[200px] text-center h-fit border-gray-700 border p-1`}
         >
             <Flex gap="4" direction="column" align="center">
-                <Box>
+                <Box className="relative">
                     <Avatar
                         src="https://i.ibb.co/GJWMFtf/chief-1.webp"
                         fallback="C"
-                        size="6"
+                        size="4"
                     />
+                    {unreadCount > 0 && (
+                        <Box
+                            className="absolute top-0 right-0 w-4 h-4 rounded-full"
+                            style={{ backgroundColor: 'darkred' }}
+                        >
+                            <Text size="1" align="center">
+                                {unreadCount}
+                            </Text>
+                        </Box>
+                    )}
                     <Text size="2" as="p" align="center" mt={'3'}>
-                        Commissioner Gordon
+                        Jr. Detective Gordon
                     </Text>
                 </Box>
-                {isOpen && (
-                    <Flex direction="column" gap="2" style={{ overflowY: 'auto', width: '100%' }}>
-                        {messages.length > 0 ? (
-                            messages.map((msg, index) => (
-                                <Text size='1' key={index}>
-                                    {msg}
+                {isOpen && openMessage === null && (
+                    <ScrollArea style={{ height: '300px', width: '100%' }}>
+                        <Flex direction="column" gap="2">
+                            {messages.length > 0 ? (
+                                messages.map((msg, index) => (
+                                    <Box
+                                        key={index}
+                                        onClick={() => handleMessageClick(index)}
+                                        className="w-full p-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors cursor-pointer"
+                                    >
+                                        <Text size="3">Message {index + 1}</Text>
+                                    </Box>
+                                ))
+                            ) : (
+                                <Text size='3'>
+                                    {defaultMessage}
                                 </Text>
-                            ))
-                        ) : (
-                            <Text>
-                                {defaultMessage}
-                            </Text>
-                        )}
-                    </Flex>
+                            )}
+                        </Flex>
+                    </ScrollArea>
+                )}
+                {isOpen && openMessage !== null && (
+                    <Box style={{ width: '100%' }}>
+                        <Button
+                            variant="ghost"
+                            onClick={handleBackClick}
+                            className="mb-2"
+                        >
+                            Back
+                        </Button>
+                        <Box className="w-full p-2 bg-gray-800 rounded">
+                            <Text size="3">{messages[openMessage]}</Text>
+                        </Box>
+                    </Box>
                 )}
                 <Button
                     variant="ghost"
@@ -294,18 +390,20 @@ interface PlayerCardProps {
     suspect: Suspect | undefined;
     variant: CardProps['variant'];
     onClick?: () => void;
+    disabled?: boolean;
 }
 const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
     suspect,
     variant,
     size = 'small',
+    disabled,
     onClick,
 }) => {
     if (!suspect) return null;
 
     if (size === 'small') {
         return (
-            <Card variant={variant} onClick={onClick} className='cursor-pointer'>
+            <Card variant={variant} onClick={onClick} className='cursor-pointer' >
                 <Box key={suspect.id}>
                     <Flex gap="4" align="center">
                         <Avatar fallback={suspect.name.charAt(0)} src={suspect.imgSrc} />
@@ -327,9 +425,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
         <Card
             variant={variant}
             className="flex flex-col items-center cursor-pointer p-4 transition-transform hover:scale-105 hover:shadow-[0_0_10px_5px_rgba(255,255,255,0.25)]"
-            onClick={() => {
-                if (onClick) onClick()
-            }}
+
         >
             <Avatar fallback={suspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
             <Text as="p" weight="bold" size="8" mt="3">
@@ -513,12 +609,24 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
         return gameState.deduction.edges.some((edge) => edge.type === 'implicates');
     }, [gameState.deduction]);
 
+    const implcatedSuspect = useMemo(() => {
+        return gameState.suspects.find((suspect) => suspect.id === findImplicatedSuspect(gameState));
+    }, [gameState.deduction]);
+
+
 
     const warmthBarColor = useMemo(() => {
         if (gameState.deduction.warmth >= 75) return 'red';
         if (gameState.deduction.warmth >= 50) return 'yellow';
         if (gameState.deduction.warmth >= 25) return 'green';
         return 'blue';
+    }, [gameState.deduction.warmth]);
+
+    const warmthMessage = useMemo(() => {
+        if (gameState.deduction.warmth >= 75) return 'Hot';
+        if (gameState.deduction.warmth >= 50) return 'Warm';
+        if (gameState.deduction.warmth >= 25) return 'Cool';
+        return 'Cold';
     }, [gameState.deduction.warmth]);
 
     const onConnect = useCallback(
@@ -545,29 +653,67 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
             <Background />
             <Controls />
             <Panel position="top-right" className="flex flex-col gap-4">
-                <Heading size="6">Layout Controls</Heading>
+                <Heading size="3" className='w-full text-center'>Layout Controls</Heading>
                 <Flex gap={'4'}>
                     <Button variant='outline' onClick={() => onLayout('TB')}>Vertical</Button>
                     <Button variant='outline' onClick={() => onLayout('LR')}>Horizontal</Button>
                 </Flex>
             </Panel>
-            <Panel position="bottom-center" className="flex flex-col gap-4">
-                {!suspectIsImplicated && <Callout.Root size="1">
+            <Panel position="bottom-right" className="flex flex-col gap-4">
+                {!suspectIsImplicated ? <Callout.Root size="1" style={{ width: '200px' }}>
                     <Callout.Icon>
                         <FiInfo />
                     </Callout.Icon>
                     <Callout.Text>
                         Implicate a suspect by linking a statement or evidence to them.
                     </Callout.Text>
-                </Callout.Root>}
+                </Callout.Root> :
+                    <>
+                        <Text size="3" weight="bold">Implicated Suspect</Text>
+                        {implcatedSuspect && <SuspectCard suspect={implcatedSuspect} key={implcatedSuspect.id} variant='surface' />}
+                    </>
+                }
                 {handleSubmitDeduction &&
                     <Button aria-disabled={!suspectIsImplicated || deductionLoading} disabled={!suspectIsImplicated || deductionLoading} onClick={() => handleSubmitDeduction()} variant='classic' size={'4'} > {deductionLoading ? <Spinner /> : 'Submit Deduction'}</Button>}
             </Panel>
             <Panel>
-                <Box width={'100px'} height={'200px'} className=' relativ'>
+                <Box className='relative w-[200px] '>
+                    <Tooltip className='z-10' content="The warmth meter indicates how close you are to solving the crime.">
+                        <Heading size="3" className='text-center mb-3'>
+                            Warmth Meter
 
-                    <Progress size={'3'} max={100} value={gameState.deduction.warmth} color={warmthBarColor} className='h-32 w-32 rotate-[270deg]' />
+                            <FiInfo className='ml-1 cursor-pointer inline' />
+                        </Heading>
+                    </Tooltip>
+                    {!deductionLoading ? <Text size="5" weight="bold" className='absolute top-[55%] z-10 left-[40%]'>{warmthMessage}</Text> :
+                        <Spinner className='absolute top-[40%] z-10 left-[45%]' />}
+                    <Progress size={'3'} max={100} duration="10s" value={gameState.deduction.warmth} color={warmthBarColor} className='h-32 w-32 rotate-[270deg] m-auto' />
+                    <Tooltip content="Your partner will provide feedback on your deductions here." className='z-10'>
+                        <Box className='absolute top-48 left-6 w-full h-full m-auto'>
+
+                            <ChiefCard gameState={gameState} defaultMessage="Implicate a suspect by linking a statement or evidence to them." messages={gameState.deduction.feedback} />
+                        </Box>
+                    </Tooltip>
                 </Box>
+            </Panel>
+
+            <Panel position="top-center" className="legend-panel p-4">
+                <Card variant="surface" className="legend-card">
+                    <Flex direction="row" gap="2">
+                        <Flex align="center" gap="2">
+                            <Box style={{ backgroundColor: '#8B0000', width: '16px', height: '16px' }} />
+                            <Text size="2">Implicates</Text>
+                        </Flex>
+                        <Flex align="center" gap="2">
+                            <Box style={{ backgroundColor: '#00FFFF', width: '16px', height: '16px' }} />
+                            <Text size="2">Supports</Text>
+                        </Flex>
+                        <Flex align="center" gap="2">
+                            <Box style={{ backgroundColor: '#FFD700', width: '16px', height: '16px' }} />
+                            <Text size="2">Contradicts</Text>
+                        </Flex>
+                    </Flex>
+                </Card>
             </Panel>
         </ReactFlow>
     );
@@ -684,7 +830,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                     </Flex>
                 </Tabs.Content>
 
-                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '90%' }}>
+                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '70vh' }}>
                     <DeductionFlow
                         gameState={gameState}
                         handleRemoveLead={handleRemoveLead}
@@ -702,17 +848,33 @@ const VotingRound: React.FC<VotingRoundProps> = ({
 interface ChooseInterrogationProps {
     gameState: SingleGameState;
     handleStartInterrogation: (suspectId: string) => void;
+    interrogationLoading: boolean;
 }
 
-const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, handleStartInterrogation }) => {
+const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, handleStartInterrogation, interrogationLoading }) => {
+    const [selectedSuspectId, setSelectedSuspectId] = useState<string>(gameState.suspects[0].id);
+
+    const handleStart = () => {
+        if (selectedSuspectId) {
+            handleStartInterrogation(selectedSuspectId);
+        }
+    };
+
     return (
         <Flex direction="column" align="center" justify="center" gap="4">
             <Heading size="7">Choose a Suspect to Interrogate</Heading>
-            <Grid columns="3" gap="4">
-                {gameState.suspects.map((suspect) => (
-                    <SuspectCard key={suspect.id} suspect={suspect} variant="surface" size='large' onClick={() => handleStartInterrogation(suspect.id)} />
-                ))}
-            </Grid>
+            <RadioCards.Root value={selectedSuspectId} onValueChange={setSelectedSuspectId} disabled={interrogationLoading}>
+                <Grid columns="3" gap="4">
+                    {gameState.suspects.map((suspect) => (
+                        <RadioCards.Item key={suspect.id} value={suspect.id} disabled={interrogationLoading}>
+                            <SuspectCard suspect={suspect} variant="ghost" size='large' />
+                        </RadioCards.Item>
+                    ))}
+                </Grid>
+            </RadioCards.Root>
+            <Button onClick={handleStart} size={'3'} disabled={!selectedSuspectId || interrogationLoading} mt={'9'}>
+                {interrogationLoading ? <Spinner /> : 'Start Interrogation'}
+            </Button>
         </Flex>
     );
 }
@@ -766,12 +928,13 @@ const Interrogation: React.FC<InterrogationProps> = ({
                             <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" className='min-w-[300px] min-h-[300px]' />
                         </Flex>
                         <Box>
+
+                            <Flex className='w-full' justify={'start'} direction={'column'}>
+                            <ScrollArea className='h-[400px] w-full'>
                             <Flex className='w-full' justify={'center'} align={'center'} direction={'column'}>
                                 {/* <SuspectCard suspect={currentSuspect} variant='surface' size='small' /> */}
                                 <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
                             </Flex>
-                            <Grid mb="2" columns="8" flow="dense" gap="5">
-
                                 {interrogationTranscript.map((conversationItem, index) => (
                                     <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
                                         <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
@@ -790,15 +953,20 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                         </Flex>
                                     </Tooltip>
                                 ))}
-                            </Grid>
+                                                                <Flex direction={'column'} className='w-full'>
+                                {responseLoading && (
+                                    <ResponseLoading label={`${currentSuspect?.name}...`} />
+                                )}
+                                {audioTranscribing && (
+                                    <ResponseLoading label="Transcribing your response..." />
+                                )}
+                                </Flex>
+                            </ScrollArea>
+
+                            </Flex>
                         </Box>
                     </Flex>
-                    {responseLoading && (
-                        <ResponseLoading label={`${currentSuspect?.name}...`} />
-                    )}
-                    {audioTranscribing && (
-                        <ResponseLoading label="Transcribing your response..." />
-                    )}
+
                 </Box>
                 <div className="flex gap-4 justify-center">
                     {socket && (
@@ -928,63 +1096,63 @@ interface ResultsSummaryProps {
 const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, leaderboardUpdating }) => {
     const eloDiff = newElo == 0 ? 0 : newElo - elo;
     return (
-        <Flex direction={'column'} >
+        <Flex direction={'column'} className='w-full' justify={'center'} align={'center'}>
 
             <Heading> Results Summary </Heading>
             <Flex gap={'5'} mt='3'>
                 <Flex gap={'3'} >
                     {leaderboardUpdating ? (
                         <Flex gap={'2'} align={'center'}>
-                       <Text> Updating Leaderboard </Text><Spinner size={'3'} />
-                       </Flex>
+                            <AnimatedText animationSpeed={150} className='text-5xl winnerHeader' message='Updating...' />
+                        </Flex>
                     ) : (
                         <>
-                    <Text weight='bold' size='9'>{newElo || elo}<Text size={'3'} as='p'> New Rank</Text></Text>
+                            <Text weight='bold' size='9'>{newElo || elo}<Text size={'3'} as='p'> New Rank</Text></Text>
 
-                    <Text>
-                        {eloDiff > 0 ? (
-                            eloDiff > 15 ? (
-                                <>
-                                    <FiChevronsUp /> {eloDiff}
-                                </>
-                            ) : (
-                                <>
-                                    <FiChevronUp /> {eloDiff}
-                                </>
-                            )
-                        ) : eloDiff < 0 ? (
-                            eloDiff < -15 ? (
-                                <>
-                                    <FiChevronsDown /> {eloDiff}
-                                </>
-                            ) : (
-                                <>
-                                    <FiChevronDown /> {eloDiff}
-                                </>
-                            )
-                        ) : (
-                            '----'
-                        )}
-                    </Text>
-                    </>
+                            <Text>
+                                {eloDiff > 0 ? (
+                                    eloDiff > 15 ? (
+                                        <>
+                                            <FiChevronsUp /> {eloDiff}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FiChevronUp /> {eloDiff}
+                                        </>
+                                    )
+                                ) : eloDiff < 0 ? (
+                                    eloDiff < -15 ? (
+                                        <>
+                                            <FiChevronsDown /> {eloDiff}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FiChevronDown /> {eloDiff}
+                                        </>
+                                    )
+                                ) : (
+                                    '----'
+                                )}
+                            </Text>
+                        </>
                     )}
                 </Flex>
                 <Flex gap={'2'}>
                     {badges.map((badge, index) => (
-<>
-                    <HoverCard.Root key={index}>
-                        <HoverCard.Trigger>
-                            <Badge key={index} size='2' variant='surface' className="cursor-pointer">
-                                {badge.badge}
-                            </Badge>
-                        </HoverCard.Trigger>
-                        <HoverCard.Content asChild side="top" align="center">
-                            <Box className="p-2 rounded">
-                                {badge.explanation}
-                            </Box>
-                        </HoverCard.Content>
-                    </HoverCard.Root>
-                    </>
+                        <>
+                            <HoverCard.Root key={index}>
+                                <HoverCard.Trigger>
+                                    <Badge key={index} size='2' variant='surface' className="cursor-pointer">
+                                        {badge.badge}
+                                    </Badge>
+                                </HoverCard.Trigger>
+                                <HoverCard.Content asChild side="top" align="center">
+                                    <Box className="p-2 rounded">
+                                        {badge.explanation}
+                                    </Box>
+                                </HoverCard.Content>
+                            </HoverCard.Root>
+                        </>
                     ))}
                 </Flex>
             </Flex>
@@ -1005,47 +1173,63 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
     return (
         <Flex direction="column" gap="4" >
             <Flex>
-                
+
                 <Box className="flex flex-col w-full items-center justify-center h-full">
-                    {gameState.outcome === 'win' ? (
+                    {gameState.outcome === 'lose' ? (
                         <>
 
-                            <Flex gap="4" mt={'9'} direction={{ sm: 'column', md: 'row' }} width={'70%'} justify={'between'} align={'center'}>
-                                <Flex direction={'column'}>
-                                    <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
-                                    <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
+                            <Flex mt={'9'} width={'80%'} align={'center'} justify={'between'} direction={{ sm: 'column', md: 'row' }} >
+                                <Flex direction={'row'} gap={'4'} className='w-full'>
+                                    <Flex direction={'column'}>
+                                        <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
+                                        <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
+                                        <Flex mt='9' direction={'column'} className='w-fit'>
+                                            <Heading mb={'3'}> The culprit was: </Heading>
+                                            {gameState.suspects
+                                                .filter((suspect) => suspect.isCulprit)
+                                                .map((suspect) => (
+                                                    <SuspectCard
+                                                        key={suspect.id}
+                                                        suspect={suspect}
+                                                        variant="surface"
+                                                        size="small"
+                                                    />
+                                                ))}
+                                        </Flex>
+
+                                    </Flex>
+
+
                                 </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating}/>
+                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating} />
                             </Flex>
                         </>
                     ) : (
                         <>
-                            <Heading className="mb-4 text-4xl">Culprit Wins!</Heading>
-                            <Flex gap="9" mt={'9'} width={'80%'} justify={'between'} align={'center'} direction={{ sm: 'column', md: 'row' }} >
-                                <Flex direction={'column'}>
-                                    <Heading> Winning Team </Heading>
-                                    <Flex mt='9'>
-                                        {gameState.suspects
-                                            .filter((suspect) => suspect.isCulprit)
-                                            .map((suspect) => (
-                                                <Card
-                                                    key={suspect.id}
-                                                    size="2"
-                                                    variant="surface"
-                                                    className="p-4 flex flex-col items-center  lg:animate-bounce"
-                                                >
-                                                    <Avatar
-                                                        fallback={suspect.name.charAt(0)}
-                                                        size="6"
+                            <Flex mt={'9'} width={'80%'} align={'center'} justify={'between'} direction={{ sm: 'column', md: 'row' }} >
+                                <Flex direction={'row'} gap={'4'} className='w-full'>
+                                    <Flex direction={'column'}>
+                                        <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You lose...' />
+                                        <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
+                                        <Flex mt='9' direction={'column'} className='w-fit'>
+                                            <Heading mb={'3'}> The culprit was </Heading>
+                                            {gameState.suspects
+                                                .filter((suspect) => suspect.isCulprit)
+                                                .map((suspect) => (
+                                                    <SuspectCard
+                                                        key={suspect.id}
+                                                        suspect={suspect}
+                                                        variant="surface"
+                                                        size="small"
                                                     />
-                                                    <Text className="mt-2 text-xl">
-                                                        {suspect.identity.split(',')[0]}
-                                                    </Text>
-                                                </Card>
-                                            ))}
+                                                ))}
+                                        </Flex>
+
                                     </Flex>
+
+
                                 </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating/>
+                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating} />
                             </Flex>
                         </>
                     )}
@@ -1058,24 +1242,24 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
                 scrollbars="vertical"
                 style={{ height: '80vh' }}
             >
-                <Flex direction="column" gap="4" className='h-full w-full' justify={'center'} align={'center'}> 
+                <Flex direction="column" gap="4" className='h-full w-full' justify={'center'} align={'center'}>
                     <AnimatedText animationSpeed={200} className='text-5xl winnerHeader' message='The real story...' />
-                <Flex direction="row" gap="9" wrap="wrap" justify={'center'} align={'center'}>
-                    {gameState.crime?.realStory.map((storyItem, index) => (
-                        <OffenseReportCard key={index} offenseReport={storyItem} />
-                    ))}
-                </Flex>
+                    <Flex direction="row" gap="9" wrap="wrap" justify={'center'} align={'center'}>
+                        {gameState.crime?.realStory.map((storyItem, index) => (
+                            <OffenseReportCard key={index} offenseReport={storyItem} index={index} />
+                        ))}
+                    </Flex>
 
 
 
 
-                <Flex direction="column" gap="4" className="w-full h-[600px] justify-center align-center">
-                    <AnimatedText animationSpeed={200} className='text-5xl text-center winnerHeader' message='Your Deduction' />
-                    <DeductionFlow
-                        gameState={gameState}
-                    />
+                    <Flex direction="column" gap="4" className="w-full h-[600px] justify-center align-center">
+                        <AnimatedText animationSpeed={200} className='text-5xl text-center winnerHeader' message='Your Deduction' />
+                        <DeductionFlow
+                            gameState={gameState}
+                        />
 
-                </Flex>
+                    </Flex>
                 </Flex>
             </ScrollArea>
         </Flex>
@@ -1122,18 +1306,25 @@ const SingleGame = () => {
     const navigate = useNavigate();
     const { roomId } = useParams<{ roomId: string }>();
     const [gameState, setGameState] = useState<SingleGameState | null>(null);
-    // const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>(testInterrogationTranscript);
+
+
+
+
     const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
     const nodeRef = useRef(null);
     const [roundTimer, setRoundTimer] = useState<number>(0);
-    const [resultsLoading, setResultsLoading] = useState<boolean>(false);
-    const [leaderboardUpdating, setLeaderboardUpdating] = useState<boolean>(false);
+
+    const [leaderboardUpdating, setLeaderboardUpdating] = useState<boolean>(true);
     const [showGameOver, setShowGameOver] = useState<boolean>(false);
     const [audioTranscribing, setAudioTranscribing] = useState<boolean>(false);
     const [responseLoading, setResponseLoading] = useState<boolean>(false);
-    const [killerVote, setKillerVote] = useState<string>();
     const [deductionSubmitted, setDeductionSubmitted] = useState<boolean>(false);
     const [deductionLoading, setDeductionLoading] = useState<boolean>(false);
+    const [interrogationLoading, setInterrogationLoading] = useState<boolean>(false);
+    const [resultsLoading, setResultsLoading] = useState<boolean>(false);
+
+    const [killerVote, setKillerVote] = useState<string>();
+
     const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false)
     const [showSidebar, setShowSidebar] = useState<boolean>(false);
     const [autoplayDialogOpen, setAutoplayDialogOpen] = useState<boolean>(true);
@@ -1148,6 +1339,7 @@ const SingleGame = () => {
 
     const gameIsOver = useMemo(() => {
         return gameState?.status == 'finished';
+        // return false;
     }, [gameState])
 
     const activeRound = useMemo(() => {
@@ -1171,13 +1363,6 @@ const SingleGame = () => {
             ?.conversations.find((conversation) => conversation.active)?.suspect;
         return gameState?.suspects?.find((suspect) => suspect.id === activeSuspectId);
     }, [gameState]);
-
-
-    // const currentSuspect: Suspect | null = useMemo(() => {
-    //     if(!gameState) return null;
-    //     console.log(gameState?.suspects?.find((suspect) => suspect.id === gameState?.rounds?.filter((round) => round.type == 'interrogation').slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null);
-    //     return gameState?.suspects?.find((suspect) => suspect.id === gameState?.rounds?.filter((round) => round.type == 'interrogation').slice().reverse().find((round) => ['active', 'completed'].includes(round.status))?.suspect) || null;
-    // }, [gameState]);
 
 
     const connectWaveStreamPlayer = async () => {
@@ -1254,19 +1439,11 @@ const SingleGame = () => {
             console.error('Invalid parameters when creating lead:', gameState, socket, roomId, sourceNode, targetNode);
             return;
         }
+        setDeductionLoading(true);
 
         emitEvent('deduction:lead:created', { sourceNode, targetNode, type });
 
     }
-
-    const handleStartInterrogation = (suspectId: string) => {
-        if (!gameState || !socket || !roomId) {
-            return;
-        }
-        console.log('Starting interrogation with suspect:', suspectId);
-        emitEvent('realtime:start', suspectId);
-    }
-
 
 
     useEffect(() => {
@@ -1275,6 +1452,7 @@ const SingleGame = () => {
                 console.log('Received game state update:', newState);
                 setGameState(newState);
                 setInterrogationTranscript([]);
+                setDeductionLoading(false)
                 setResultsLoading(false);
             });
 
@@ -1303,6 +1481,11 @@ const SingleGame = () => {
 
             socket.on('realtime:ended', () => {
                 setLoadingSessionEnd(false);
+                setInterrogationLoading(false);
+            });
+
+            socket.on('realtime:started', () => {
+                setInterrogationLoading(false);
             });
 
             socket.on('deduction:completed', () => {
@@ -1313,7 +1496,7 @@ const SingleGame = () => {
                 setRoundTimer(params.countdown);
             });
 
-            socket.on('leaderboard:started', () => {    
+            socket.on('leaderboard:started', () => {
                 setLeaderboardUpdating(true);
             });
 
@@ -1359,7 +1542,6 @@ const SingleGame = () => {
     useEffect(() => {
         if (roomId) {
             roomsService.getRoom(roomId).then((room) => {
-                console.log('adsjhflaksdjhfkla:', room);
                 if (room.game_state && typeof room.game_state === 'object') {
                     console.log(room);
                     setGameState(room.game_state as SingleGameState);
@@ -1367,6 +1549,12 @@ const SingleGame = () => {
                 } else {
                     navigate(`/lobby/${roomId}`);
                 }
+            });
+
+            leaderboardService.getGameResultsForUser(roomId, user?.id || '').then((response) => {
+                setPlayerBadges(response.results.badges);
+                setLeaderboardUpdating(false);
+                setPlayerElo({ oldRating: response.results.old_rating, newRating: response.results.new_rating });
             });
         }
 
@@ -1401,6 +1589,17 @@ const SingleGame = () => {
         emitEvent('deduction:submit', roomId);
     }
 
+    const handleStartInterrogation = (suspectId: string) => {
+        if (!gameState || !socket || !roomId) {
+            return;
+        }
+        console.log('Starting interrogation with suspect:', suspectId);
+        setLoadingSessionEnd(false);
+        setInterrogationLoading(true);
+        emitEvent('realtime:start', suspectId);
+    }
+
+
     const handleCreateNewdeductionNode = (node: DeductionNode) => {
         if (!gameState || !socket || !roomId) {
             console.error('Invalid parameters when creating deduction node:', gameState, socket, roomId);
@@ -1415,6 +1614,7 @@ const SingleGame = () => {
     }
 
     const handleRemoveLead = (id: string) => {
+        setDeductionLoading(true);
         console.log('Removing lead:', id);
         emitEvent('deduction:lead:removed', id);
     }
@@ -1498,7 +1698,7 @@ const SingleGame = () => {
                 );
             } else {
                 return (
-                    <ChooseInterrogation gameState={gameState} handleStartInterrogation={handleStartInterrogation} />
+                    <ChooseInterrogation gameState={gameState} interrogationLoading={interrogationLoading} handleStartInterrogation={handleStartInterrogation} />
                 );
             }
 
@@ -1546,7 +1746,7 @@ const SingleGame = () => {
         <>
             <Box className=" flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
-                {!showSidebar && !gameIsOver && (
+                {!showSidebar && gameState.status === 'active' && (
                     <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
                 )}
                 {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4 z-10" >
@@ -1645,7 +1845,7 @@ const SingleGame = () => {
                                 >
 
                                     <div ref={nodeRef} className='h-full'>
-                                    {/* <Button onClick={updateLeaderboard}> Updated Leaderboard</Button> */}
+                                        {/* <Button onClick={updateLeaderboard}> Updated Leaderboard</Button> */}
                                         {renderGameContent()}
                                     </div>
                                 </CSSTransition>

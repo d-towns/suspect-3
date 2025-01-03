@@ -192,6 +192,7 @@ export const SinglePlayerGameStateSchema = z
             .strict()
         ),
         warmth: z.number().describe("A number between 0 and 100 that represents how close the player's analysis is to the correct answer"),
+        feedback: z.array(z.string()),
       })
       .strict(),
     allEvidence: z.array(

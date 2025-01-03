@@ -158,7 +158,7 @@ export default class OpenAIGameService extends LLMGameService {
    * @param {ZodObject} responseFormat - Zod object to parse the response, Must be wrapped in zodResponseFormat().
    * @returns {Promise<any>}
    */
-  async createChatCompletion(messages, responseFormat) {
+  async createChatCompletion(messages, responseFormat, maxToxens) {
     try {
       if (!messages || !Array.isArray(messages)) {
         console.error(
@@ -177,10 +177,12 @@ export default class OpenAIGameService extends LLMGameService {
         model: "gpt-4o-2024-08-06",
         messages: messages,
         response_format: responseFormat,
-        max_completion_tokens: 500
+        max_completion_tokens: maxToxens || 200,
       });
+      console.log("Chat completion:", JSON.stringify(completion));
 
       const result = completion.choices[0].message.content;
+      console.log("Chat completion result:", result);
       return JSON.parse(result);
     } catch (error) {
       console.error("Error in createChatCompletion:", error);

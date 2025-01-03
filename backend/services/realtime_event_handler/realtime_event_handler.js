@@ -8,6 +8,7 @@ export default class RealtimeEventHandler {
     this.responder = responder
     this.lastAudioMessageDeltas = [];
     this.lastAudioMessageTranscript = [];
+    this.eventListeners = {};
     this.realtimeInstructions = null
     this.ws.on("message", async (data) => {
       this.handleMessage(data, responder);
@@ -50,7 +51,7 @@ export default class RealtimeEventHandler {
           break;
 
         case "conversation.item.input_audio_transcription.completed":
-          await this.handleAudioTranscriptionCompleted(
+          await this.handleUserAudioTranscriptCompleted(
             event,
             responder
           );
@@ -113,7 +114,7 @@ export default class RealtimeEventHandler {
     console.log("Session updated:", event);
   }
 
-  async handleAudioTranscriptionCompleted(event) {
+  async handleUserAudioTranscriptCompleted(event) {
     console.log("Audio transcription completed", event.transcript);
     this.lastAudioMessageDeltas = [];
 
@@ -128,6 +129,8 @@ export default class RealtimeEventHandler {
       role: "user",
       content: `Detective: ${event.transcript}`,
     });
+
+
 
     this.gameManager.emit("realtime:transcript:done:user", playerConversationItem);
 

@@ -1,3 +1,4 @@
+import { Badge } from '../models/gameResults.model';
 import axiosInstance from '../utils/axios-instance';
 
 export interface LeaderboardEntry {
@@ -19,6 +20,18 @@ export interface LeaderboardResponse {
     message?: string;
     page?: number;
     limit?: number;
+}
+
+export interface GameResultResponse {
+    success: boolean;
+    results: {
+        game_room_id: string;
+        user_id: string;
+        old_rating: number;
+        new_rating: number;
+        won: boolean;
+        badges: Badge[];
+    }
 }
 
 export const leaderboardService = {
@@ -93,6 +106,22 @@ export const leaderboardService = {
             return response.data;
         } catch (error) {
             console.error('Error deleting leaderboard entry:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Retrieves game results for a specific game
+     * @param gameId - The ID of the game
+     */
+    getGameResultsForUser: async (gameId: string, userId:string): Promise<GameResultResponse> => {
+        try {
+            const response = await axiosInstance.get(`/leaderboard/${gameId}/results`,
+                { params: { userId: userId } });
+            console.log('Game results:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching game results for user:', error);
             throw error;
         }
     }

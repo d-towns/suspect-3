@@ -16,7 +16,7 @@ import {
   SinglePlayerGameStateSchema,
   AnalysisSchema,
 } from "../models/game-state-schema.js";
-import z from "zod";
+
 
 dotenv.config({ path: "../.env" });
 
@@ -158,8 +158,8 @@ Remember to be impartial but thorough in your investigation.`,
 
 4. Analyze interrogations:
 - the interrogation round is the first round of the game and should start as active
-   - conversations between the player acting as the detective and the suspects who are LLM's will take place in the interrogation round
-    - the interrogation round object should be updated with the conversations between the detective ( player ) and the suspect.
+    - conversations between the player acting as the detective and the suspects who are LLM's will take place in the interrogation round
+    - the interrogation round object should be updated with the conversations between the detective ( player ) and the suspect at the end of each interrogation. the end of the interrogation will be indicted by a message in the thread
     - there will be multiple individual interrogation conversations between the detective and each suspect, they should have at least one conversation with each suspect before the interrogation round is set to completed.
     - Be sure to track both detective and suspect responses in the game state round conversation for that suspect
     - After the interrogation round is complete, START THE NEXT VOTING ROUND OF THE GAME. IF THERE IS NO ROUND AFTER THE INTERROGATION ROUND, THE GAME IS FINISHED AND THE CULPRIT WINS.
@@ -181,26 +181,18 @@ Remember to be impartial but thorough in your investigation.`,
     - Interrogation Round Rules:
       - The suspect attribute for each round should be the suspect ID
       - When the game state is first created, the first round should be an interrogation round.
+      - the interrogation round should be created with and an empty conversation object that will be updated with the conversations between the detective and the individual suspects
       - Each round has a status, it is either inactive, active, or completed
     - voting round Rules:
       - the voting round involves the player creating leads and determining a culprit vote
-      - At the each interrogation round, there should be a voting round where the player makes a deduction graph that will represent the players deduction
+      - there should be one voting round where the player makes a deduction graph that will represent the players deduction
+      - the voting round should have an empty conversations object that will not be updated
       - the players deduction, which is a graph of nodes that can either be a suspect statement, a piece of evidence, or a suspect themselves.
       - if the players deduction is accepted, but the vote is incorrect, the player loses the game
       - if the players deduction is accepted and is correct, the player wins the game
+      - Each round has a status, it is either inactive, active, or completed
 
-  7. Determine if the game is finished:
-    - The game is finished when either all the rounds are completed or the player (detective) correctly vote for the culprit
-    - if the player hasnt made a deduction that is accepted by the police chief and is the correct culprit vote by the time all the rounds are completed, the player loses the game
-
-  8. IMPORTANT NOTE:
-    
-    WHEN THE GAME STATE IS FIRST BEING CREATED, THE DEDUCTIONS ANAYLSIS SHOULD BE CREATED WITH TWO OBJECTS THAT HAVE EITHER EMPTY STRINGS OR ARRAYS FOR THEIR VALUES.
-    DO NOT CHANGE ANY OF THE DEDUCTION ANALYSIS OR VOTING ROUND RULES. ONLY UPDATE THE GAMESTATE WITH THE DEDUCTION OBJECTS THAT HAVE BEEN PUT INTO THE GAME THREAD. THESE RULES ARE CRUCIAL TO THE GAMEPLAY AND SHOULD NOT BE ALTERED.
-    DO NOT REMOVE ROUNDS FROM THE GAME STATE OR ADD MORE ROUNDS THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.
-    DO NOT REMOVE ROUNDS FORM THE GAME STATE AFTER THE INITAL CREATION. IF A ROUND IS SKIPPED, A MESSAGE SHOULD BE PLACED IN THE GAME THREAD THAT INDICATES THE ROUND IS BEING SKIPPED.
-    IMPORTANT NOTE:
-    NEVER ADD MORE ROUNDS TO THE GAME THAN THE NUMBER OF SUSPECTS MULTIPLIED BY 2. THIS WILL CAUSE THE GAME TO BE INCOMPLETE AND THE GAME STATE TO BE INACCURATE.`,
+   `,
         model: "gpt-4o-2024-08-06",
         response_format: zodResponseFormat(
           SinglePlayerGameStateSchema,

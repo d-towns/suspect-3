@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { createSupabaseClient } from "../db/supabase.js";
 import { z } from "zod";
+import {LeaderboardService} from "../services/leaderboard/leaderboard.service.js";
 
 const LeaderboardSchema = z.object({
   id: z.number(),
@@ -34,6 +35,8 @@ router.put("/:userId", asyncHandler(updateLeaderboardEntry));
 
 // DELETE /leaderboard/:userId
 router.delete("/:userId", asyncHandler(deleteLeaderboardEntry));
+
+router.get("/:gameId/results", asyncHandler(getGameResultsForUser));
 
 async function getLeaderboard(req, res) {
   const supabase = createSupabaseClient({ req, res });
@@ -171,6 +174,36 @@ async function deleteLeaderboardEntry(req, res) {
     success: true,
     message: "Leaderboard entry deleted successfully",
   });
+}
+
+
+async function getGameResultsForUser(req, res) {
+  const { gameId } = req.params;
+  const userId = req.query.userId;
+
+  console.log("Getting game results for user:", userId, gameId);
+
+  const { data, error } = await LeaderboardService.getGameResultsForUser(userId, gameId);
+  console.log("Gamefadfadfads:", data, error);
+  if (error) {
+    console.error("Error fetching game results:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching game results: ${error.message}`,
+    });
+  }
+
+  
+
+  if (!data) {
+    console.log("Game results not found");
+    return res.status(404).json({
+      success: false,
+      message: "Game results not found",
+    });
+  }
+
+  return res.status(200).json({ success: true, results: data });
 }
 
 export { router as leaderboardRouter };

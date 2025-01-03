@@ -1,9 +1,9 @@
-import OpenaiGameService from "../services/openai_game_service.js";
+import { createMultiPlayerGameMasterAssistant, createSinglePlayerGameMasterAssistant } from "../utils/assistant_instructions.js";
 import OpenAIEloService from "../services/llm/elo/openai-elo.service.js";
 
 export async function createAssistants() {
-    await OpenaiGameService.createMultiPlayerGameMasterAssistant();
-    await OpenaiGameService.createSinglePlayerGameMasterAssistant();
+    await createSinglePlayerGameMasterAssistant();
+    await createMultiPlayerGameMasterAssistant();
     await OpenAIEloService.createEloAssistant();
 
 }
