@@ -74,6 +74,7 @@ export const Lobby: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
 
   useEffect(() => {
+    console.log('Lobby mounted');
     const initializeLobby = async () => {
       console.log(`user: ${user}`)
       console.log(`roomId: ${roomId}`)
@@ -144,15 +145,16 @@ export const Lobby: React.FC = () => {
       };
     }
     let cleanupListeners: Function;
+    initializeLobby();
     if (socket && socket.connected) {
-      initializeLobby();
+      
       cleanupListeners = setupListeners();
     }
 
     return () => {
       if (cleanupListeners) cleanupListeners();
     }
-  }, [socket, isConnected]);
+  }, [socket, isConnected, roomId]);
 
   useEffect(() => {
     if (lobbyState.room && typeof lobbyState.room.game_state !== 'string' && lobbyState.room.game_state?.status == 'active') {

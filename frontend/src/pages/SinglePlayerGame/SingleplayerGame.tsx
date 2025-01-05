@@ -273,10 +273,10 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     />
                     {unreadCount > 0 && (
                         <Box
-                            className="absolute top-0 right-0 w-4 h-4 rounded-full"
-                            style={{ backgroundColor: 'darkred' }}
+                            className="absolute top-3 right-0 w-4 h-4 rounded-full"
+                            
                         >
-                            <Text size="1" align="center">
+                            <Text size="3" align="center" mb={'4'} style={{ backgroundColor: 'darkred' }} className='rounded-xl py-1 px-2'>
                                 {unreadCount}
                             </Text>
                         </Box>
@@ -286,7 +286,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     </Text>
                 </Box>
                 {isOpen && openMessage === null && (
-                    <ScrollArea style={{ height: '300px', width: '100%' }}>
+                    <ScrollArea style={{ height: 'fit', width: '100%' }}>
                         <Flex direction="column" gap="2">
                             {messages.length > 0 ? (
                                 messages.map((msg, index) => (
@@ -315,7 +315,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                         >
                             Back
                         </Button>
-                        <Box className="w-full p-2 bg-gray-800 rounded">
+                        <Box className="w-full p-2 rounded">
                             <Text size="3">{messages[openMessage]}</Text>
                         </Box>
                     </Box>
@@ -365,12 +365,13 @@ const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose
     return (
         <AlertDialog.Root open={open} onOpenChange={onClose}>
             <AlertDialog.Content size='4'>
-                <Box className="p-4">
-                    <Text as="p" size="3" align="center">
+            <AlertDialog.Title align={'center'}>Allow Autoplay</AlertDialog.Title>
+            <AlertDialog.Description>
+            <Text as="span" size="3" align="center" className='w-full'>
                         This game requires audio playback. Please allow autoplay to proceed.
                     </Text>
-                    <Flex justify="center" mt="4" gap={'6'}>
-
+                </AlertDialog.Description>
+                    <Flex justify="center" mt="6" gap={'6'}>
                         <AlertDialog.Cancel onClick={() => onClose()}>
                             <Button variant="soft" color="gray">
                                 Cancel
@@ -380,7 +381,6 @@ const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose
                             <Button variant="soft">Allow</Button>
                         </AlertDialog.Action>
                     </Flex>
-                </Box>
             </AlertDialog.Content>
         </AlertDialog.Root>
     );
@@ -651,7 +651,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
             fitView
         >
             <Background />
-            <Controls />
+            <Controls position='top-right' style={{flexDirection:'row', position:'absolute', top:'80px', width:'130px'}}/>
             <Panel position="top-right" className="flex flex-col gap-4">
                 <Heading size="3" className='w-full text-center'>Layout Controls</Heading>
                 <Flex gap={'4'}>
@@ -830,7 +830,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                     </Flex>
                 </Tabs.Content>
 
-                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '70vh' }}>
+                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '90vh' }}>
                     <DeductionFlow
                         gameState={gameState}
                         handleRemoveLead={handleRemoveLead}
@@ -1098,8 +1098,8 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
     return (
         <Flex direction={'column'} className='w-full' justify={'center'} align={'center'}>
 
-            <Heading> Results Summary </Heading>
-            <Flex gap={'5'} mt='3'>
+            <Heading> Rating </Heading>
+            <Flex gap={'5'} mt='3' direction={'column'} align={'center'} justify={'center'}>
                 <Flex gap={'3'} >
                     {leaderboardUpdating ? (
                         <Flex gap={'2'} align={'center'}>
@@ -1107,27 +1107,27 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
                         </Flex>
                     ) : (
                         <>
-                            <Text weight='bold' size='9'>{newElo || elo}<Text size={'3'} as='p'> New Rank</Text></Text>
+                            <Text weight='bold' className='text-8xl'>{newElo || elo}<Text className='text-2xl' as='p'> New Rank</Text></Text>
 
-                            <Text>
+                            <Text as='span'>
                                 {eloDiff > 0 ? (
                                     eloDiff > 15 ? (
                                         <>
-                                            <FiChevronsUp /> {eloDiff}
+                                            <FiChevronsUp className='inline text-green-500' /> <Text className='text-3xl inline text-green-500' as='span'>{eloDiff}</Text>
                                         </>
                                     ) : (
                                         <>
-                                            <FiChevronUp /> {eloDiff}
+                                            <FiChevronUp /> <Text className='text-3xl inline text-green-500' as='span'>{eloDiff}</Text>
                                         </>
                                     )
                                 ) : eloDiff < 0 ? (
                                     eloDiff < -15 ? (
                                         <>
-                                            <FiChevronsDown /> {eloDiff}
+                                            <FiChevronsDown className='inline text-red-500' size={'30'}/> <Text className='text-3xl inline text-red-500' as='span'>{eloDiff}</Text>
                                         </>
                                     ) : (
                                         <>
-                                            <FiChevronDown /> {eloDiff}
+                                            <FiChevronDown /> <Text className='text-3xl inline text-red-500' as='span'>{eloDiff}</Text>
                                         </>
                                     )
                                 ) : (
@@ -1137,22 +1137,23 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
                         </>
                     )}
                 </Flex>
+                <Separator size="4" />
+                <Text className='text-2xl' weight={'bold'}>Badges</Text>
                 <Flex gap={'2'}>
+               
                     {badges.map((badge, index) => (
-                        <>
                             <HoverCard.Root key={index}>
                                 <HoverCard.Trigger>
                                     <Badge key={index} size='2' variant='surface' className="cursor-pointer">
-                                        {badge.badge}
+                                        <Text className='text-xl'>{badge.badge}</Text>
                                     </Badge>
                                 </HoverCard.Trigger>
                                 <HoverCard.Content asChild side="top" align="center">
                                     <Box className="p-2 rounded">
-                                        {badge.explanation}
+                                        <Text> {badge.explanation} </Text>  
                                     </Box>
                                 </HoverCard.Content>
                             </HoverCard.Root>
-                        </>
                     ))}
                 </Flex>
             </Flex>
@@ -1164,104 +1165,78 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
 interface GameOverProps {
     gameState: SingleGameState;
     oldRating: number;
-    newRating: number | 0
+    newRating: number | 0;
     badges: GameResultBadge[];
     leaderboardUpdating: boolean;
 }
 
 const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRating: newElo, badges, leaderboardUpdating }) => {
     return (
-        <Flex direction="column" gap="4" >
-            <Flex>
-
-                <Box className="flex flex-col w-full items-center justify-center h-full">
-                    {gameState.outcome === 'lose' ? (
+        <Flex direction="column" gap="4">
+            <Flex direction={{ sm: 'column', md: 'row' }} align="center" justify="between" width={'60%'} gap="9" className='m-auto'>
+                <Flex direction="column" gap="2">
+                    {gameState.outcome === 'win' ? (
                         <>
-
-                            <Flex mt={'9'} width={'80%'} align={'center'} justify={'between'} direction={{ sm: 'column', md: 'row' }} >
-                                <Flex direction={'row'} gap={'4'} className='w-full'>
-                                    <Flex direction={'column'}>
-                                        <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
-                                        <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
-                                        <Flex mt='9' direction={'column'} className='w-fit'>
-                                            <Heading mb={'3'}> The culprit was: </Heading>
-                                            {gameState.suspects
-                                                .filter((suspect) => suspect.isCulprit)
-                                                .map((suspect) => (
-                                                    <SuspectCard
-                                                        key={suspect.id}
-                                                        suspect={suspect}
-                                                        variant="surface"
-                                                        size="small"
-                                                    />
-                                                ))}
-                                        </Flex>
-
-                                    </Flex>
-
-
-                                </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating} />
-                            </Flex>
+                            <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You win!' />
+                            <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
                         </>
                     ) : (
                         <>
-                            <Flex mt={'9'} width={'80%'} align={'center'} justify={'between'} direction={{ sm: 'column', md: 'row' }} >
-                                <Flex direction={'row'} gap={'4'} className='w-full'>
-                                    <Flex direction={'column'}>
-                                        <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You lose...' />
-                                        <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
-                                        <Flex mt='9' direction={'column'} className='w-fit'>
-                                            <Heading mb={'3'}> The culprit was </Heading>
-                                            {gameState.suspects
-                                                .filter((suspect) => suspect.isCulprit)
-                                                .map((suspect) => (
-                                                    <SuspectCard
-                                                        key={suspect.id}
-                                                        suspect={suspect}
-                                                        variant="surface"
-                                                        size="small"
-                                                    />
-                                                ))}
-                                        </Flex>
-
-                                    </Flex>
-
-
-                                </Flex>
-                                <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating} />
-                            </Flex>
+                            <AnimatedText animationSpeed={150} className='text-8xl winnerHeader' message='You lose...' />
+                            <AnimatedText animationSpeed={150} className='text-3xl winnerHeader' message='Case Closed' />
                         </>
                     )}
-                </Box>
-            </Flex>
-            <Heading>Game Summary</Heading>
-            <ScrollArea
-                className="border rounded-lg p-4"
-                type="always"
-                scrollbars="vertical"
-                style={{ height: '80vh' }}
-            >
-                <Flex direction="column" gap="4" className='h-full w-full' justify={'center'} align={'center'}>
-                    <AnimatedText animationSpeed={200} className='text-5xl winnerHeader' message='The real story...' />
-                    <Flex direction="row" gap="9" wrap="wrap" justify={'center'} align={'center'}>
-                        {gameState.crime?.realStory.map((storyItem, index) => (
-                            <OffenseReportCard key={index} offenseReport={storyItem} index={index} />
+                </Flex>
+                <Flex direction={'column'} gap={'4'} align={'center'}>
+                    <Text size="2" weight="bold" className='text-3xl'>The Culprit</Text>
+                    {gameState.suspects
+                        .filter((suspect) => suspect.isCulprit)
+                        .map((suspect) => (
+                            <SuspectCard
+                                key={suspect.id}
+                                suspect={suspect}
+                                variant="surface"
+                                size="small"
+                            />
                         ))}
+                </Flex>
+            </Flex>
+            
+            <Tabs.Root defaultValue="results" className="w-full">
+                <Tabs.List className="flex justify-center  mb-4">
+                    <Tabs.Trigger value="results" className="mr-4 px-4 py-2 text-lg">
+                        Results Summary
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="real-story" className="mr-4 px-4 py-2 text-lg">
+                        Real Story
+                    </Tabs.Trigger>
+                    <Tabs.Trigger value="deduction" className="px-4 py-2 text-lg">
+                        Your Deduction
+                    </Tabs.Trigger>
+                </Tabs.List>
+
+                <Tabs.Content value="results" className="mt-4">
+                    <ResultsSummary elo={elo} newElo={newElo} badges={badges} leaderboardUpdating={leaderboardUpdating} />
+                </Tabs.Content>
+
+                <Tabs.Content value="real-story" className="mt-4">
+                    <Flex direction="column" gap="4">
+                        <Flex direction="row" gap="3" wrap="wrap" justify={'center'} align={'center'}>
+                            {gameState.crime?.realStory.map((storyItem, index) => (
+                                <OffenseReportCard key={index} offenseReport={storyItem} index={index} />
+                            ))}
+                        </Flex>
                     </Flex>
+                </Tabs.Content>
 
-
-
-
-                    <Flex direction="column" gap="4" className="w-full h-[600px] justify-center align-center">
-                        <AnimatedText animationSpeed={200} className='text-5xl text-center winnerHeader' message='Your Deduction' />
+                <Tabs.Content value="deduction" className="mt-4">
+                    <Flex direction="column" gap="4" className="h-[70vh] w-full" justify={'center'} align={'center'}>
                         <DeductionFlow
                             gameState={gameState}
                         />
-
                     </Flex>
-                </Flex>
-            </ScrollArea>
+                </Tabs.Content>
+            </Tabs.Root>
         </Flex>
     );
 };
@@ -1338,8 +1313,8 @@ const SingleGame = () => {
     );
 
     const gameIsOver = useMemo(() => {
-        return gameState?.status == 'finished';
-        // return false;
+        // return gameState?.status == 'finished';
+        return false;
     }, [gameState])
 
     const activeRound = useMemo(() => {
@@ -1348,7 +1323,7 @@ const SingleGame = () => {
         const activeRound = gameState?.rounds?.find((round) => round.status === 'active')
         console.log(gameState);
         return activeRound;
-        // return {type: 'voting'}
+        // return {type: 'interrogation'}
     }, [gameState]);
 
     const activeConversation = useMemo(() => {
@@ -1552,9 +1527,10 @@ const SingleGame = () => {
             });
 
             leaderboardService.getGameResultsForUser(roomId, user?.id || '').then((response) => {
-                setPlayerBadges(response.results.badges);
+                const result = response.results[0];
+                setPlayerBadges(result.badges);
                 setLeaderboardUpdating(false);
-                setPlayerElo({ oldRating: response.results.old_rating, newRating: response.results.new_rating });
+                setPlayerElo({ oldRating: result.old_rating, newRating: result.new_rating });
             });
         }
 
@@ -1677,10 +1653,11 @@ const SingleGame = () => {
         }
 
         if (activeRound?.type === 'interrogation') {
-            if (activeRound?.conversations.find((conversation) => {
+            if (activeRound?.conversations?.find((conversation) => {
                 return conversation.active
             })) {
                 return (
+                    
                     <Interrogation
                         wavStreamPlayerRef={wavStreamPlayerRef}
                         loadingSessionEnd={loadingSessionEnd}
@@ -1698,6 +1675,7 @@ const SingleGame = () => {
                 );
             } else {
                 return (
+                
                     <ChooseInterrogation gameState={gameState} interrogationLoading={interrogationLoading} handleStartInterrogation={handleStartInterrogation} />
                 );
             }

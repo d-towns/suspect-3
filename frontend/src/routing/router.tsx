@@ -9,6 +9,7 @@ import FAQ from '../pages/faq';
 import Leaderboard from '../pages/leaderboard';
 import Terms from '../pages/terms';
 import Home from '../pages/home';
+import Profile from '../pages/profile';
 
 const router = createBrowserRouter([
   {
@@ -51,6 +52,10 @@ const router = createBrowserRouter([
             element: <RenderGame />,
 
           },
+          {
+            path: 'profile',
+            element: <Profile/>
+          }
         ],
       },
     ],

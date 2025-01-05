@@ -11,6 +11,7 @@ import {
   Inset,
   Strong,
 } from '@radix-ui/themes';
+import { useSocketContext } from '../context/SocketContext/socket.context';
 
 
 interface ModeCardProps {
@@ -64,6 +65,11 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const {socket} = useSocketContext();
+
+  if(socket){
+    console.log('socket connected');
+  }
 
   const createRoom = async (mode: string) => {
     if (!user) return;

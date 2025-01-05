@@ -17,33 +17,34 @@ const FAQ: React.FC = () => {
             <Box className=" p-6 rounded-lg shadow-lg mt-6 w-full">
                 <Tabs.Root defaultValue="single" aria-label="Game Mode Tabs">
                     <Tabs.List className='w-full flex justify-center'>
-                        <Tabs.Trigger value="single" className='text-3xl game-heading'>Single Player</Tabs.Trigger>
-                        <Tabs.Trigger value="multi" className='text-3xl game-heading'>Multiplayer</Tabs.Trigger>
+                        <Tabs.Trigger value="single" className='text-xl game-heading'>Single Player</Tabs.Trigger>
+                        <Tabs.Trigger value="multi" className='text-xl game-heading'>Multiplayer</Tabs.Trigger>
                     </Tabs.List>
                     <Tabs.Content value="single">
                         <Grid columns={{ sm: '1' }} gap="9" mt={'5'}>
-                            <Flex>
-                                <Box width={'50%'}>
+                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} >
+                                <Box>
                                 <Heading as="h3" size="6" mb="2">
                                     Step 1
                                 </Heading>
-                                <Text size={'8'}>Once the game is started, you will be shown an offense report. This is what the authorities currently know about the crime</Text>
+                                <Text size={'6'}>Once the game is started, you will be shown an offense report. This is what the authorities currently know about the crime</Text>
                                 </Box>
-                                <img src="/offense-report.gif" alt="Single Player" className="w-1/2" />
+                                <img src="/offense-report.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex>
-                                <Box width={'50%'}>
+                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} >
+                                <Box >
                                 <Heading as="h3" size="6" mb="2">
                                     Step 2
                                 </Heading>
-                                <Text size={'8'}>You will then have 10 minutes to interrogate any suspects you want, one at a time. Ask them about the crime and their involvement in it</Text>
+                                <Text size={'6'}>You will then have 10 minutes to interrogate any suspects you want, one at a time. Ask them about the crime and their involvement in it</Text>
                                 </Box>
-                                <img src="/interrogation.gif" alt="Single Player" className="w-1/2" />
+                                <img src="/interrogation.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex>
-                                <Box width={'50%'}>
+                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'}>
+
+                                <Box>
                                 <Heading as="h3" size="6" mb="2">
                                     Step 3
                                 </Heading>
@@ -59,23 +60,27 @@ const FAQ: React.FC = () => {
                                 </Text>
                                 </Flex>
                                 </Box>
-                                <img src="/deduction.gif" alt="Single Player" className="w-1/2" />
+                                <img src="/deduction.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex>
-                                <Box width={'50%'}>
+                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} align={'center'}>
+
+                                <Box >
                                 <Heading as="h3" size="6" mb="2">
                                     Step 4
                                 </Heading>
                                 <Flex direction={'column'} gap={'6'}>
-                                <Text size={'8'}>Submit Your deduction and find out if you solved the crime!</Text>
-                                <Text size={'8'}>If you are correct, you win! If you are incorrect, you lose.</Text>
-                                <Text size={'8'}>You will get a updated leaderboard rating as well as custom badges that describe how you play</Text>
+                                <Text size={'6'}>Submit Your deduction and find out if you solved the crime!</Text>
+                                <Text size={'6'}>If you are correct, you win! If you are incorrect, you lose.</Text>
+                                <Text size={'6'}>You will get a updated leaderboard rating as well as custom badges that describe how you play</Text>
                                 </Flex>
                                 </Box>
-                                <img src="/results.gif" alt="Single Player" className="w-1/2" />
+                                <img src="/results.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
+                            <Text  size="9" mb="2" className='text-center'>
+                                Good Luck, Detective!
+                            </Text>
                         </Grid>
                     </Tabs.Content>
                     <Tabs.Content value="multi" mt={'5'}>

@@ -36,7 +36,8 @@ router.put("/:userId", asyncHandler(updateLeaderboardEntry));
 // DELETE /leaderboard/:userId
 router.delete("/:userId", asyncHandler(deleteLeaderboardEntry));
 
-router.get("/:gameId/results", asyncHandler(getGameResultsForUser));
+router.get("/game/:gameId/results", asyncHandler(getGameResultsForUser));
+router.get("/user/:userId/results", asyncHandler(getAllGameResultsForUser));
 
 async function getLeaderboard(req, res) {
   const supabase = createSupabaseClient({ req, res });
@@ -194,6 +195,35 @@ async function getGameResultsForUser(req, res) {
   }
 
   
+
+  if (!data) {
+    console.log("Game results not found");
+    return res.status(404).json({
+      success: false,
+      message: "Game results not found",
+    });
+  }
+
+  return res.status(200).json({ success: true, results: data });
+}
+
+async function getAllGameResultsForUser(req, res) {
+  const { userId } = req.params;
+  const page = parseInt(req.query.page) || 1;
+
+  console.log("Getting all game results for user:", userId);
+
+  const { data, error } = await LeaderboardService.getAllGameResultsForUser(userId, page);
+
+  if (error) {
+    console.error("Error fetching game results:", error);
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching game results: ${error.message}`,
+    });
+  }
+
+  console.log("Game results:", data);
 
   if (!data) {
     console.log("Game results not found");

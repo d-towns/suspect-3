@@ -92,7 +92,7 @@ export class LeaderboardService {
           .from("game_results")
           .select("*")
           .eq("user_id", userId)
-          .eq("game_room_id", gameId).single();
+          .eq("game_room_id", gameId)
 
           console.log("Game results for user:", data);
       
@@ -100,6 +100,23 @@ export class LeaderboardService {
           throw new Error(`Error fetching game results: ${error.message}`);
         }
       
+        return { data, error };
+      }
+
+      static async getAllGameResultsForUser(userId, page) {
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        const limit = 30;
+        const offset = (page - 1) * limit;
+        const { data, error } = await supabase
+          .from("game_results")
+          .select("*")
+          .eq("user_id", userId)
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          throw new Error(`Error fetching game results: ${error.message}`);
+        }
+
         return { data, error };
       }
 

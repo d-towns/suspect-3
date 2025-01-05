@@ -19,7 +19,7 @@ export const useSocket = () => {
   const navigate = useNavigate();
 
   const connectSocket = useCallback(() => {
-    console.warn('Connecting socket');
+    // console.warn('Connecting socket');
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
@@ -44,7 +44,7 @@ export const useSocket = () => {
     setSocket(newSocket);
 
     return () => {
-      console.warn('Disconnecting socket');
+      // console.warn('Disconnecting socket');
       newSocket.disconnect();
 
     };
@@ -73,6 +73,8 @@ export const useSocket = () => {
           console.error(`Failed to join room: ${response.error}`);
         }
       });
+    } else {
+      console.error('Socket not connected or room not joined');
     }
   }, [socket, isConnected, roomId, user]);
 
@@ -86,7 +88,7 @@ export const useSocket = () => {
       }, HEARTBEAT_INTERVAL);
 
       return () => {
-        console.warn('Clearing heartbeat interval');
+        // console.warn('Clearing heartbeat interval');
         clearInterval(interval)
       };
     }
@@ -144,10 +146,11 @@ export const useSocket = () => {
   }, [isConnected, addToast, connectSocket]);
 
   useEffect(() => {
+    console.log('useEffect: connectSocket');
     const cleanup = connectSocket();
 
     return cleanup;
-  }, []);
+  } , [] );
 
   useEffect(() => {
     const stopHeartbeat = startHeartbeat();

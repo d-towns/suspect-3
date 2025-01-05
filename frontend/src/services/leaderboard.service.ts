@@ -31,7 +31,8 @@ export interface GameResultResponse {
         new_rating: number;
         won: boolean;
         badges: Badge[];
-    }
+    }[];
+    message?: string;
 }
 
 export const leaderboardService = {
@@ -116,8 +117,20 @@ export const leaderboardService = {
      */
     getGameResultsForUser: async (gameId: string, userId:string): Promise<GameResultResponse> => {
         try {
-            const response = await axiosInstance.get(`/leaderboard/${gameId}/results`,
+            const response = await axiosInstance.get(`/leaderboard/game/${gameId}/results`,
                 { params: { userId: userId } });
+            console.log('Game results:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching game results for user:', error);
+            throw error;
+        }
+    },
+
+    getAllGameResults: async (userId: string, page: number): Promise<GameResultResponse> => {
+        try {
+            const response = await axiosInstance.get(`/leaderboard/user/${userId}/results`,
+                { params: { page: page } });
             console.log('Game results:', response.data);
             return response.data;
         } catch (error) {
