@@ -17,19 +17,19 @@ const sampleOffenses : OffenseReportItem[] = [
   {
     location: 'The Office',
     time: '9:00 AM',
-    description: 'The victim was found dead in the office with a stab wound to the chest.',
+    description: 'The suspects in case #1E9Z were brought into HQ for questioning. None of them claimed to have seen the victim.',
     imgSrc: '/multi-player-splash.webp'
   },
   {
-    location: 'The Kitchen',
+    location: 'The Interrogation Room',
     time: '9:00 AM',
-    description: 'The victim was called in for dinner and was found dead in the kitchen with a stab wound to the chest.',
+    description: 'Suspect #UK3 was brought in for questioning. Their alibi was loose and they were seen near the crime scene.',
     imgSrc: '/single-player-splash.webp'
   },
   {
-    location: 'The Bedroom',
+    location: 'The Bozeman Hotel',
     time: '9:00 AM',
-    description: 'The victim was found dead in the bedroom with a stab wound to the chest.',
+    description: 'The suspect entered the hotel at 9:00 AM and left at 9:30 AM. The victim was found dead at 9:15 AM.',
     imgSrc: '/backdoor.webp'
   }
 ];
@@ -91,7 +91,7 @@ const Home: React.FC = () => {
       px="4"
     >
 
-      <AnimatedText className='text-9xl main-header mb-5' animationSpeed={200}  message="Suspect" />
+      <AnimatedText className='text-7xl md:text-9xl main-header mb-5' animationSpeed={200}  message="Suspect" />
       <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -99,13 +99,13 @@ const Home: React.FC = () => {
 
       >
       <Flex direction="row" gap="4" mb="6" className='h-full z-10'>
-        {user ? <Link to='/play'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> :  <Text onClick={() => setLoginDialogOpen(true)} size={'8'} as='span' className='main-link'>Login</Text> }
+        {user ? <Link to='/play'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link'>Play</Text></Link> :  <Text onClick={() => setLoginDialogOpen(true)} size={{initial: '6', md: '8'}} as='span' className='main-link'>Login</Text> }
        {!user && <LoginDialog open={loginDialogOpen} onOpenChange={() => setLoginDialogOpen(false)}/>}
         {/* <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> */}
         <Separator orientation="vertical" size={'2'} />
-        <Link to='/faq'> <Text size={'8'} as='span' className='main-link z-10'>How To Play</Text></Link>
+        <Link to='/faq'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link z-10'>How To Play</Text></Link>
         <Separator orientation="vertical" size={'2'} />
-        <Link to='/leaderboard'> <Text size={'8'} as='span' className='main-link'>Leaderboard </Text></Link>
+        <Link to='/leaderboard'> <Text size={{initial: '6', md: '8'}}as='span' className='main-link'>Leaderboard </Text></Link>
       </Flex>
       </motion.div>
       </Flex>
@@ -117,10 +117,10 @@ const Home: React.FC = () => {
         <motion.div
           initial={{
             opacity: 0,
-            ...(Math.random() > 0.5 ? { x: Math.random() * 700 } : { y: Math.random() * 400 })
+            ...(Math.random() > 0.5 ? { x: 100} : { y: Math.random() * 400 })
           }}
           
-          animate={{ opacity: .20, x: Math.random() * 700, y: Math.random() * 400 }}
+          animate={{ opacity: .20, x: 100, y: Math.random() * 400 }}
           exit={{
             opacity: 0,
             ...(Math.random() > 0.5 ? { x: -100 } : { y: -100 })

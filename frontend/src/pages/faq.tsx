@@ -10,7 +10,7 @@ const FAQ: React.FC = () => {
                 <Heading as="h2" size="8" mb="4" className='game-heading'>
                     Game Overview
                 </Heading>
-                <Text mb="4" size={'8'}>
+                <Text mb="4" size={{initial: '6', sm: '7', md: '8'}}>
                     Suspect is a mystery game about deception and deduction. We use LLM's to create unique crime scenarios that the players take part in via real-time voice communication either as a detective or a suspect.
                 </Text>
             </Box>
@@ -22,7 +22,7 @@ const FAQ: React.FC = () => {
                     </Tabs.List>
                     <Tabs.Content value="single">
                         <Grid columns={{ sm: '1' }} gap="9" mt={'5'}>
-                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} >
+                            <Flex direction={{ initial: 'column', md: 'row' }} gap="4" justify={'center'} >
                                 <Box>
                                 <Heading as="h3" size="6" mb="2">
                                     Step 1
@@ -32,7 +32,7 @@ const FAQ: React.FC = () => {
                                 <img src="/offense-report.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} >
+                            <Flex direction={{ initial: 'column', md: 'row' }} gap="4" justify={'center'} >
                                 <Box >
                                 <Heading as="h3" size="6" mb="2">
                                     Step 2
@@ -42,7 +42,7 @@ const FAQ: React.FC = () => {
                                 <img src="/interrogation.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'}>
+                            <Flex direction={{ initial: 'column', md: 'row' }} gap="4" justify={'center'}>
 
                                 <Box>
                                 <Heading as="h3" size="6" mb="2">
@@ -63,7 +63,7 @@ const FAQ: React.FC = () => {
                                 <img src="/deduction.gif" alt="Single Player" className="md:w-1/2 sm:w-full" />
                                 
                             </Flex>
-                            <Flex direction={{ sm: 'column', md: 'row' }} gap="4" justify={'center'} align={'center'}>
+                            <Flex direction={{ initial: 'column', md: 'row' }} gap="4" justify={'center'} align={'center'}>
 
                                 <Box >
                                 <Heading as="h3" size="6" mb="2">
