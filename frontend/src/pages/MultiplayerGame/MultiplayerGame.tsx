@@ -382,7 +382,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, elo, newElo, badges }) =
     <Flex direction="column" gap="4" >
       <Flex>
         <Box className="flex flex-col w-full items-center justify-center h-full">
-          {gameState.outcome?.winner === 'innocents' ? (
+          {gameState.outcome === 'win' ? (
             <>
               <Heading className="mb-4 text-4xl">Innocents Win!</Heading>
               <Flex gap="4"  mt={'9'} direction={{sm: 'column', md: 'row'}} width={'80%'} justify={'between'} >
@@ -587,30 +587,36 @@ const MultiplayerGame = () => {
 
   const handleUserAudioTranscriptEvent = useCallback((params: any) => {
     console.log('Received audio transcript:', params);
-    const { speaker, audioTranscript, currentRoundTime } = params;
-    setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker }]);
+    const { speaker, audioTranscript, currentRoundTime, responseId } = params;
+    setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker, responseId }]);
     setAudioTranscribing(false);
   }, [roundTimer]);
 
   const handleRealtimeAudioTranscriptEvent = (params: any) => {
-    const { speaker, transcript, currentRoundTime } = params;
+    const { speaker, transcript, currentRoundTime, responseId } = params;
+    console.log('Received audio transcript:', params);
     setInterrogationTranscript(prev => {
-      const lastItem = prev[prev.length - 1];
-      if (!lastItem) {
-        // If there's no last item, create a new one and add the delta as the first text of the transcript
-        return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
-      } else if (lastItem.speaker !== speaker) {
-        // If the speaker has changed, create a new item
-        return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker }];
-      }
-      const updatedItem = {
-        ...lastItem,
-        audioTranscript: lastItem.audioTranscript + transcript,
-        speaker
-      };
-      return [...prev.slice(0, prev.length - 1), updatedItem];
+        const lastItem = prev[prev.length - 1];
+        if (!lastItem) {
+            // If there's no last item, create a new one
+            return [{ audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }];
+        }
+
+        if (!prev.find((item) => item.responseId === responseId)) {
+            // If the responseId is different, add as new item
+            return [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }];
+        }
+
+        // Append to existing item
+        return prev.map((item) => {
+            if (item.responseId === responseId) {
+                return { ...item, audioTranscript: item.audioTranscript + ' ' + transcript };
+            }
+            return item;
+        });
     });
-  };
+};
+
 
   const handleRealtimeAudioDeltaEvent = async (params: { speaker: string, audio: Int16Array }) => {
     console.log('Received audio delta:', params);
@@ -975,7 +981,7 @@ const MultiplayerGame = () => {
                           <p><strong>Type:</strong> {gameState.crime.type || 'Unknown'}</p>
                           <p><strong>Location:</strong> {gameState.crime.location || 'Unknown'}</p>
                           <p><strong>Time:</strong> {gameState.crime.time || 'Unknown'}</p>
-                          <p className="mb-4"><strong>Description:</strong> {gameState.crime.description || 'No description available'}</p>
+                          <p className="mb-4"><strong>Description:</strong> {gameState.crime.offenseReport[0].description || 'No description available'}</p>
                         </>
                       )}
                       <h3 className="text-xl font-bold mb-2">Your Evidence:</h3>

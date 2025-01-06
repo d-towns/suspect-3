@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table, IconButton, Text, Card, Badge } from "@radix-ui/themes";
 import { GameResult } from '../models/gameResults.model';
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
