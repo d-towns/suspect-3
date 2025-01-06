@@ -10,6 +10,8 @@ import Terms from '../pages/terms';
 import Home from '../pages/home';
 import Profile from '../pages/profile';
 import TokenPage from '../pages/token';
+import ErrorBoundary from '../pages/errorBoundary';
+import { ThemeProvider } from '../context/ThemeContext';
 
 const router = createBrowserRouter([
   {
@@ -57,6 +59,7 @@ const router = createBrowserRouter([
         ],
       },
     ],
+    errorElement:<ThemeProvider><ErrorBoundary /></ThemeProvider> 
   },
 ]);
 
