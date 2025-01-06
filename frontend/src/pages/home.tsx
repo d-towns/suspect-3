@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Flex, Text, Separator } from '@radix-ui/themes';
 import './home.css'
@@ -44,8 +44,7 @@ const sampleAnimatedTexts = [
 
 const Home: React.FC = () => {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
-  const nodeRef = useRef(null);
-  const [cardsRendered, setCardsRendered] = useState(sampleOffenses.map((offense, index) => {return {index: index, rendered: false}}));
+  const [cardsRendered, setCardsRendered] = useState(sampleOffenses.map((_, index) => {return {index: index, rendered: false}}));
   const [animatedTextsState, setAnimatedTextsState] = useState(
     sampleAnimatedTexts.map((_, i) => ({ index: i, rendered: false }))
   );

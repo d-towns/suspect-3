@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/auth.context';
-import { useNavigate } from 'react-router-dom';
 import {
   Button,
   Flex,
@@ -26,21 +25,14 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ open, onOpenChange }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState(false);
-  const { login, loginWithGoogle, user } = useAuth();
-  const navigate = useNavigate();
-
-  // useEffect(() => {
-  //   if (user) {
-  //     navigate('/play');
-  //   }
-  // }, [user, navigate]);
+  const { login, loginWithGoogle } = useAuth();
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await login(email, '');
+      await login(email);
       setSignupSuccess(true);
     } catch (err) {
       setError(`An error occurred. Please try again. ${err instanceof Error ? err.message : ''}`);

@@ -15,7 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   guestSignIn: (username: string) => Promise<void>;
@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   //   }
   // };
 
-  const login = async (email: string, password: string, provider: string = 'none') => {
+  const login = async (email: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOtp({

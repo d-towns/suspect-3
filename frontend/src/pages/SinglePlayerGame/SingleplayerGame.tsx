@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSocketContext } from '../../context/SocketContext/socket.context';
-import { ConversationItem, SingleGameState, Suspect, Lead, Deduction, OffenseReportItem, Conversation, DeductionNode, EdgeType } from '../../models/game-state.model';
+import { ConversationItem, SingleGameState, Suspect, Deduction, OffenseReportItem, Conversation, DeductionNode, EdgeType } from '../../models/game-state.model';
 import { Badge as GameResultBadge } from '../../models/gameResults.model';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomsService } from '../../services/rooms.service';
 import { leaderboardService } from '../../services/leaderboard.service';
 import { useAuth } from '../../context/auth.context';
-import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiPlus, FiInfo } from 'react-icons/fi';
+import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp, FiSidebar, FiInfo } from 'react-icons/fi';
 import AudioRecorder from '../../components/audioRecorder';
 import ResponseLoading from '../../components/responseLoading';
-import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, RadioCards, Tooltip, Avatar, Separator, HoverCard, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, Inset, IconButton, Callout, Progress, Container } from '@radix-ui/themes';
+import { Card, Flex, SegmentedControl, AlertDialog, Box, Text, Grid, Button, RadioCards, Tooltip, Avatar, Separator, HoverCard, Heading, ScrollArea, Badge, Strong, CardProps, Tabs, Spinner, IconButton, Callout, Progress } from '@radix-ui/themes';
 import './game.css';
 import { Socket } from 'socket.io-client';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -89,50 +89,6 @@ const OffenseReport: React.FC<OffenseReportProps> = ({ offenseReport, handleStar
 };
 
 
-
-interface LeadCardProps {
-    lead: Lead | null;
-    suspects: Suspect[];
-    index: number;
-}
-
-const LeadCard: React.FC<LeadCardProps> = ({ lead, suspects, index }) => {
-    return (
-        <Card style={{ height: '150px' }} className='w-full'>
-            <Flex
-                direction="column"
-                className="gap-2 p-2 items-left justify-center rounded-lg transition-all duration-100 hover:cursor-pointer"
-            >
-                {lead ? (
-                    <>
-                        <Text as="p" size="2" className="text-left">
-                            {suspects.find((suspect) => suspect.id === lead.suspect)?.name}
-                        </Text>
-                        <ScrollArea className="h-20 p-1" type='auto'>
-                            <Text
-                                as="p"
-                                size="2"
-                                weight="bold"
-                                style={{
-                                    textAlign: 'center',
-                                }}
-                            >
-                                {lead.evidence}
-                            </Text>
-                        </ScrollArea>
-                    </>
-                ) : (
-                    <Text as="p" size="3" weight="bold" color="gray">
-                        Lead #{index + 1}
-                    </Text>
-                )}
-            </Flex>
-        </Card>
-    );
-};
-
-
-
 interface ChiefCardProps {
     gameState: SingleGameState;
     messages: string[];
@@ -140,7 +96,7 @@ interface ChiefCardProps {
     deduction?: Deduction;
 }
 
-const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduction, messages = [] }) => {
+const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(messages.length);
     const [openMessage, setOpenMessage] = useState<number | null>(null);
@@ -174,7 +130,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     {unreadCount > 0 && (
                         <Box
                             className="absolute top-3 right-0 w-4 h-4 rounded-full"
-                            
+
                         >
                             <Text size="3" align="center" mb={'4'} style={{ backgroundColor: 'darkred' }} className='rounded-xl py-1 px-2'>
                                 {unreadCount}
@@ -189,7 +145,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ gameState, defaultMessage, deduct
                     <ScrollArea style={{ height: 'fit', width: '100%' }}>
                         <Flex direction="column" gap="2">
                             {messages.length > 0 ? (
-                                messages.map((msg, index) => (
+                                messages.map((_, index) => (
                                     <Box
                                         key={index}
                                         onClick={() => handleMessageClick(index)}
@@ -265,22 +221,22 @@ const AllowAutoplayDialog: React.FC<AllowAutoplayDialogProps> = ({ open, onClose
     return (
         <AlertDialog.Root open={open} onOpenChange={onClose}>
             <AlertDialog.Content size='4'>
-            <AlertDialog.Title align={'center'}>Allow Autoplay</AlertDialog.Title>
-            <AlertDialog.Description>
-            <Text as="span" size="3" align="center" className='w-full'>
+                <AlertDialog.Title align={'center'}>Allow Autoplay</AlertDialog.Title>
+                <AlertDialog.Description>
+                    <Text as="span" size="3" align="center" className='w-full'>
                         This game requires audio playback. Please allow autoplay to proceed.
                     </Text>
                 </AlertDialog.Description>
-                    <Flex justify="center" mt="6" gap={'6'}>
-                        <AlertDialog.Cancel onClick={() => onClose()}>
-                            <Button variant="soft" color="gray">
-                                Cancel
-                            </Button>
-                        </AlertDialog.Cancel>
-                        <AlertDialog.Action onClick={() => onAllow()}>
-                            <Button variant="soft">Allow</Button>
-                        </AlertDialog.Action>
-                    </Flex>
+                <Flex justify="center" mt="6" gap={'6'}>
+                    <AlertDialog.Cancel onClick={() => onClose()}>
+                        <Button variant="soft" color="gray">
+                            Cancel
+                        </Button>
+                    </AlertDialog.Cancel>
+                    <AlertDialog.Action onClick={() => onAllow()}>
+                        <Button variant="soft">Allow</Button>
+                    </AlertDialog.Action>
+                </Flex>
             </AlertDialog.Content>
         </AlertDialog.Root>
     );
@@ -296,7 +252,6 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
     suspect,
     variant,
     size = 'small',
-    disabled,
     onClick,
 }) => {
     if (!suspect) return null;
@@ -551,7 +506,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
             fitView
         >
             <Background />
-            <Controls position='top-right' style={{flexDirection:'row', position:'absolute', top:'80px', width:'130px'}}/>
+            <Controls position='top-right' style={{ flexDirection: 'row', position: 'absolute', top: '80px', width: '130px' }} />
             <Panel position="top-right" className="flex flex-col gap-4">
                 <Heading size="3" className='w-full text-center'>Layout Controls</Heading>
                 <Flex gap={'4'}>
@@ -638,20 +593,12 @@ interface VotingRoundProps {
 
 const VotingRound: React.FC<VotingRoundProps> = ({
     gameState,
-    killerVote,
-    deductionSubmitted,
     deductionLoading,
     handleCreateNewLead,
     handleRemoveLead,
     handleCreateNewdeductionNode,
-    setKillerVote,
     handleSubmitDeduction,
-    handleShowGameOver,
-    handleVoteSubmission,
-    handleStartNextRound,
-    voteSubmitted,
 }) => {
-    const cheifMessage = "I see you've been hard at work, Detective. Who do you think is the culprit?";
     const [activeConversation, setActiveConversation] = useState<Conversation | undefined>(undefined);
 
     return (
@@ -805,7 +752,6 @@ interface InterrogationProps {
 
 const Interrogation: React.FC<InterrogationProps> = ({
     interrogationTranscript,
-    roundTimer,
     responseLoading,
     audioTranscribing,
     socket,
@@ -830,38 +776,38 @@ const Interrogation: React.FC<InterrogationProps> = ({
                         <Box>
 
                             <Flex className='w-full' justify={'start'} direction={'column'}>
-                            <ScrollArea className='h-[400px] w-full'>
-                            <Flex className='w-full' justify={'center'} align={'center'} direction={'column'}>
-                                {/* <SuspectCard suspect={currentSuspect} variant='surface' size='small' /> */}
-                                <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
-                            </Flex>
-                                {interrogationTranscript.map((conversationItem, index) => (
-                                    <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
-                                        <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
-                                            <Box ml="2" mb="2">
-                                                <Text as="p" weight="bold" size="3">
-                                                    {Math.floor(conversationItem.timestamp / 60)}:
-                                                    {conversationItem.timestamp % 60 < 10 ? '0' : ''}
-                                                    {conversationItem.timestamp % 60}
-                                                </Text>
-                                            </Box>
-                                            <Box className="col-span-7">
-                                                <Text align="left" as="span">
-                                                    {conversationItem.audioTranscript}
-                                                </Text>
-                                            </Box>
-                                        </Flex>
-                                    </Tooltip>
-                                ))}
-                                                                <Flex direction={'column'} className='w-full'>
-                                {responseLoading && (
-                                    <ResponseLoading label={`${currentSuspect?.name}...`} />
-                                )}
-                                {audioTranscribing && (
-                                    <ResponseLoading label="Transcribing your response..." />
-                                )}
-                                </Flex>
-                            </ScrollArea>
+                                <ScrollArea className='h-[400px] w-full'>
+                                    <Flex className='w-full' justify={'center'} align={'center'} direction={'column'}>
+                                        {/* <SuspectCard suspect={currentSuspect} variant='surface' size='small' /> */}
+                                        <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
+                                    </Flex>
+                                    {interrogationTranscript.map((conversationItem, index) => (
+                                        <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
+                                            <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
+                                                <Box ml="2" mb="2">
+                                                    <Text as="p" weight="bold" size="3">
+                                                        {Math.floor(conversationItem.timestamp / 60)}:
+                                                        {conversationItem.timestamp % 60 < 10 ? '0' : ''}
+                                                        {conversationItem.timestamp % 60}
+                                                    </Text>
+                                                </Box>
+                                                <Box className="col-span-7">
+                                                    <Text align="left" as="span">
+                                                        {conversationItem.audioTranscript}
+                                                    </Text>
+                                                </Box>
+                                            </Flex>
+                                        </Tooltip>
+                                    ))}
+                                    <Flex direction={'column'} className='w-full'>
+                                        {responseLoading && (
+                                            <ResponseLoading label={`${currentSuspect?.name}...`} />
+                                        )}
+                                        {audioTranscribing && (
+                                            <ResponseLoading label="Transcribing your response..." />
+                                        )}
+                                    </Flex>
+                                </ScrollArea>
 
                             </Flex>
                         </Box>
@@ -1023,7 +969,7 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
                                 ) : eloDiff < 0 ? (
                                     eloDiff < -15 ? (
                                         <>
-                                            <FiChevronsDown className='inline text-red-500' size={'30'}/> <Text className='text-3xl inline text-red-500' as='span'>{eloDiff}</Text>
+                                            <FiChevronsDown className='inline text-red-500' size={'30'} /> <Text className='text-3xl inline text-red-500' as='span'>{eloDiff}</Text>
                                         </>
                                     ) : (
                                         <>
@@ -1040,20 +986,20 @@ const ResultsSummary: React.FC<ResultsSummaryProps> = ({ elo, newElo, badges, le
                 <Separator size="4" />
                 <Text className='text-2xl' weight={'bold'}>Badges</Text>
                 <Flex gap={'2'}>
-               
+
                     {badges.map((badge, index) => (
-                            <HoverCard.Root key={index}>
-                                <HoverCard.Trigger>
-                                    <Badge key={index} size='2' variant='surface' className="cursor-pointer">
-                                        <Text className='text-xl'>{badge.badge}</Text>
-                                    </Badge>
-                                </HoverCard.Trigger>
-                                <HoverCard.Content asChild side="top" align="center">
-                                    <Box className="p-2 rounded">
-                                        <Text> {badge.explanation} </Text>  
-                                    </Box>
-                                </HoverCard.Content>
-                            </HoverCard.Root>
+                        <HoverCard.Root key={index}>
+                            <HoverCard.Trigger>
+                                <Badge key={index} size='2' variant='surface' className="cursor-pointer">
+                                    <Text className='text-xl'>{badge.badge}</Text>
+                                </Badge>
+                            </HoverCard.Trigger>
+                            <HoverCard.Content asChild side="top" align="center">
+                                <Box className="p-2 rounded">
+                                    <Text> {badge.explanation} </Text>
+                                </Box>
+                            </HoverCard.Content>
+                        </HoverCard.Root>
                     ))}
                 </Flex>
             </Flex>
@@ -1101,7 +1047,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
                         ))}
                 </Flex>
             </Flex>
-            
+
             <Tabs.Root defaultValue="results" className="w-full">
                 <Tabs.List className="flex justify-center  mb-4">
                     <Tabs.Trigger value="results" className="mr-4 px-4 py-2 text-lg">
@@ -1226,12 +1172,12 @@ const SingleGame = () => {
         // return {type: 'interrogation'}
     }, [gameState]);
 
-    const activeConversation = useMemo(() => {
-        if (!gameState) return null;
-        const activeConversation = gameState?.rounds?.find((round) => round?.type === "interrogation")
-            ?.conversations.find((conversation) => conversation.active);
-        return activeConversation;
-    }, [gameState]);
+    // const activeConversation = useMemo(() => {
+    //     if (!gameState) return null;
+    //     const activeConversation = gameState?.rounds?.find((round) => round?.type === "interrogation")
+    //         ?.conversations.find((conversation) => conversation.active);
+    //     return activeConversation;
+    // }, [gameState]);
 
     const activeSuspect = useMemo(() => {
         const activeSuspectId = gameState?.rounds?.find((round) => round?.type === "interrogation")
@@ -1504,12 +1450,12 @@ const SingleGame = () => {
         emitEvent('realtime:end', roomId);
     }
 
-    const updateLeaderboard = () => {
-        if (!socket) {
-            return;
-        }
-        emitEvent('leaderboard:update', {});
-    }
+    // const updateLeaderboard = () => {
+    //     if (!socket) {
+    //         return;
+    //     }
+    //     emitEvent('leaderboard:update', {});
+    // }
 
     const renderGameContent = (): JSX.Element | null => {
 
@@ -1557,7 +1503,7 @@ const SingleGame = () => {
                 return conversation.active
             })) {
                 return (
-                    
+
                     <Interrogation
                         wavStreamPlayerRef={wavStreamPlayerRef}
                         loadingSessionEnd={loadingSessionEnd}
@@ -1575,7 +1521,7 @@ const SingleGame = () => {
                 );
             } else {
                 return (
-                
+
                     <ChooseInterrogation gameState={gameState} interrogationLoading={interrogationLoading} handleStartInterrogation={handleStartInterrogation} />
                 );
             }
