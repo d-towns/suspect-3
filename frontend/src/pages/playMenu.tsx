@@ -14,6 +14,7 @@ interface ModeCardProps {
   altText: string;
   description?: string;
   mode: 'single' | 'multi';
+  blocked?: boolean;
 }
 
 const ModeCard: React.FC<ModeCardProps> = ({
@@ -21,21 +22,27 @@ const ModeCard: React.FC<ModeCardProps> = ({
   imgSrc,
   altText,
   description,
-  mode
+  mode,
+  blocked = false
 }) => {
+  const handleClick = () => {
+    if (!blocked) createRoom(mode);
+  };
+
   return (
     <Box
       maxWidth="640px"
       style={{
         position: 'relative',
         flex: 1,
-        cursor: 'pointer',
         margin: '0 16px',
+        cursor: blocked ? 'not-allowed' : 'pointer',
+        opacity: blocked ? 0.6 : 1,
       }}
     >
       <Card
         size="3"
-        onClick={() => createRoom(mode)}
+        onClick={handleClick}
         className="hover:scale-105 hover:border transition ease-in-out duration-200"
       >
         <Inset clip="padding-box" side="top" pb="current">
@@ -46,10 +53,20 @@ const ModeCard: React.FC<ModeCardProps> = ({
           />
         </Inset>
         <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
-          <Strong>{altText} Mode</Strong>
+        { blocked && (
+          <Text as="p" color="orange" size={{ sm: '2', md: '3', lg: '4' }}>
+            This mode is currently under construction
+          </Text>
+        )}
+          <Strong style={{textDecoration: blocked ? 'line-through': 'none'}}>{altText} Mode</Strong>
         </Text>
         <Separator my="3" size="4" />
-        {description && <Text as="p" size={{ sm: '2', md: '3', lg: '4' }}>{description}</Text>}
+        {description && (
+          <Text as="p" size={{ sm: '2', md: '3', lg: '4' }}>
+            {description}
+          </Text>
+        )}
+
         <Separator my="3" size="4" />
       </Card>
     </Box>
@@ -116,6 +133,7 @@ const PlayMenu: React.FC = () => {
           description="Clear your name as a suspect against the detective! The culprit is among you, but who? Invite your friends and use your wits to deceive the detective and avoid being framed...or found out."
           altText="Multiplayer"
           mode="multi"
+          blocked
         />
       </Flex>
 
