@@ -118,7 +118,7 @@ const PlayMenu: React.FC = () => {
         direction={{ initial: 'column', md: 'row' }}
         gap="6"
         className="h-full self-center items-center justify-self-center"
-        mt={{ xs: '6', md: '0' }}
+        mt={{ initial: '6', md: '9' }}
       >
         <ModeCard
           createRoom={createRoom}

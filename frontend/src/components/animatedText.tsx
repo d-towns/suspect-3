@@ -37,7 +37,7 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   }, [animateText]);
 
   return (
-    <span className={`text-left ${className} text-${size}`}>
+    <span className={`text-left ${className} text-${size}`} style={{fontFamily: 'Special Elite'}}>
       {displayedText}
       {!isAnimationComplete && <span className={`animate-pulse`}>|</span>}
     </span>
