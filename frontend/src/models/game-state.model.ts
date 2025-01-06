@@ -1,12 +1,20 @@
+
 export interface ConversationExhange {
   speaker: string,
   message: string
+}
+
+export interface Conversation {
+  suspect: string,
+  active: boolean,
+  responses: ConversationExhange[]
 }
 
 export interface ConversationItem {
   audioTranscript: string
   timestamp: number
   speaker: 'user' | 'assistant'
+  responseId: string
 }
 
 export interface VotingRoundVote {
@@ -18,7 +26,7 @@ export interface Round {
   player: string,
   suspect?: string,
   type: 'interrogation' | 'voting',
-  conversation: ConversationExhange[],
+  conversations: Conversation[],
   results: {
     guiltScoreUpdate?: number
     votingResults?: VotingRoundVote[]
@@ -36,10 +44,23 @@ export interface Player {
   isCulprit: boolean;
 }
 
+export interface OffenseReportItem {
+  location: string;
+  time: string;
+  description: string;
+  imgSrc: string;
+}
+
 export interface Crime {
   type: string;
   location: string;
   time: string;
+  offenseReport: OffenseReportItem[];
+  realStory: OffenseReportItem[];
+}
+
+export interface Evidence {
+  id: string;
   description: string;
 }
 
@@ -47,12 +68,9 @@ export interface GameState {
     status: 'setup' | 'active' | 'finished';
     crime?: Crime;
     rounds: Round[];
-    allEvidence: string[];
+    allEvidence: Evidence[];
     interrogationProgress?: number;
-    outcome?: {
-      winner: "innocents" | "culprit" | "not_yet_determined";
-      averageGuiltScore?: number;
-    };
+    outcome: 'win' | 'lose' | 'not_yet_determined';
   }
 
   export interface Suspect {
@@ -62,6 +80,7 @@ export interface GameState {
     temperment: string;
     interrogated: boolean;
     isCulprit: boolean;
+    imgSrc: string;
   }
 
   export interface Lead {
@@ -74,18 +93,31 @@ export interface GameState {
     accepted: boolean;
   }
 
+  
   export interface Deduction {
-    submitted: boolean;
-    active: boolean;
-    leads: Lead[];
-    culpritVote: string;
-    analysis: DeductionAnalysis
+    nodes: DeductionNode[];
+    edges: DeductionEdge[];
+    warmth: number;
+    feedback: string[];
   }
 
+  export interface DeductionNode {
+    id: string;
+    type: "statement" | "evidence" | "suspect";
+    data: any;
+  }
+
+  export interface DeductionEdge {
+    source_node: DeductionNode;
+    target_node: DeductionNode;
+    type: EdgeType;
+  }
+
+  export type EdgeType = "supports" | "contradicts" | 'implicates'
   export interface SingleGameState extends GameState {
     player: string;
     suspects: Suspect[];
-    deductions: Deduction[];
+    deduction: Deduction;
     culpritVote: string;
   }
 

@@ -72,12 +72,11 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
           <DropdownMenu.Item shortcut={`${theme == 'light' ? '☀️' : '🌙'}`} onClick={() => toggleTheme()} className='my-2'>
             Theme
           </DropdownMenu.Item>
-          <DropdownMenu.Item >
-            Profile
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            Settings
-          </DropdownMenu.Item>
+          <RouterLink  to="/profile" color="gray">
+            <DropdownMenu.Item>
+              Profile
+            </DropdownMenu.Item>
+          </RouterLink>
         </DropdownMenu.Group>
 
         <Separator size={'4'} />

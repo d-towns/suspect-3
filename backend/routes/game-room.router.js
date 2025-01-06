@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { createSupabaseClient } from "../db/supabase.js";
-import { GameRoomService } from "../services/game-room.service.js";
+import { GameRoomService } from "../services/game_room/game_room.service.js";
+import { parseCookieHeader } from "@supabase/ssr";
 
 const router = Router();
 
@@ -58,6 +59,9 @@ async function getGameRooms(req, res) {
 // POST /create-room
 async function createGameRoom(req, res) {
   const supabase = createSupabaseClient({ req, res });
+  const jwt = parseCookieHeader(req.headers.cookie).find(cookie => cookie.name === 'token').value;
+  console.log('jwt:', jwt);
+  const { data: { user } } = await supabase.auth.getUser(jwt);
   const { userId, mode } = req.body;
 
   if (!userId) {

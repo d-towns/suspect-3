@@ -7,6 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase URL or Anon Key is not set");
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    flowType: 'implicit',
+    persistSession: true,
+    detectSessionInUrl: true,
+  }
+  
+});
 
 export { supabase };

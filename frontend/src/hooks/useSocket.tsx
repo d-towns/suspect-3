@@ -19,7 +19,7 @@ export const useSocket = () => {
   const navigate = useNavigate();
 
   const connectSocket = useCallback(() => {
-    console.warn('Connecting socket');
+    // console.warn('Connecting socket');
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
@@ -27,8 +27,13 @@ export const useSocket = () => {
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
-      
+      startHeartbeat()
       setIsConnected(true);
+    });
+
+    newSocket.on('reconnect_error', (error: any) => {
+      console.error('Socket reconnection error', error);
+      addToast('Failed to reconnect to game server, trying again...',  );
     });
 
     newSocket.on('disconnect', () => {
@@ -39,7 +44,7 @@ export const useSocket = () => {
     setSocket(newSocket);
 
     return () => {
-      console.warn('Disconnecting socket');
+      // console.warn('Disconnecting socket');
       newSocket.disconnect();
 
     };
@@ -47,7 +52,7 @@ export const useSocket = () => {
 
   const emitEvent = useCallback((event: string, data: any) => {
     if (socket && isConnected) {
-      console.log(`Emitting event: ${event} with data: ${JSON.stringify(data)}`);
+      // console.log(`Emitting event: ${event} with data: ${JSON.stringify(data)}`);
       socket.emit(event, data);
     }
   } , [socket, isConnected]);
@@ -61,13 +66,15 @@ export const useSocket = () => {
           // if we are in a game room, we should send a joined-game event
           // check if game is in the url using navigator
           if (window.location.pathname.includes('game')) {
-            socket.emit('joined-game');
+            socket.emit('joined-game', roomId);
 
           }
         } else {
           console.error(`Failed to join room: ${response.error}`);
         }
       });
+    } else {
+      console.error('Socket not connected or room not joined');
     }
   }, [socket, isConnected, roomId, user]);
 
@@ -75,13 +82,13 @@ export const useSocket = () => {
     if (socket && isConnected) {
       const interval = setInterval(() => {
         if (user) {
-          socket.emit('set-user', user.email, user.username, user.id);
+          socket.emit('set-user', user.email, user.username, user.id, roomId);
         socket.emit('heartbeat', roomId || 'global');
         }
       }, HEARTBEAT_INTERVAL);
 
       return () => {
-        console.warn('Clearing heartbeat interval');
+        // console.warn('Clearing heartbeat interval');
         clearInterval(interval)
       };
     }
@@ -113,7 +120,7 @@ export const useSocket = () => {
 
   const startGame = useCallback((mode : GameMode) => {
     if (socket && isConnected && roomId) {
-      socket.emit('start-game', roomId, mode);
+      socket.emit('game:create', roomId, mode);
     }
   }, [socket, isConnected, roomId]);
 
@@ -129,12 +136,21 @@ export const useSocket = () => {
       navigate(`/lobby/${invite.game_id}`);
     });
   }, [addToast, navigate]);
+  
+  useEffect(() => {
+    if (isConnected) {
+      addToast('Connected to game server');
+    } else {
+      addToast('Disconnected from game server');
+    }
+  }, [isConnected, addToast, connectSocket]);
 
   useEffect(() => {
+    console.log('useEffect: connectSocket');
     const cleanup = connectSocket();
 
     return cleanup;
-  }, []);
+  } , [] );
 
   useEffect(() => {
     const stopHeartbeat = startHeartbeat();

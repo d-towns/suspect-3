@@ -1,6 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from '../App';
-import Login from '../pages/login';
 import PlayMenu from '../pages/playMenu';
 import Lobby from '../pages/lobby';
 import RenderGame from '../pages/renderGame';
@@ -8,6 +7,11 @@ import ProtectedRoute from './protected-route';
 import FAQ from '../pages/faq';
 import Leaderboard from '../pages/leaderboard';
 import Terms from '../pages/terms';
+import Home from '../pages/home';
+import Profile from '../pages/profile';
+import TokenPage from '../pages/token';
+import ErrorBoundary from '../pages/errorBoundary';
+import { ThemeProvider } from '../context/ThemeContext';
 
 const router = createBrowserRouter([
   {
@@ -16,7 +20,7 @@ const router = createBrowserRouter([
     children: [
       {
         path: '',
-        element: <Login />,
+        element: <Home />,
       },
       {
         path: 'faq',
@@ -26,6 +30,8 @@ const router = createBrowserRouter([
         path: 'terms',
         element: <Terms />,
       },
+      {path: 'token', element: <TokenPage />},
+      
       {
         element: <ProtectedRoute />,
         children: [
@@ -46,9 +52,14 @@ const router = createBrowserRouter([
             element: <RenderGame />,
 
           },
+          {
+            path: 'profile',
+            element: <Profile/>
+          }
         ],
       },
     ],
+    errorElement:<ThemeProvider><ErrorBoundary /></ThemeProvider> 
   },
 ]);
 

@@ -74,6 +74,7 @@ export const Lobby: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
 
   useEffect(() => {
+    console.log('Lobby mounted');
     const initializeLobby = async () => {
       console.log(`user: ${user}`)
       console.log(`roomId: ${roomId}`)
@@ -119,7 +120,13 @@ export const Lobby: React.FC = () => {
             gameStarting: true
           }));
         });
-        socket.on('game-created', () => navigate(`/game/${roomId}`));
+        socket.on('game:creating', () => {
+          setLobbyState(prevState => ({
+            ...prevState,
+            gameStarting: true
+          }));
+        });
+        socket.on('game:created', () => navigate(`/game/${roomId}`));
 
         socket.on('player-left', removePlayer);
         socket.on('player-joined', addPlayer);
@@ -138,15 +145,16 @@ export const Lobby: React.FC = () => {
       };
     }
     let cleanupListeners: Function;
+    initializeLobby();
     if (socket && socket.connected) {
-      initializeLobby();
+      
       cleanupListeners = setupListeners();
     }
 
     return () => {
       if (cleanupListeners) cleanupListeners();
     }
-  }, [socket, isConnected]);
+  }, [socket, isConnected, roomId]);
 
   useEffect(() => {
     if (lobbyState.room && typeof lobbyState.room.game_state !== 'string' && lobbyState.room.game_state?.status == 'active') {
@@ -236,10 +244,6 @@ export const Lobby: React.FC = () => {
 
   const handleStartGameClick = () => {
     if(!lobbyState.room) { return ;}
-    setLobbyState(prevState => ({
-      ...prevState,
-      gameStarting: true
-    }));
     startGame(lobbyState.room.mode);
   };
 
@@ -317,7 +321,9 @@ export const Lobby: React.FC = () => {
                 </Flex>
               ))}
               <Box className='mt-4'>
-{ lobbyState.players.size < 2 && lobbyState.room?.mode == 'multi'      &&         <Callout.Root size='1' className='my-2 flex items-center'>
+                {lobbyState.room?.mode == 'multi' && (
+                  <>{
+lobbyState.players.size < 2    &&        <Callout.Root size='1' className='my-2 flex items-center'>
                   <Callout.Icon>
                     <IoAlertCircle />
                   </Callout.Icon>
@@ -325,6 +331,7 @@ export const Lobby: React.FC = () => {
                     {lobbyState.players.size < 2 && 'A minimum of 2 players are required to start the game. Invite your friends to join!'}
                   </Callout.Text>
                 </Callout.Root>}
+
                 <Flex align="center" gap="2" mt='4'>
                   <TextField.Root
                     placeholder="Invite other players by email"
@@ -334,6 +341,7 @@ export const Lobby: React.FC = () => {
                   />
                   <Button onClick={handleSendInvite}>Send Invite</Button>
                 </Flex>
+                </>)}
               </Box>
             </Box>
           </Box>

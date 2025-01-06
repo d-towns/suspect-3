@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import SingleGame from './SingleplayerGame';
-import MultiplayerGame from './MultiplayerGame';
+import { Link, useParams } from 'react-router-dom';
+import SingleGame from './SinglePlayerGame/SingleplayerGame';
+import MultiplayerGame from './MultiplayerGame/MultiplayerGame';
 import { roomsService } from '../services/rooms.service';
 import { GameRoom } from '../models';
+import { useAuth } from '../context/auth.context';
+import { Button, Card, Flex, Heading } from '@radix-ui/themes';
 
 const RenderGame: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
+    const {user} = useAuth();
     const [gameRoom, setGameRoom] = useState<GameRoom | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -27,8 +30,30 @@ const RenderGame: React.FC = () => {
             }
         };
 
+
+
         fetchRoom();
     }, [roomId]);
+
+
+    if(gameRoom?.host_id !== user?.id){
+        return (
+            <Flex align="center" justify="center" >
+            <Card style={{ padding: '24px', textAlign: 'center' }}>
+                <Heading style={{ fontFamily: 'Special Elite, sans-serif', marginBottom: '16px' }}>
+                    This isn't your case, Detective
+                </Heading>
+                <Button
+                variant='surface'
+                size={'4'}
+                >
+                    <Link to='/play'>Main Menu</Link>
+                </Button>
+            </Card>
+            </Flex>
+        )
+    }
+
 
     if (loading) {
         return <div>Loading...</div>;

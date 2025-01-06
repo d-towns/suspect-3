@@ -45,7 +45,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const addToast = useCallback((message: string, onClick?: () => void) => {
     const id = toastIdRef.current + 1;
     toastIdRef.current = id;
-    setToasts((prev) => [...prev, { id, message, onClick }]);
+    setCurrentToast(null);
+    setToasts([{ id, message, onClick }]);
   }, []);
 
   // Effect to display the next toast when there's no current toast

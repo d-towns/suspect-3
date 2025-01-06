@@ -3,48 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
-import OpenaiGameService from "../services/openai-game-service.js";
-import { GameRoomService } from "../services/game-room.service.js";
-
-function startInterval(initialNumber, tickCallback, doneCallback) {
-  let intervalId;
-
-  const start = () => {
-    console.log("Starting interval...");
-    let number = initialNumber;
-
-    intervalId = setInterval(() => {
-      number--;
-      if (tickCallback) {
-        tickCallback(number);
-      }
-      if (number <= 0) {
-        clearInterval(intervalId);
-        if (doneCallback) {
-          doneCallback();
-        }
-        console.log("Interval cleared automatically.");
-      }
-    }, 1000);
-  };
-
-  // Immediately start the interval
-  start();
-
-  // Return an object with a clear method
-  return {
-    // give the ability to clear the interval on demand and call the doneCallback
-    // ex. All voting round votes are in so we can clear the interval and move on to the next round
-
-    clear: () => {
-      clearInterval(intervalId);
-      if (doneCallback) {
-        doneCallback();
-      }
-      console.log("Interval cleared on demand.");
-    },
-  };
-}
+import { GameRoomService } from "../services/game_room/game_room.service.js";
+import { GameRoomManagerFactory } from "../services/game_manager/game_manager_factory.js";
 
 export class GameRoomSocketServer {
   static instance = null;
@@ -54,7 +14,7 @@ export class GameRoomSocketServer {
       return GameRoomSocketServer.instance;
     }
 
-    this.openaiGameService = new OpenaiGameService();
+    // this.openaiGameService = new OpenaiGameService();
     if (!httpServer) {
       this.io = new Server(3001, {
         cors: {
@@ -88,57 +48,98 @@ export class GameRoomSocketServer {
       )
       .subscribe();
 
-    this.roomRoundTimers = new Map();
 
+      // keeps track of all the round timers for each room in this socket server
+    this.roomGameManagers = new Map();
+    // set up the socket event listeners
     this.io.on("connection", (socket) => {
       socket.on("set-user", this.handleSetUserDetails.bind(this, socket));
       socket.on("disconnect", this.handleDisconnect.bind(this, socket));
       socket.on("join-room", this.handleJoinRoom.bind(this, socket));
       socket.on("leave-room", this.handleLeaveRoom.bind(this, socket));
+
+      // TODO: this should move the game into the deduction phase
       socket.on(
         "start-next-round",
         this.handleStartNextRound.bind(this, socket)
       );
+
+      socket.on("realtime:start", this.handleStartInterrogation.bind(this, socket));
+
       socket.on("chat-message", this.handleChatMessage.bind(this, socket));
+
       socket.on(
         "online-players-list",
         this.handleOnlinePlayersList.bind(this, socket)
       );
+      
       socket.on(
-        "realtime-audio-response",
+        "realtime:audio:delta:user",
         this.handleRealtimeAudioResponse.bind(this, socket)
       );
-      socket.on(
-        "realtime-audio-response-end",
-        this.handleRealtimeAudioResponseEnd.bind(this, socket)
-      );
-      socket.on(
-        "voting-round-vote",
-        this.handleVotingRoundVote.bind(this, socket)
-      );
-      socket.on("submit-deduction", this.handleSubmitDeduction.bind(this, socket));
+
+      socket.on("realtime:end", this.handleEndInterrogation.bind(this, socket));
+      socket.on("deduction:lead:created", this.handleDeductionLeadCreated.bind(this, socket));
+      socket.on('deduction:node:created', this.handleDeductionNodeCreated.bind(this, socket));
+      socket.on('deduction:lead:removed', this.handleDeductionLeadRemoved.bind(this, socket));
+      socket.on("deduction:submit", this.handleSubmitDeduction.bind(this, socket));
+      socket.on("leaderboard:update", this.handleLeaderboardUpdate.bind(this, socket));
+
+      // Multiplayer only
+      // socket.on(
+      //   "voting-round-vote",
+      //   this.handleVotingRoundVote.bind(this, socket)
+      // );
+
+      // Single player only
+
+      // heartbeat lister for client sockets connected to this server
       socket.on("heartbeat", this.handleHeartbeat.bind(this, socket));
-      socket.on("start-game", this.handleStartGame.bind(this, socket));
+
+      // called when the host of a game starts the game from the looby
+
+      socket.on("game:create", this.handleCreateInitialGameState.bind(this, socket));
+      socket.on('game:start', this.handleStartGame.bind(this, socket));
+      // called when a player navigates to the game page
       socket.on("joined-game", this.handleJoinedGame.bind(this, socket));
+      // called when a player readies up in the game lobby
       socket.on("player-ready", this.handlePlayerReady.bind(this, socket));
 
-      // Initialize lastHeartbeat
+      // Initialize lastHeartbeat for the socket that just connected
       socket.lastHeartbeat = Date.now();
 
-      // Start the heartbeat check interval
+      // Start the heartbeat check interval for the socket that just connected
       setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
     });
 
     GameRoomSocketServer.instance = this;
   }
 
-  handleSetUserDetails(socket, userEmail, userName, userId) {
+  static getInstance(httpServer) {
+    if (!GameRoomSocketServer.instance && httpServer) {
+      new GameRoomSocketServer(httpServer);
+      console.log("GameRoomSocketServer instance created");
+      console.log(
+        "Socket.IO server is running on path:",
+        GameRoomSocketServer.instance.io.path()
+      );
+    } else if (!GameRoomSocketServer.instance && !httpServer) {
+      new GameRoomSocketServer();
+    }
+    return GameRoomSocketServer.instance;
+  }
+
+  // TODO: these attributes should be set on the socket.data object
+  handleSetUserDetails(socket, userEmail, userName, userId, roomId) {
+    console.log(`User details: ${userEmail}, ${userName}, ${userId}, ${roomId}`);
     socket.userEmail = userEmail;
     socket.userName = userName;
     socket.isReady = false;
     socket.userId = userId;
+    socket.roomId = roomId;
   }
 
+  // this could be moved to a 
   handleDisconnect(socket) {
     console.log(`User ${socket.userEmail} disconnected`);
     const room = this.io.sockets.adapter.rooms.get(socket.roomId);
@@ -148,7 +149,7 @@ export class GameRoomSocketServer {
     if (room) {
       const playerLeftData = {
         email: socket.userEmail,
-        id: socket.userId,
+        id: socket.userId, // this shouldnt be sent to the client
         userName: socket.userName,
       };
       socket.to(socket.roomId).emit("player-left", playerLeftData);
@@ -164,14 +165,11 @@ export class GameRoomSocketServer {
     if (!socket.rooms.has(roomId)) {
       socket.join(roomId);
     }
-    socket.userEmail = userEmail;
-    socket.userId = userId;
-    socket.roomId = roomId;
-    socket.userName = userName;
+    this.handleSetUserDetails(socket, userEmail, userName, userId, roomId);
     console.log(`User ${userEmail} joined room ${roomId}`);
     socket.to(roomId).emit("player-joined", {
       email: userEmail,
-      id: userId,
+      id: userId, // this shouldnt be sent to the client
       username: userName,
     });
     if (callback) callback({ success: true });
@@ -183,6 +181,15 @@ export class GameRoomSocketServer {
     socket.to(roomId).emit("user-left", { userEmail, userName });
   }
 
+  handleStartGame(socket, roomId) {
+    try {
+      this.roomGameManagers.get(roomId).startGame();
+    } catch (error) {
+      console.error(`Error in handleStartGame: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
   /**
    * Handles the submission of a deduction by a user.
    *
@@ -191,101 +198,117 @@ export class GameRoomSocketServer {
    * @param {Object} deduction - The deduction submitted by the user.
    */
   async handleSubmitDeduction(socket, roomId, deduction) {
-    if (!socket) {
-      console.error('handleSubmitDeduction: Socket is undefined.');
-      return;
-    }
-
-    if (!roomId) {
-      console.error('handleSubmitDeduction: roomId is undefined.');
-      return;
-    }
-
-    // if (!deduction) {
-    //   console.error('handleSubmitDeduction: Deduction data is missing.');
-    //   return;
-    // }
-
     try {
-
-      // get the most recent game state
-      const gameRoom = await GameRoomService.getGameRoom(roomId);
-      const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
-
-      await OpenaiGameService.runDeductionAnalysis(roomId, gameRoom.thread_id, gameState);
-      console.log(`Deduction analysis sent to room ${roomId} by user ${socket.userEmail}.`);
+      this.roomGameManagers.get(socket.roomId).runDeductionAnalysis(deduction);
     } catch (error) {
-      console.error('handleSubmitDeduction: Error during deduction analysis.', error);
+      console.error(`Error in handleSubmitDeduction: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  async handleStartInterrogation(socket, suspectId) {
+    try {
+      if(!socket.roomId) {
+    console.log("Socket room id is undefined");
+    return;
+      }
+      console.log("Starting interrogation for suspect:", suspectId);
+      this.roomGameManagers.get(socket.roomId).startInterrogation(suspectId);
+    } catch (error) {
+      console.error(`Error in handleStartInterrogation: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  async handleEndInterrogation(socket) {
+    try {
+      console.log("Ending interrogation...");
+      this.roomGameManagers.get(socket.roomId).endInterrogation();
+    } catch (error) {
+      console.error(`Error in handleEndInterrogation: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
     }
   }
 
   async handleStartNextRound(socket, roomId) {
-    const userId = socket.userId;
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-    const { data, error } = await supabase
-      .from("game_rooms")
-      .select()
-      .eq("id", roomId)
-      .single();
-    if (error) {
-      console.error("Error fetching game room:", error);
-      return;
-    }
-    // const room = data[0];
-    // const game_state = GameRoomService.decryptGameState(room.game_state);
-    // await OpenaiGameService.startRealtimeInterregation(
-    //   roomId,
-    //   userId,
-    //   game_state
-    // );
-    await OpenaiGameService.runThreadAndProcess(
-      data.thread_id,
-      roomId,
-      data.mode,
-      false
-    );
-    this.startGameLoop(socket, roomId);
-  }
-
-  async handleVotingRoundVote(socket, vote) {
-    console.log("Voting round vote received:", vote);
     try {
-      await OpenaiGameService.addVotingRoundVote(socket.roomId, vote);
-
-      // check to see if all players have voted
-
-      const currentRoundVotes =
-        (this.roomRoundTimers.get(socket.roomId).currentRoundVotes || 0) + 1;
-
-      this.roomRoundTimers.set(socket.roomId, {
-        ...this.roomRoundTimers.get(socket.roomId),
-        currentRoundVotes,
-      });
-      const numberOfPlayers = this.getPlayersInRoom(socket.roomId).length;
-
-      // if all players have voted, clear the round timer and start the next round
-
-      if (currentRoundVotes === numberOfPlayers) {
-        this.roomRoundTimers.get(socket.roomId).clearRoundTimer();
-      }
+      this.roomGameManagers.get(socket.roomId).startNextPhase();
     } catch (error) {
-      console.error("Error adding voting round vote:", error);
+      console.error(`Error in handleStartNextRound: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
     }
   }
+
+  async handleDeductionLeadCreated(socket, nodes) {
+    try {
+      const { sourceNode, targetNode, type } = nodes;
+      this.roomGameManagers.get(socket.roomId).createNewLead(sourceNode, targetNode, type);
+    } catch (error) {
+      console.error(`Error in handleDeductionLeadCreated: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  async handleDeductionNodeCreated(socket, node) {
+    try {
+      this.roomGameManagers.get(socket.roomId).createNewDeductionNode(node);
+    } catch (error) {
+      console.error(`Error in handleDeductionNodeCreated: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  async handleDeductionLeadRemoved(socket, leadId) {
+    try {
+      this.roomGameManagers.get(socket.roomId).removeLead(leadId);
+    } catch (error) {
+      console.error(`Error in handleDeductionLeadRemoved: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  async handleLeaderboardUpdate(socket, leaderboard) {
+    try {
+      this.roomGameManagers.get(socket.roomId).calculateGameResults(leaderboard);
+    } catch (error) {
+      console.error(`Error in handleLeaderboardUpdate: ${error.message}`);
+      this.emitToRoom(socket.roomId, 'error', { message: error.message });
+    }
+  }
+
+  // async handleVotingRoundVote(socket, vote) {
+  //   console.log("Voting round vote received:", vote);
+  //   try {
+  //     await OpenaiGameService.addVotingRoundVote(socket.roomId, vote);
+
+  //     // check to see if all players have voted
+
+  //     const currentRoundVotes =
+  //       (this.roomGameManagers.get(socket.roomId).currentRoundVotes || 0) + 1;
+
+  //     this.roomGameManagers.set(socket.roomId, {
+  //       ...this.roomGameManagers.get(socket.roomId),
+  //       currentRoundVotes,
+  //     });
+  //     const numberOfPlayers = this.getPlayersInRoom(socket.roomId).length;
+
+  //     // if all players have voted, clear the round timer and start the next round
+
+  //     if (currentRoundVotes === numberOfPlayers) {
+  //       this.roomGameManagers.get(socket.roomId).clearRoundTimer();
+  //     }
+  //   } catch (error) {
+  //     console.error("Error adding voting round vote:", error);
+  //   }
+  // }
 
   async handleRealtimeAudioResponse(socket, audioData) {
-    await OpenaiGameService.addUserResponseToInputAudioBuffer(
-      socket.roomId,
-      socket.userId,
-      audioData.audioBuffer
-    );
-  }
-
-  async handleRealtimeAudioResponseEnd(socket) {
-    await OpenaiGameService.createInterrogationResponse(socket.roomId);
+    const manager = this.roomGameManagers.get(socket.roomId);
+    if (!manager) {
+      console.error("Game manager not found for room:", socket.roomId);
+      return;
+    }
+    manager.addUserAudioToInputBuffer(audioData.audioBuffer);
   }
 
   handleChatMessage(socket, roomId, userEmail, userName, message) {
@@ -358,10 +381,12 @@ export class GameRoomSocketServer {
     }
   }
 
-  async handleStartGame(socket, roomId, mode) {
+  async handleCreateInitialGameState(socket, roomId, mode) {
     console.log(`Starting game in room ${roomId}`);
-    this.emitToRoom(roomId, "game-creating");
+    this.emitToRoom(roomId, "game:creating");
     try {
+
+      //TODO: use a built in socket.io function for getting all sockets in a room
       const room = this.io.sockets.adapter.rooms.get(roomId);
       const playerIds = Array.from(room).map((socketId) => {
         const socket = this.io.sockets.sockets.get(socketId);
@@ -371,21 +396,15 @@ export class GameRoomSocketServer {
           username: socket.userName,
         };
       });
+      console.log("Player IDs: ", playerIds + '\n\n\n');
+      const gameRoom = await GameRoomService.getGameRoom(roomId);
+      const manager =  GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, null);
 
-      const thread = await OpenaiGameService.createGameThread(playerIds, mode);
-      console.log(`Thread created: ${thread.id}`);
+      this.attachGameManagerListeners(manager,roomId);
+      
+      this.roomGameManagers.set(roomId, manager);
 
-      // save the thread id to the game room
-      await GameRoomService.updateGameRoom(roomId, { thread_id: thread.id });
-
-      const run = await OpenaiGameService.runThreadAndProcess(
-        thread.id,
-        roomId,
-        mode,
-        false
-      );
-
-      this.emitToRoom(roomId, "game-created");
+      manager.createInitialGameState(roomId, playerIds);
       console.log(`Game started in room ${roomId}`);
     } catch (error) {
       console.error(`Error starting game in room ${roomId}:`, error);
@@ -394,302 +413,147 @@ export class GameRoomSocketServer {
       });
     }
   }
-  /** the game loop
-   * the first round will have different time than the rest of the rounds
-   * it will last 30 seconds and give the players time to read their cards
-   * once that timer ends, we should call the startRealtimeInterrogation function in the openaiGameService
-   * with the user who is the host of the room
-   * all rounds after the first should have a 2 minute timer
-   * Client Side:
-   * - the client will send the audio data in chunks that will append to the input audio buffer
-   * - once the response timer ends client side the createInterrogationResponse function in the openaiGameService will be called
-   * Server Side: ( this is what we need to implement)
-   * once the two minute timer ends for the round, we need to take the conversation and add it to the game thread so that it can be run and then a function call can be made to generate the new game state
-   * that state will be encrypted and stored in the database via supabase
-   * once that is done, we can emit the new state to the clients
-   * then we start the next round
+
+    /**
+   * Attaches listeners to the game manager's events and forwards them to the client sockets.
    *
-   *
+   * @param {GameRoomManager} manager - The game manager instance.
+   * @param {string} roomId - The ID of the room.
    */
-  async startGameLoop(socket, roomId) {
-    // function to emit the round tick event to the room
-
-    let listenerFunc = null;
-    const initialGameRoom = await GameRoomService.getGameRoom(roomId);
-    const emitRoundTick = (number) => {
-      this.emitToRoom(roomId, "round-timer-tick", { countdown: number });
-      this.roomRoundTimers.set(socket.roomId, {
-        ...this.roomRoundTimers.get(socket.roomId),
-        currentRoundTime: number,
+    attachGameManagerListeners(manager, roomId) {
+      // Example event listeners
+      manager.on('game:created', (data) => {
+        this.emitToRoom(roomId, 'game:created', data);
       });
-    };
-
-    // function to start the first round, this will be called after the first round timer ends
-    // this will start the first round and then start the interval for the rest of the rounds
-    const emitRoundStart = async () => {
-      try {
-        console.log("Starting round...");
-        this.emitToRoom(roomId, "round-end");
-
-        // get the room and its game state
-        const room = this.io.sockets.adapter.rooms.get(roomId);
-        if (!room) {
-          return;
-        }
-        const gameRoom = await GameRoomService.getGameRoom(roomId);
-        const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
-        console.log("Game state:", gameState);
-        // get the next round player, if there is no inactive round, the game is over
-        const nextRound = gameState.rounds.find(
-          (round) => round.status === "active"
-        );
-        // if (gameRoom.mode == 'multi') {
-        const nextRoundPlayerSocket = Array.from(room)
-          .map((socketId) => {
-            const s = this.io.sockets.sockets.get(socketId);
-            console.log("Socket:", s.userId);
-            if (s.userId === nextRound.player) {
-              return s;
-            }
-          })
-          .filter(Boolean)[0];
-        // }
-
-        // if there is a next round player, start the realtime session and the interrogation
-        // else its a voting round
-        if (gameRoom.mode == "multi") {
-          if (nextRoundPlayerSocket) {
-            // check to see what type of round it is
-            if (nextRound.type == "interrogation") {
-              // if(true) {
-              await OpenaiGameService.openRealtimeSession(
-                roomId,
-                gameState,
-                gameRoom.thread_id,
-                gameRoom.mode
-              );
-              // run the game thread to update the round state
-              // await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
-
-              await OpenaiGameService.startRealtimeInterregation(
-                roomId,
-                nextRoundPlayerSocket.userId,
-                gameState,
-                gameRoom.mode,
-                listenerFunc
-              );
-              // console.log("host socket", nextRoundPlayerSocket.userId);
-              console.log("Starting interrogation round...");
-              // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
-
-              const { clear } = startInterval(
-                90,
-                emitRoundTick,
-                handleRoundEnd
-              );
-              this.roomRoundTimers.set(socket.roomId, {
-                ...this.roomRoundTimers.get(socket.roomId),
-                clearRoundTimer: clear,
-              });
-            }
-          } else {
-            this.emitToRoom(roomId, "voting-round-start");
-
-            const { clear } = startInterval(30, emitRoundTick, handleRoundEnd);
-            this.roomRoundTimers.set(socket.roomId, {
-              ...this.roomRoundTimers.get(socket.roomId),
-              clearRoundTimer: clear,
-            });
-          }
-        } else {
-          // SINGLE PLAYER MODE
-          if (nextRound.type == "interrogation") {
-            await OpenaiGameService.openRealtimeSession(
-              roomId,
-              gameState,
-              gameRoom.thread_id,
-              gameRoom.mode
-            );
-            // run the game thread to update the round state
-            // await OpenaiGameService.runThreadAndProcess(initialGameRoom.thread_id, roomId);
-
-            await OpenaiGameService.startRealtimeInterregation(
-              roomId,
-              gameState.player,
-              gameState,
-              gameRoom.mode,
-              listenerFunc
-            );
-            // console.log("host socket", nextRoundPlayerSocket.userId);
-            console.log("Starting interrogation round...");
-            // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, nextRoundPlayerSocket.userId )
-
-            const { clear } = startInterval(90, emitRoundTick, handleRoundEnd);
-            this.roomRoundTimers.set(socket.roomId, {
-              ...this.roomRoundTimers.get(socket.roomId),
-              clearRoundTimer: clear,
-            });
-          } else {
-            this.emitToRoom(roomId, "voting-round-start");
-
-            // const { clear } = startInterval(30, emitRoundTick, handleRoundEnd);
-            // this.roomRoundTimers.set(socket.roomId, {
-            //   ...this.roomRoundTimers.get(socket.roomId),
-            //   clearRoundTimer: clear,
-            // });
-          }
-        }
-      } catch (error) {
-        console.error("Error starting round:", error);
-      }
-    };
-
-    const handleRoundEnd = async () => {
-      // Process the conversation and update the game state by running the thread
-      // conversation transcripts for both the player in the room and the AI are stored in the game thread in the openai game service upson
-      // Realtime API server-sent events 'response.audio_transcript.done and 'conversation.item.input_audio_transcript.done'
-      this.emitToRoom(roomId, "round-end");
-
-      try {
-        const gameRoom = await GameRoomService.getGameRoom(roomId);
-        const gameState = GameRoomService.decryptGameState(gameRoom.game_state);
-
-        // get the current active round
-        let activeRound = gameState.rounds.find(
-          (round) => round.status === "active"
-        );
-
-        if (activeRound.type == "interrogation") {
-          await OpenaiGameService.endRealtimeInterrogation(
-            gameRoom.id,
-            gameRoom.mode
-          );
-          console.log("Ending interrogation round...");
-          await OpenaiGameService.endInterrogationRound(
-            gameRoom.thread_id,
-            gameState,
-            gameRoom.mode
-          );
-        } else if (activeRound.type == "voting") {
-          await OpenaiGameService.endVotingRound(
-            gameRoom.thread_id,
-            gameRoom.mode
-          );
-        }
-
-        const updatedGameState = await OpenaiGameService.runThreadAndProcess(
-          initialGameRoom.thread_id,
-          roomId,
-          gameRoom.mode,
-          false
-        );
-
-        // if the game is not over, start the next round
-        if (updatedGameState.status == "finished") {
-          OpenaiGameService.endGameAndCalculateResults(roomId);
-          this.emitToRoom(roomId, "game-end");
-        }
-
-        //get the next active round
-        activeRound = updatedGameState.rounds.find(
-          (round) => round.status === "active"
-        );
-        if (!activeRound) {
-          this.emitToRoom(roomId, "game-end");
-        }
-
-        if (gameRoom.mode == "multi") {
-          // if the player in the active round is not connected, skip the round
-          const playerSocket = Array.from(room).find((socketId) => {
-            const s = this.io.sockets.sockets.get(socketId);
-            return s.userId === activeRound.player;
-          });
-          if (!playerSocket) {
-            await OpenaiGameService.skipInterrogationRound(
-              roomId,
-              activeRound.player
-            );
-            handleRoundEnd();
-            return;
-          }
-
-          if (activeRound.type == "interrogation") {
-            await OpenaiGameService.startRealtimeInterregation(
-              roomId,
-              activeRound.player,
-              updatedGameState,
-              gameRoom.mode
-            );
-            // OpenaiGameService.sendGeneratedAudio('resp_ANPFVm2Waf2cfB3dj0xMU',roomId, activeRound.player )
-            const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
-            this.roomRoundTimers.set(socket.roomId, {
-              ...this.roomRoundTimers.get(socket.roomId),
-              clearRoundTimer: clear,
-            });
-          } else if (activeRound.type == "voting") {
-            this.emitToRoom(roomId, "voting-round-start");
-            const { clear } = startInterval(120, emitRoundTick, handleRoundEnd);
-            this.roomRoundTimers.set(socket.roomId, {
-              ...this.roomRoundTimers.get(socket.roomId),
-              clearRoundTimer: clear,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error handling round end:", error);
-      }
-    };
-
-    const startFirstRound = (timer) => {
-      const { clear } = startInterval(timer, emitRoundTick, emitRoundStart);
-      this.roomRoundTimers.set(socket.roomId, {
-        ...this.roomRoundTimers.get(socket.roomId),
-        clearRoundTimer: clear,
+  
+      manager.on('game:started', (data) => {
+        this.emitToRoom(roomId, 'game:started', data);
       });
-    };
 
-    startFirstRound(20);
-  }
+      manager.on('game:updated', (data) => {
+        this.emitToRoom(roomId, 'game:updated', data);
+      });
+  
+      manager.on('round:tick', (data) => {
+        this.emitToRoom(roomId, 'round:tick', data);
+      });
+  
+      manager.on('phase:started', (data) => {
+        this.emitToRoom(roomId, 'phase:started', data);
+      });
+  
+      manager.on('phase:ended', (data) => {
+        this.emitToRoom(roomId, 'phase:ended', data);
+        // Optionally, remove listeners if the game has ended
+      });
+      manager.on('leaderboard:started', (data) => {
+        this.emitToRoom(roomId, 'leaderboard:started', data);
+        // Optionally, remove listeners if the game has ended
+      });
+      manager.on('leaderboard:finished', (data) => {
+        this.emitToRoom(roomId, 'leaderboard:finished', data);
+        // Optionally, remove listeners if the game has ended
+      });
+
+      manager.on('deduction:started', (data) => {
+        this.emitToRoom(roomId, 'deduction:started', data);
+        // Optionally, remove listeners if the game has ended
+      });
+      manager.on('deduction:completed', (data) => {
+        this.emitToRoom(roomId, 'deduction:completed', data);
+        // Optionally, remove listeners if the game has ended
+      });
+      manager.on('deduction:error', (data) => {
+        this.emitToRoom(roomId, 'deduction:error', data);
+        // Optionally, remove listeners if the game has ended
+      });
+
+      manager.on('realtime:connected', (data) => {
+        this.emitToRoom(roomId, 'realtime:connected', data);
+      });
+      manager.on('realtime:disconnected', (data) => {
+        this.emitToRoom(roomId, 'realtime:disconnected', data);
+      });
+      manager.on('realtime:started', (data) => {
+        this.emitToRoom(roomId, 'realtime:started', data);
+      });
+      manager.on('realtime:message', (data) => {
+        this.emitToRoom(roomId, 'realtime:message', data);
+      });
+      manager.on("realtime:transcript:done:user", (data) => {
+        this.emitToRoom(roomId, 'realtime:transcript:done:user', data);
+      });
+      manager.on('realtime:audio:delta:assistant', (data) => {
+        this.emitToRoom(roomId, 'realtime:audio:delta:assistant', data);
+      });
+      manager.on('realtime:transcript:delta:assistant', (data) => {
+        this.emitToRoom(roomId, 'realtime:transcript:delta:assistant', data);
+      });
+  
+      // Add more listeners as needed based on game manager events
+    }
 
   async handleJoinedGame(socket, roomId, userId) {
     if (socket.inGame === undefined) {
       socket.inGame = true;
       console.log(
-        `User ${socket.userEmail} joined the game in room ${socket.roomId}`
+        `User ${socket.userEmail} joined the game in room ${socket.roomId || roomId}`
       );
-      const room = this.io.sockets.adapter.rooms.get(socket.roomId);
+      const room = this.io.sockets.adapter.rooms.get(socket.roomId || roomId);
       if (room) {
         const allInGame = Array.from(room).every((socketId) => {
           const s = this.io.sockets.sockets.get(socketId);
           return s.inGame;
         });
-        const gameRoom = await GameRoomService.getGameRoom(socket.roomId);
+        const gameRoom = await GameRoomService.getGameRoom(socket.roomId || roomId);
         const game_state = GameRoomService.decryptGameState(
           gameRoom.game_state
         );
 
         // console log all the variables being checked
+
+        let gameManager = this.roomGameManagers.get(socket.roomId);
         console.log("All in game:", allInGame);
         console.log("Host ID:", gameRoom.host_id === socket.userId);
         console.log(
-          "Room Round Timer:",
-          this.roomRoundTimers.get(socket.roomId) === undefined
+          "Has GameManager:",
+          gameManager !== undefined
+        );
+        console.log("Game State Status:", game_state.status !== "finished");
+        if(!gameManager) {
+          const playerIds = Array.from(room).map((socketId) => {
+            const socket = this.io.sockets.sockets.get(socketId);
+            return {
+              id: socket.userId,
+              email: socket.userEmail,
+              username: socket.userName,
+            };
+          });
+          
+          gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, game_state);
+          this.attachGameManagerListeners(gameManager,roomId);
+        
+          this.roomGameManagers.set(roomId, gameManager);
+        }
+        console.log("All in game:", allInGame);
+        console.log("Host ID:", gameRoom.host_id === socket.userId);
+        console.log(
+          "Has GameManager:",
+          gameManager !== undefined
         );
         console.log("Game State Status:", game_state.status !== "finished");
         if (
           allInGame &&
           gameRoom.host_id === socket.userId &&
-          this.roomRoundTimers.get(socket.roomId) === undefined &&
-          game_state.status !== "finished"
+          gameManager !== undefined &&
+          game_state.status === 'active'
         ) {
+          console.log(  "asdfasdf" + game_state.status);
+          gameManager.startGame();
           console.log(
-            `All players in room ${socket.roomId} have joined the game. Starting game...`
-          );
+            `All players in room ${socket.roomId} have joined the game. Game is eligible to start...`
+          );  
 
-          this.emitToRoom(socket.roomId, "game-starting");
-
-          // Start the game loop
-          this.startGameLoop(socket, socket.roomId);
         }
       }
     }
@@ -748,20 +612,6 @@ export class GameRoomSocketServer {
 
       this.io.to(roomId).emit("player-list", playerData);
     }
-  }
-
-  static getInstance(httpServer) {
-    if (!GameRoomSocketServer.instance && httpServer) {
-      new GameRoomSocketServer(httpServer);
-      console.log("GameRoomSocketServer instance created");
-      console.log(
-        "Socket.IO server is running on path:",
-        GameRoomSocketServer.instance.io.path()
-      );
-    } else if (!GameRoomSocketServer.instance && !httpServer) {
-      new GameRoomSocketServer();
-    }
-    return GameRoomSocketServer.instance;
   }
 
   emit(event, data) {

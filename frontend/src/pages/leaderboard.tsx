@@ -8,6 +8,7 @@ import {
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 import {leaderboardService} from '../services/leaderboard.service';
 import LoadingScreen from '../routing/loading-screen';
+import ErrorCard from '../components/errorCard';
 
 interface Player {
     id: number;
@@ -60,7 +61,7 @@ if (loading) {
 }
 
 if (error) {
-    return <div>Error: {error}</div>;
+    return <ErrorCard error={error} />;
 }
 
 

@@ -1,6 +1,8 @@
 // invites.service.ts
 import axiosInstance from '../utils/axios-instance';
 import { Invite } from '../models';
+import { supabase } from '../utils/supabase-client';
+import moment from 'moment';
 
 export const invitesService = {
   /**
@@ -13,20 +15,39 @@ export const invitesService = {
   createInvite: async (senderUserId: string, recipentUserEmail: string, GameId: string): Promise<string> => {
     try {
       // check if invite email is valid
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-if (!emailRegex.test(recipentUserEmail)) {
-  throw new Error('Invalid email address');
-}
-      const response = await axiosInstance.post('/invites/create-invite', {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipentUserEmail)) {
+        throw new Error('Invalid email address');
+      }
+
+      const createInviteCode = () => {
+        // create a random 6 character alphanumeric string
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
+      }
+
+      const inviteData = {
         sender_user_id: senderUserId,
         recipient_user_email: recipentUserEmail,
         game_id: GameId,
-        
-      });
-      if (response.data.success) {
-        return response.data.inviteId;
+        accepted: false,
+        created_at: moment.utc().toISOString(), // Use moment.utc()
+        invite_code: createInviteCode(),
+        // expires in 15 minutes
+        expires_at: moment.utc().add(15, 'minutes').toISOString(), // Use moment.utc().add()
+      };
+      console.log('Created at:', inviteData.created_at);
+      console.log('Expires at:', inviteData.expires_at);
+
+      const { data, error } = await supabase
+        .from('invites')
+        .insert([inviteData])
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error('Failed to create invite');
       }
-      throw new Error('Failed to create invite');
+      return data.id;
     } catch (error) {
       console.error('Error creating invite:', error);
       throw error;
@@ -40,13 +61,15 @@ if (!emailRegex.test(recipentUserEmail)) {
    */
   getInvites: async (userEmail: string): Promise<Invite[]> => {
     try {
-      const response = await axiosInstance.get('/invites/get-invites', {
-        params: { recipient_user_email: userEmail },
-      });
-      if (response.data.success) {
-        return response.data.invites;
+      const { data, error } = await supabase
+        .from('invites')
+        .select('*')
+        .eq('recipient_user_email', userEmail);
+
+      if (error) {
+        throw new Error('Failed to fetch invites');
       }
-      throw new Error('Failed to fetch invites');
+      return data;
     } catch (error) {
       console.error('Error fetching invites:', error);
       throw error;
