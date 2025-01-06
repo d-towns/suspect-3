@@ -56,6 +56,10 @@ const Navbar: React.FC = () => {
     setPlaying(!playing);
   };
 
+  if(window.location.pathname === '/'){
+    return null;
+  }
+
 
   const renderNavLinks = () => {
 

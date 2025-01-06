@@ -142,12 +142,12 @@ const Home: React.FC = () => {
                 initial={{
                   opacity: 0,
                   ...(Math.random() > 0.5
-                    ? { x: Math.random() * 500 }
+                    ? { x: Math.random() * 100 }
                     : { y: Math.random() * 700 })
                 }}
                 animate={{
                   opacity: 0.2,
-                  x: Math.random() * 500,
+                  x: Math.random() * 100,
                   y: Math.random() * 700
                 }}
                 exit={{
