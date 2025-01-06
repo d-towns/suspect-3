@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axiosInstance from '../utils/axios-instance';
+import {supabase} from '../utils/supabase-client';
 
 // Define the User interface
 interface User {
@@ -30,6 +31,8 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const authRedirectUrl = (import.meta.env.VITE_NODE_ENV === 'dev' ? import.meta.env.VITE_DEV_FRONTEND_URL : import.meta.env.VITE_PROD_FRONTEND_URL) + '/token';
+
 // AuthProvider Component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -49,7 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await api.get('users/get-user');
       console.log('Check auth response:', response);
-      const userData =  {
+      const userData = {
         id: response.data.user.id,
         email: response.data.user.email,
         username: response.data.user.user_metadata.username
@@ -63,16 +66,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Function to handle user login
+  // const login = async (email: string, password: string, provider: string = 'none') => {
+  //   setLoading(true);
+  //   try {
+  //     const response = await api.post('users/login', { email, password, provider });
+  //     const userData = {
+  //       id: response.data.session.user.id,
+  //       email: response.data.session.user.email,
+  //       username: response.data.session.user.user_metadata.username
+  //     }
+  //     setUser(userData);
+  //   } catch (error) {
+  //     console.error('Login error:', error);
+  //     throw error;
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const login = async (email: string, password: string, provider: string = 'none') => {
     setLoading(true);
     try {
-      const response = await api.post('users/login', { email, password, provider});
-      const userData =  {
-        id: response.data.session.user.id,
-        email: response.data.session.user.email,
-        username: response.data.session.user.user_metadata.username
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // set this to false if you do not want the user to be automatically signed up
+          shouldCreateUser: true,
+          emailRedirectTo: authRedirectUrl,
+          data: {
+            username: email.split('@')[0],
+          }
+        },
+      })
+      setUser(data?.user);
+      if (error) {
+        console.error('Login error:', error);
+        throw error;
       }
-      setUser(userData);
+      console.log('Login response:', data);
+
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -81,11 +113,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+
   const loginWithGoogle = async () => {
     setLoading(true);
     try {
-      const response = await api.post('users/login', { provider: 'google' });
-      console.log(response);
+      // const response = await api.post('users/login', { provider: 'google' });
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { scopes: 'email', redirectTo: authRedirectUrl,  }
+      });
+      // const userData = {
+      //   id: response.data.session.user.id,
+      //   email: response.data.session.user.email,
+      //   username: response.data.session.user.user_metadata.username
+      // }
+      // setUser(userData);
+      
     } catch (error) {
       console.error('Provider login error:', error);
       throw error;
@@ -98,8 +141,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const guestSignIn = async (username: string) => {
     setLoading(true);
     try {
-      const response = await api.post('users/guest-sign-in', {username});
-      const userData =  {
+      const response = await api.post('users/guest-sign-in', { username });
+      const userData = {
         id: response.data.session.user.id,
         email: response.data.session.user.email,
         username: response.data.session.user.user_metadata.username
@@ -116,17 +159,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Function to handle user signup
   const signup = async (email: string, password: string, username: string) => {
     try {
-     await api.post('users/sign-up', { email, password, username });
+      await api.post('users/sign-up', { email, password, username });
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
     }
   };
 
-  // Function to handle user logout
+  // Function to handle user logout 
   const logout = async () => {
     try {
       await api.post('users/logout');
+      // const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_SECRET_KEY,
+      // );
+      await supabase.auth.signOut();
+      console.log('User logged out');
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);

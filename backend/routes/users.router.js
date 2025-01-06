@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
+import { parseCookieHeader } from '@supabase/ssr'
 
 const router = Router();
 
@@ -61,7 +62,9 @@ const guestSignIn = async (req, res) => {
 }
 
 const loginUser = async (req, res) => {
+  console.log('loginUser called');
   const supabase = createSupabaseClient({ req, res });
+  console.log('asdfasdfasdfasd called');
   const { email, password, provider } = req.body;
 
 
@@ -69,17 +72,21 @@ const loginUser = async (req, res) => {
     return res.status(400).json({ message: "Please enter all fields" });
   }
 
+  console.log('asdfasdfasdfasd called');
+
 
   
   try {
     if (provider === 'google') {
       const origin = process.env.NODE_ENV === 'dev' ? process.env.BACKEND_URL : process.env.PROD_BACKEND_URL
+      console.log('origin:', origin);
       const {data, error} = supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${origin}/users/auth/callback`
         },
       })
+      console.log('data:', data);
 
       if (data.url) {
         res.redirect(303, data.url)
@@ -101,10 +108,14 @@ const loginUser = async (req, res) => {
 const logoutUser = async (req, res) => {
   const supabase = createSupabaseClient({ req, res });
   try {
-    const { error } = await supabase.auth.signOut();
+    const jwt = parseCookieHeader(req.headers.cookie).find(cookie => cookie.name === 'token').value;
+    // console.log('jwt:', jwt);
+    const { error } = await supabase.auth.signOut(jwt);
     if (error) throw error;
+    res.clearCookie('token');
     return res.status(200).json({ success: true, message: "User logged out successfully" });
   } catch (error) {
+    
     return res.status(500).json({ success: false, message: `Error logging out user: ${error.message}` });
   }
 };
@@ -112,7 +123,9 @@ const logoutUser = async (req, res) => {
 const getUser = async (req, res) => {
   const supabase = createSupabaseClient({ req, res });
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const jwt = parseCookieHeader(req.headers.cookie).find(cookie => cookie.name === 'token').value;
+    console.log('jwt:', jwt);
+    const { data: { user }, error } = await supabase.auth.getUser(jwt);
     if (error) throw error;
     return res.status(200).json({ success: true, user: user });
   } catch (error) {
@@ -175,16 +188,16 @@ router.get("/auth/confirm", async function (req, res) {
   // res.redirect(303, '/auth/auth-code-error')
 })
 
-router.get("/auth/callback", async function (req, res) {
-  const code = req.query.code
-  const next = req.query.next ?? ''
+// router.get("/auth/callback", async function (req, res) {
+//   const code = req.query.code
+//   const next = req.query.next ?? ''
 
-  if (code) {
-    const supabase = createSupabaseClient({ req, res })
-    await supabase.auth.exchangeCodeForSession(code)
-  }
-  console.log('redirecting to:', next)
-  res.redirect(303, `${next.slice(1)}`)
-})
+//   if (code) {
+//     const supabase = createSupabaseClient({ req, res })
+//     await supabase.auth.exchangeCodeForSession(code)
+//   }
+//   console.log('redirecting to:', next)
+//   res.redirect(303, `${next.slice(1)}`)
+// })
 
 export { router as usersRouter };

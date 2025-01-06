@@ -1,6 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from '../App';
-import Login from '../pages/login';
 import PlayMenu from '../pages/playMenu';
 import Lobby from '../pages/lobby';
 import RenderGame from '../pages/renderGame';
@@ -10,6 +9,7 @@ import Leaderboard from '../pages/leaderboard';
 import Terms from '../pages/terms';
 import Home from '../pages/home';
 import Profile from '../pages/profile';
+import TokenPage from '../pages/token';
 
 const router = createBrowserRouter([
   {
@@ -21,10 +21,6 @@ const router = createBrowserRouter([
         element: <Home />,
       },
       {
-        path: 'login',
-        element: <Login />,
-      },
-      {
         path: 'faq',
         element: <FAQ />,
       },
@@ -32,6 +28,8 @@ const router = createBrowserRouter([
         path: 'terms',
         element: <Terms />,
       },
+      {path: 'token', element: <TokenPage />},
+      
       {
         element: <ProtectedRoute />,
         children: [

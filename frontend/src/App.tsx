@@ -28,7 +28,7 @@ const ThemedApp: React.FC = () => {
 
   return (
     <React.StrictMode>
-    <Theme accentColor="purple" grayColor="sand" radius="large" scaling="95%" appearance={theme}>
+    <Theme accentColor="orange" grayColor="sand"  radius="large" scaling="95%" appearance={theme} >
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className='min-h-[85vh] flex justify-center overflow-hidden '>

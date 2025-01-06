@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {  Button, Card, Flex, Heading, Text, Inset, Separator } from '@radix-ui/themes';
+import { Flex, Text, Separator } from '@radix-ui/themes';
 import './home.css'
 import AnimatedText from '../components/animatedText';
 import { AnimatePresence, motion } from "motion/react"
-import { OffenseReportCard } from './SinglePlayerGame/SingleplayerGame';
+import { OffenseReportCard } from '../components/OffenseCard';
 import { OffenseReportItem } from '../models/game-state.model';
+import { useAuth } from '../context/auth.context';
+import LoginDialog from './login';
 
 //   location: string;
   // time: string;
@@ -41,12 +43,13 @@ const sampleAnimatedTexts = [
 
 
 const Home: React.FC = () => {
-  const [inProp, setInProp] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const nodeRef = useRef(null);
   const [cardsRendered, setCardsRendered] = useState(sampleOffenses.map((offense, index) => {return {index: index, rendered: false}}));
   const [animatedTextsState, setAnimatedTextsState] = useState(
     sampleAnimatedTexts.map((_, i) => ({ index: i, rendered: false }))
   );
+  const {user} = useAuth();
 
   useEffect(() => {
   let currentTextIndex = 0;
@@ -97,15 +100,17 @@ const Home: React.FC = () => {
 
       >
       <Flex direction="row" gap="4" mb="6" className='h-full z-10'>
-        <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link>
+        {user ? <Link to='/play'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> :  <Text onClick={() => setLoginDialogOpen(true)} size={'8'} as='span' className='main-link'>Login</Text> }
+       {!user && <LoginDialog open={loginDialogOpen} onOpenChange={() => setLoginDialogOpen(false)}/>}
+        {/* <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> */}
         <Separator orientation="vertical" size={'2'} />
         <Link to='/faq'> <Text size={'8'} as='span' className='main-link z-10'>How To Play</Text></Link>
         <Separator orientation="vertical" size={'2'} />
         <Link to='/leaderboard'> <Text size={'8'} as='span' className='main-link'>Leaderboard </Text></Link>
       </Flex>
       </motion.div>
-
       </Flex>
+
             {sampleOffenses.map((offense, index) => (
         <div className='absolute h-fit top-0 left-0 z-[-10]' key={index}>
           <AnimatePresence>

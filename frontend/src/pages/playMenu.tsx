@@ -1,18 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { roomsService } from '../services/rooms.service';
 import { useAuth } from '../context/auth.context';
-import {
-  Box,
-  Flex,
-  Text,
-  Separator,
-  Card,
-  Inset,
-  Strong,
-} from '@radix-ui/themes';
+import { Box, Flex, Text, Separator, Card, Inset, Strong, Dialog, Button, TextField } from '@radix-ui/themes';
 import { useSocketContext } from '../context/SocketContext/socket.context';
-
+import { supabase } from '../utils/supabase-client';
+import AnimatedText from '../components/animatedText';
+import './playMenu.css';
 
 interface ModeCardProps {
   createRoom: (mode: string) => void;
@@ -35,14 +29,14 @@ const ModeCard: React.FC<ModeCardProps> = ({
       style={{
         position: 'relative',
         flex: 1,
-        cursor:'pointer',
+        cursor: 'pointer',
         margin: '0 16px',
       }}
     >
       <Card
         size="3"
         onClick={() => createRoom(mode)}
-        className={'hover:scale-105 hover:border transition ease-in-out duration-200'}
+        className="hover:scale-105 hover:border transition ease-in-out duration-200"
       >
         <Inset clip="padding-box" side="top" pb="current">
           <img
@@ -51,7 +45,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
             className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
           />
         </Inset>
-        <Text as="p" align='center' size={{ lg: '7', md: '5', sm: '4' }} >
+        <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
           <Strong>{altText} Mode</Strong>
         </Text>
         <Separator my="3" size="4" />
@@ -65,9 +59,28 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const {socket} = useSocketContext();
+  const { socket } = useSocketContext();
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [username, setUsername] = useState('');
 
-  if(socket){
+  useEffect(() => {
+    if (user && !user?.username) {
+      const defaultName = user?.email?.split('@')[0] || '';
+      setUsername(defaultName);
+      setShowUsernameModal(true);
+    }
+  }, [user]);
+
+  const handleSetUsername = async () => {
+    try {
+      await supabase.auth.updateUser({ data: { username } });
+      setShowUsernameModal(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  if (socket) {
     console.log('socket connected');
   }
 
@@ -82,24 +95,51 @@ const PlayMenu: React.FC = () => {
     }
   };
 
-
   return (
-        <Flex direction={{ initial: 'column', md: 'row' }} gap={'6'} className='h-full self-center items-center justify-self-center '  mt={{xs: '6', md:'0'}}>
-          <ModeCard
-            createRoom={createRoom}
-            imgSrc="single-player-splash-2.webp"
-            altText="Single Player"
-            description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
-            mode="single"
-          />
-          <ModeCard
-            createRoom={createRoom}
-            imgSrc="multi-player-splash.webp"
-            description='Clear your name as a suspect against the detective! The culprit is among you, but who? Invite your friends and use your wits to deceive the detective and avoid being framed...or found out.'
-            altText="Multiplayer"
-            mode="multi"
-          />
-        </Flex>
+    <>
+      <Flex
+        direction={{ initial: 'column', md: 'row' }}
+        gap="6"
+        className="h-full self-center items-center justify-self-center"
+        mt={{ xs: '6', md: '0' }}
+      >
+        <ModeCard
+          createRoom={createRoom}
+          imgSrc="single-player-splash-2.webp"
+          altText="Single Player"
+          description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
+          mode="single"
+        />
+        <ModeCard
+          createRoom={createRoom}
+          imgSrc="multi-player-splash.webp"
+          description="Clear your name as a suspect against the detective! The culprit is among you, but who? Invite your friends and use your wits to deceive the detective and avoid being framed...or found out."
+          altText="Multiplayer"
+          mode="multi"
+        />
+      </Flex>
+
+      <Dialog.Root open={showUsernameModal} onOpenChange={setShowUsernameModal}>
+        <Dialog.Content className='flex flex-col items-center justify-center'>
+          <Dialog.Title className="mb-4">
+            <AnimatedText message="Welcome to the force, Detective!" className='dialogHeader' animationSpeed={80} />
+          </Dialog.Title>
+          <Dialog.Description className="mb-4">
+            Choose a username to be displayed in game.
+          </Dialog.Description>
+          <TextField.Root size="3" placeholder="Username"             className="border w-full"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}>
+            <TextField.Slot side="right" px="1">
+            <Button className='w-full' onClick={handleSetUsername}>
+            Save
+          </Button>
+            </TextField.Slot>
+          </TextField.Root>
+
+        </Dialog.Content>
+      </Dialog.Root>
+    </>
   );
 };
 
