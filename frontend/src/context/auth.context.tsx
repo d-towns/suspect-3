@@ -182,7 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Function to handle user logout 
   const logout = async () => {
     try {
-      await api.post('users/logout');
+      // await api.post('users/logout');
       // const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_SECRET_KEY,
       // );
       await supabase.auth.signOut();
