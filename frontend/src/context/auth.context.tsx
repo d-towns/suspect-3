@@ -50,19 +50,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     setLoading(true);
     try {
-      const response = await api.get('users/get-user', {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json, text/plain, */*',
-        },
-      });
-      console.log('Check auth response:', response);
+      // const response = await api.get('users/get-user', {
+      //   withCredentials: true,
+      //   headers: {
+      //     'Content-Type': 'application/json, text/plain, */*',
+      // 'Set-Cookie': 'token=accessToken; Secure; Path=/; SameSite=None; HttpOnly',
+      //   },
+      // });
+      // console.log('Check auth response:', response);
+
+      const {data: userResponse, error} = await supabase.auth.getUser();
+      if (error) {
+        throw error;
+      }
+      if(userResponse.user && userResponse.user.email) {
       const userData = {
-        id: response.data.user.id,
-        email: response.data.user.email,
-        username: response.data.user.user_metadata.username
+        id: userResponse.user.id,
+        email: userResponse.user.email,
+        username: userResponse.user.user_metadata.username
       }
       setUser(userData);
+    }
     } catch (error) {
       setUser(null);
     } finally {
