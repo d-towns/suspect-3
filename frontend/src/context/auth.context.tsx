@@ -50,7 +50,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     setLoading(true);
     try {
-      const response = await api.get('users/get-user');
+      const response = await api.get('users/get-user', {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json, text/plain, */*',
+        },
+      });
       console.log('Check auth response:', response);
       const userData = {
         id: response.data.user.id,
