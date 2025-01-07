@@ -64,47 +64,50 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async createInitialGameState() {
-    // create a game thread
-    const thread = await this.llmGameService.createGameThread();
+    try {
+      // create a game thread
+      const thread = await this.llmGameService.createGameThread();
 
-    // add the crime message to the thread
-    await this.llmGameService.addMessageToThread(thread.id, {
-      role: "user",
-      content: this.createCrime(),
-    });
-
-    console.log(`Thread created: ${thread.id}`);
-
-    this.threadId = thread.id;
-
-    // run the thread to get the initial game state
-    this.gameState = await this.llmGameService.runGameThread(
-      process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-      thread.id
-    );
-    if (!this.gameState) {
-      console.error("Error creating initial game state");
-      return null;
-    } else {
-      // TODO: use a chat completion to check for errors in the game state upon inital creation
-      // this.gameState = await this.checkGameState();
-      // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
-      if ( this.gameState.rounds.find((round) => round.type === "interrogation").conversations.length !== 0) {
-        this.gameState.rounds.find((round) => round.type === "interrogation").conversations = [];
-      }
-
-      this.gameState.status = "setup";
-
-
-      // add the game state and thread id to the database
-      await GameRoomService.updateGameRoom(this.roomId, {
-        thread_id: this.threadId,
-        game_state: GameRoomService.encryptGameState(this.gameState),
+      // add the crime message to the thread
+      await this.llmGameService.addMessageToThread(thread.id, {
+        role: "user",
+        content: this.createCrime(),
       });
 
-      // tell the socket server that the game has been created
-      // TODO #io.js: the socket server needs to listen for the game-created event and emit that event to the client so that it can route to the correct game screen
-      this.emit("game:created", { gameState: this.gameState });
+      console.log(`Thread created: ${thread.id}`);
+
+      this.threadId = thread.id;
+
+      // run the thread to get the initial game state
+      this.gameState = await this.llmGameService.runGameThread(
+        process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+        thread.id
+      );
+      if (!this.gameState) {
+        console.error("Error creating initial game state");
+        return null;
+      } else {
+        // TODO: use a chat completion to check for errors in the game state upon initial creation
+        // this.gameState = await this.checkGameState();
+        // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
+        if (this.gameState.rounds.find((round) => round.type === "interrogation").conversations.length !== 0) {
+          this.gameState.rounds.find((round) => round.type === "interrogation").conversations = [];
+        }
+
+        this.gameState.status = "setup";
+
+        // add the game state and thread id to the database
+        await GameRoomService.updateGameRoom(this.roomId, {
+          thread_id: this.threadId,
+          game_state: GameRoomService.encryptGameState(this.gameState),
+        });
+
+        // tell the socket server that the game has been created
+        // TODO #io.js: the socket server needs to listen for the game-created event and emit that event to the client so that it can route to the correct game screen
+        this.emit("game:created", { gameState: this.gameState });
+      }
+    } catch (error) {
+      this.emit("error", error.message);
     }
   }
 

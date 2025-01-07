@@ -421,7 +421,9 @@ export class GameRoomSocketServer {
    * @param {string} roomId - The ID of the room.
    */
     attachGameManagerListeners(manager, roomId) {
-      // Example event listeners
+      manager.on('error', (data) => {
+        this.emitToRoom(roomId, 'error', data);
+      });
       manager.on('game:created', (data) => {
         this.emitToRoom(roomId, 'game:created', data);
       });

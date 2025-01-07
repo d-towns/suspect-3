@@ -23,6 +23,7 @@ export const useSocket = () => {
     const newSocket = io(SOCKET_SERVER_URL, {
       path: '/socket.io',
       transports: ['websocket'],
+      reconnection: true,
     });
 
     newSocket.on('connect', () => {
@@ -39,6 +40,11 @@ export const useSocket = () => {
     newSocket.on('disconnect', () => {
       console.log('Socket disconnected');
       setIsConnected(false);
+    });
+
+    newSocket.on('error', (error: any) => {
+      console.error('Socket error', error);
+      addToast(`Error: ${error.message} \n Please refresh the page to reconnect`,  );
     });
 
     setSocket(newSocket);
