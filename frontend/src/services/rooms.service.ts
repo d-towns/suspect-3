@@ -51,7 +51,7 @@ export const roomsService = {
       console.error(error);
       throw new Error('Failed to fetch room');
     }
-    const decrypted = decryptGameState(data.game_state);
+    const decrypted = await decryptGameState(data.game_state);
     const game_state = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
     return { ...data, game_state };
   },
