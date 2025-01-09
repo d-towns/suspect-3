@@ -186,42 +186,6 @@ export default class RealtimeEventHandler {
     console.log("Added assistant transcript to game thread");
   }
 
-  // injectConversationHistory(responder) {
-  //   if (!this.ws) {
-  //     console.error("injectConversationHistory error: websocket is required.");
-  //     return;
-  //   }
-  //   if (!this.gameManager) {
-  //     console.error("injectConversationHistory error: gameManager is required.");
-  //     return;
-  //   }
-  //   const previousSuspectConversations =
-  //   this.gameManager.getPreviousSuspectConversations(responder);
-  //   console.log("Previous suspect conversations:", previousSuspectConversations);
-  // if (previousSuspectConversations) {
-  //   console.log("Injecting previous suspect conversations");
-  //   for (const conversation of previousSuspectConversations) {
-  //     conversation.responses.forEach((response) => {
-  //       const event = {
-  //         type: "conversation.item.create",
-  //         item: {
-  //           type: "message",
-  //           role: response.speaker == "Detective" ? "user" : "assistant",
-  //           content: [
-  //             {
-  //               type: response.speaker == "Detective" ? "input_text" : "text",
-  //               text: response.message,
-  //             },
-  //           ],
-  //         },
-  //       };
-  //       console.log("Injecting conversation item:", event);
-  //       this.ws.send(JSON.stringify(event));
-  //     });
-  //   }
-  // }
-  // }
-
   audioDeltaListener(event) {
     console.log("Realtime audio delta received");
     this.gameManager.emit("realtime:audio:delta:assistant", {
