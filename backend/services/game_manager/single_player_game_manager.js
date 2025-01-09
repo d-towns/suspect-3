@@ -5,9 +5,7 @@ import OpenAIGameService from "../llm/openai_game_service.js";
 import OpenAIEloService from "../llm/elo/openai-elo.service.js";
 
 import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player_realtime_handler.js";
-import {
-  SinglePlayerGameStateSchema,
-} from "../../models/game-state-schema.js";
+import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -90,8 +88,13 @@ export class SinglePlayerGameManager extends GameManager {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
         // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
-        if (this.gameState.rounds.find((round) => round.type === "interrogation").conversations.length !== 0) {
-          this.gameState.rounds.find((round) => round.type === "interrogation").conversations = [];
+        if (
+          this.gameState.rounds.find((round) => round.type === "interrogation")
+            .conversations.length !== 0
+        ) {
+          this.gameState.rounds.find(
+            (round) => round.type === "interrogation"
+          ).conversations = [];
         }
 
         this.gameState.status = "setup";
@@ -131,13 +134,11 @@ export class SinglePlayerGameManager extends GameManager {
           determine if the game is in the correct state. If the game is not in the correct state, provide a new game state that is in the correct state.`,
         },
       ],
-      zodResponseFormat(
-        SinglePlayerGameStateSchema,
-        "gameState"
-      ), 1500
+      zodResponseFormat(SinglePlayerGameStateSchema, "gameState"),
+      1500
     );
 
-    console.log('\n\n\n' + "Game state check result:", result + '\n\n\n' );
+    console.log("\n\n\n" + "Game state check result:", result + "\n\n\n");
 
     return result;
   }
@@ -179,16 +180,16 @@ export class SinglePlayerGameManager extends GameManager {
   startInterrogationPhase() {
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, keeping the current timer");
-    }  else {
+    } else {
       const { clear } = startInterval(
         this.interrogationTimer,
         this.emitRoundTick.bind(this),
         this.endInterrogationPhase.bind(this)
       );
-      
+
       this.clearRoundTimer = clear;
     }
-    
+
     console.log("Starting interrogation phase...");
     this.currentPhase = "interrogation";
     this.emit("phase:started", { phase: this.currentPhase });
@@ -201,12 +202,10 @@ export class SinglePlayerGameManager extends GameManager {
       .find((round) => round.type === "interrogation")
       .conversations.find((conversation) => conversation.active);
 
-      console.log("Active conversation", activeConversation);
+    console.log("Active conversation", activeConversation);
     if (activeConversation) {
-
       this.startInterrogation(activeConversation.suspect);
     }
-
   }
 
   async createNewLead(sourceNode, targetNode, type) {
@@ -359,30 +358,33 @@ export class SinglePlayerGameManager extends GameManager {
     this.realtimeHandler.addCustomMessageListener(async (data) => {
       const parsed = JSON.parse(data);
 
-    const activeSuspect = this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.suspect;
-      if (parsed.type === "conversation.item.input_audio_transcription.completed") {
+      const activeSuspect = this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations?.at(-1)?.suspect;
+
+      const transcriptionEventTypes = [
+        "response.audio_transcript.done",
+        "conversation.item.input_audio_transcription.completed",
+      ];
+
+      if (transcriptionEventTypes.includes(parsed.type)) {
         // add the transcription to the game state active conversation
         this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.responses.push({
-          speaker: "Detective",
-          message: parsed.transcript
-        });
-      } else if (parsed.type === "response.audio_transcript.done") {
-        // add the transcription to the game state active conversation
-        this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.responses.push({
-          speaker: activeSuspect,
-          message: parsed.transcript
+          .find((round) => round.type === "interrogation")
+          .conversations?.at(-1)
+          ?.responses.push({
+            speaker:
+              parsed.type === "response.audio_transcript.done"
+                ? activeSuspect
+                : "Detective",
+            message: parsed.transcript,
+          });
+
+        await GameRoomService.updateGameRoom(this.roomId, {
+          game_state: GameRoomService.encryptGameState(this.gameState),
         });
       }
     });
-
-
-        
 
     const activeConversation = this.gameState.rounds
       .find((round) => round.type === "interrogation")
@@ -451,26 +453,24 @@ export class SinglePlayerGameManager extends GameManager {
           // Remove this listener so we only handle one final response
           this.gameState.rounds
             .find((round) => round.type == "interrogation")
-            .conversations.find((conversation) => conversation.active).active = false;
+            .conversations.find(
+              (conversation) => conversation.active
+            ).active = false;
 
+          await GameRoomService.updateGameRoom(this.roomId, {
+            game_state: GameRoomService.encryptGameState(this.gameState),
+          });
 
-            await GameRoomService.updateGameRoom(this.roomId, {
-              game_state: GameRoomService.encryptGameState(this.gameState),
-            });
-          
-            setTimeout(() => {
-              this.emit("game:updated", this.gameState);
-            }, 5000);
-             
+          setTimeout(() => {
+            this.emit("game:updated", this.gameState);
+          }, 5000);
+
           // this.gameState = await this.llmGameService.runGameThread(
           //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
           //   this.threadId
           // );
 
           // set the most recent conversation to active false
-          
-
-
 
           // setTimeout(() => {
           //   this.emit("game:updated", this.gameState);
@@ -514,10 +514,20 @@ export class SinglePlayerGameManager extends GameManager {
     //   this.threadId
     // );
 
-    if(this.gameState.rounds.find((round) => round.type === "interrogation").conversations.some((conversation) => conversation.active)) {
-      this.gameState.rounds.find((round) => round.type === "interrogation").conversations.find((conversation) => conversation.active).active = false;
+    if (
+      this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.some((conversation) => conversation.active)
+    ) {
+      this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.find(
+          (conversation) => conversation.active
+        ).active = false;
     }
-    this.gameState.rounds.find((round) => round.type === "interrogation").status = "completed";
+    this.gameState.rounds.find(
+      (round) => round.type === "interrogation"
+    ).status = "completed";
     // save the game state to the database
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
@@ -599,7 +609,8 @@ export class SinglePlayerGameManager extends GameManager {
     //   this.threadId
     // );
 
-    this.gameState.rounds.find((round) => round.type === "voting").status = "completed";
+    this.gameState.rounds.find((round) => round.type === "voting").status =
+      "completed";
     this.gameState.status = "finished";
 
     // save the game state to the database
@@ -687,85 +698,47 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("game:updated", this.gameState);
   }
 
-  /**
-   * Take the deduction graph and traverse in a depth-first search from each statement node in order to build the dedudction analysis that will be sent to the chat completion.
-   * Each complete path create a string, incomplete paths will not be included in the analysis. the edge types will be used to connect the nodes in their logical order.
-   *
-   * @param {SinglePlayerGameStateSchema.deduction} deduction
-   */
-
-  analyzeDeductionGraph(deduction) {
-    const { nodes, edges } = deduction;
-    const adjacencyList = {};
-
-    // Build adjacency list
-    edges.forEach((edge) => {
-      if (!adjacencyList[edge.source_node]) {
-        adjacencyList[edge.source_node] = [];
-      }
-      adjacencyList[edge.source_node].push({
-        target: edge.target_node,
-        type: edge.type,
-      });
-    });
-
-    const analysisResults = [];
-    const visited = new Set();
-
-    const dfs = (currentNode, path, edgeTypes) => {
-      if (visited.has(currentNode)) return;
-      visited.add(currentNode);
-      path.push(currentNode);
-
-      if (
-        !adjacencyList[currentNode] ||
-        adjacencyList[currentNode].length === 0
-      ) {
-        // Complete path
-        const pathStrings = path.map((nodeId) => {
-          const node = nodes.find((n) => n.id === nodeId);
-          if (node.type === "statement" || node.type === "suspect") {
-            return node.data.message || node.data.identity;
-          }
-          return node.data;
-        });
-        const edgeDescriptions = edgeTypes.map((type) => {
-          switch (type) {
-            case "supports":
-              return "supports";
-            case "contradicts":
-              return "contradicts";
-            case "implicates":
-              return "implicates";
-            default:
-              return "";
-          }
-        });
-        let analysisString = "";
-        for (let i = 0; i < edgeDescriptions.length; i++) {
-          analysisString += `${pathStrings[i]} ${edgeDescriptions[i]} ${
-            pathStrings[i + 1]
-          }. `;
-        }
-        analysisResults.push(analysisString.trim());
-      } else {
-        adjacencyList[currentNode].forEach((edge) => {
-          dfs(edge.target, [...path], [...edgeTypes, edge.type]);
-        });
-      }
-
-      visited.delete(currentNode);
-    };
-
-    // Start DFS from each statement node
-    nodes.forEach((node) => {
-      if (node.type === "statement") {
-        dfs(node.id, [], []);
-      }
-    });
-
-    return analysisResults;
+  #getPreviousSuspectConversations(suspect) {
+    return this.gameState.rounds
+      .find((round) => round.type === "interrogation")
+      .conversations.filter(
+        (conversation) => conversation.suspect === suspect.id
+      );
   }
+
+  async summarizePreviousConversations(suspect) {
+    const previousConversations = this.#getPreviousSuspectConversations(suspect);
+    console.log("Previous conversations:", previousConversations);
+    if (previousConversations.length === 0) {
+      return "This is the first conversation with the detective.";
+    }
+
+    const summarySchema = z.object({
+      summary: z.string(),
+    });
+    const response = await this.llmGameService.createChatCompletion(
+      [
+        {
+          role: "system",
+          content: "You are an assistant summarizing previous conversations.",
+        },
+        {
+          role: "assistant",
+          content: `Summarize the previous conversations with suspect ${suspect.name}.`,
+        },
+        {
+          role: "user",
+          content: `Given the previous conversations with suspect ${suspect.name}: ${JSON.stringify(
+            previousConversations
+          )}`,
+        },
+      ],
+      zodResponseFormat(summarySchema, "summary")
+    );
+    return response.summary;
+  }
+
+
 
   async calculateGameResults() {
     // ... if deduction accepted -> check culprit
@@ -774,7 +747,7 @@ export class SinglePlayerGameManager extends GameManager {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
       console.log("Game finished, calculating ELO changes...");
-      if(this.clearRoundTimer) this.clearRoundTimer();
+      if (this.clearRoundTimer) this.clearRoundTimer();
 
       const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
         this.playerId
