@@ -178,19 +178,23 @@ export class SinglePlayerGameManager extends GameManager {
 
   startInterrogationPhase() {
     if (this.roundTimer > 0) {
-      console.log("Round timer is still running, cannot start new phase");
-      return;
+      console.log("Round timer is still running, keeping the current timer");
+    }  else {
+      const { clear } = startInterval(
+        this.interrogationTimer,
+        this.emitRoundTick.bind(this),
+        this.endInterrogationPhase.bind(this)
+      );
+      
+      this.clearRoundTimer = clear;
     }
+    
+    console.log("Starting interrogation phase...");
     this.currentPhase = "interrogation";
     this.emit("phase:started", { phase: this.currentPhase });
     // ... set up a 10-minute timer. On expire, go to next phase ...
     // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
 
-    const { clear } = startInterval(
-      this.interrogationTimer,
-      this.emitRoundTick.bind(this),
-      this.endInterrogationPhase.bind(this)
-    );
     // if there is an active conversation in the interrogation phase, we should open a realtime session using startInterrogation
     // if there is no active conversation, we should just wait for the player to initiate one
     const activeConversation = this.gameState.rounds
@@ -199,10 +203,10 @@ export class SinglePlayerGameManager extends GameManager {
 
       console.log("Active conversation", activeConversation);
     if (activeConversation) {
+
       this.startInterrogation(activeConversation.suspect);
     }
 
-    this.clearRoundTimer = clear;
   }
 
   async createNewLead(sourceNode, targetNode, type) {
@@ -505,10 +509,15 @@ export class SinglePlayerGameManager extends GameManager {
       this.endInterrogation();
     }
     // run the game thread to process the conversation and generate the next game state
-    this.gameState = await this.llmGameService.runGameThread(
-      process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-      this.threadId
-    );
+    // this.gameState = await this.llmGameService.runGameThread(
+    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+    //   this.threadId
+    // );
+
+    if(this.gameState.rounds.find((round) => round.type === "interrogation").conversations.some((conversation) => conversation.active)) {
+      this.gameState.rounds.find((round) => round.type === "interrogation").conversations.find((conversation) => conversation.active).active = false;
+    }
+    this.gameState.rounds.find((round) => round.type === "interrogation").status = "completed";
     // save the game state to the database
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
@@ -585,10 +594,13 @@ export class SinglePlayerGameManager extends GameManager {
     // tell listeners that the deduction phase has ended
     this.emit("phase:ended", { phase: this.currentPhase });
     // run the thread to process the deduction and generate the finished game state
-    this.gameState = await this.llmGameService.runGameThread(
-      process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-      this.threadId
-    );
+    // this.gameState = await this.llmGameService.runGameThread(
+    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+    //   this.threadId
+    // );
+
+    this.gameState.rounds.find((round) => round.type === "voting").status = "completed";
+    this.gameState.status = "finished";
 
     // save the game state to the database
     await GameRoomService.updateGameRoom(this.roomId, {
@@ -598,7 +610,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("game:updated", this.gameState);
 
     // check if the game is over ( is should be ) and then run the elo rating calculation
-    this.checkWinCondition();
+    await this.calculateGameResults();
   }
 
   async runDeductionAnalysis() {
@@ -762,6 +774,8 @@ export class SinglePlayerGameManager extends GameManager {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
       console.log("Game finished, calculating ELO changes...");
+      if(this.clearRoundTimer) this.clearRoundTimer();
+
       const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
         this.playerId
       );

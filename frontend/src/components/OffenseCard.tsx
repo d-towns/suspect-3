@@ -38,7 +38,7 @@ export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseRep
                     <Flex className='w-full'>
                         <img
                             src={offenseReport.imgSrc || sampleImage[index || 0]}
-                            className="block object-cover w-full max-h-[800px] bg-gray-200 rounded"
+                            className="block object-cover w-full max-h-[600px] bg-gray-200 rounded"
                         />
 
                         <Flex direction='column' gap='9' className='w-full ml-5'>

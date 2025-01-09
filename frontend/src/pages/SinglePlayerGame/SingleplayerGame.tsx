@@ -730,7 +730,8 @@ const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, ha
 interface InterrogationProps {
     gameState: SingleGameState;
     currentSuspect: Suspect | undefined;
-    interrogationTranscript: ConversationItem[];
+    userInterrogationTranscript: ConversationItem[];
+    suspectInterrogationTranscript: ConversationItem[];
     wavStreamPlayerRef: React.MutableRefObject<WavStreamPlayer | null>;
     roundTimer: number
     responseLoading: boolean;
@@ -751,7 +752,8 @@ interface InterrogationProps {
  */
 
 const Interrogation: React.FC<InterrogationProps> = ({
-    interrogationTranscript,
+    userInterrogationTranscript,
+    suspectInterrogationTranscript,
     responseLoading,
     audioTranscribing,
     socket,
@@ -761,6 +763,14 @@ const Interrogation: React.FC<InterrogationProps> = ({
     handleEndInterrogation,
     loadingSessionEnd,
 }) => {
+
+    const interrogationTranscript: ConversationItem[] = [];
+    let i = 0;
+    while (i < userInterrogationTranscript.length || i < suspectInterrogationTranscript.length) {
+        if (userInterrogationTranscript[i]) interrogationTranscript.push(userInterrogationTranscript[i]);
+        if (suspectInterrogationTranscript[i]) interrogationTranscript.push(suspectInterrogationTranscript[i]);
+        i++;
+    }
     return (
         <>
             <div className='grid grid-cols-1 grid-rows-[auto_1fr] gap-4'>
@@ -782,8 +792,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                         <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
                                     </Flex>
                                     {interrogationTranscript.map((conversationItem, index) => (
-                                        <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
-                                            <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
+                                            <Flex key={index} className='col-span-8 gap-5 py-3'>
                                                 <Box ml="2" mb="2">
                                                     <Text as="p" weight="bold" size="3">
                                                         {Math.floor(conversationItem.timestamp / 60)}:
@@ -797,7 +806,6 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                                     </Text>
                                                 </Box>
                                             </Flex>
-                                        </Tooltip>
                                     ))}
                                     <Flex direction={'column'} className='w-full'>
                                         {responseLoading && (
@@ -820,9 +828,11 @@ const Interrogation: React.FC<InterrogationProps> = ({
                             socket={socket}
                             emitEvent={emitEvent}
                             onAudioRecorded={handleAudioRecorded}
+                            loadingSessionEnd={loadingSessionEnd}
+                            handleEndInterrogation={handleEndInterrogation}
                         />
                     )}
-                    <Button
+                    {/* <Button
                         size="4"
                         variant='outline'
                         radius='small'
@@ -832,7 +842,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                         onClick={() => handleEndInterrogation()}
                     >
                         {loadingSessionEnd ? <Spinner /> : 'End Interrogation'}
-                    </Button>
+                    </Button> */}
                 </div>
             </div>
         </>
@@ -1131,7 +1141,8 @@ const SingleGame = () => {
 
 
 
-    const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
+    const [userInterrogationTranscript, setUserInterrogationTranscript] = useState<ConversationItem[]>([]);
+    const [suspectInterrogationTranscript, setSuspectInterrogationTranscript] = useState<ConversationItem[]>([]);
     const nodeRef = useRef(null);
     const [roundTimer, setRoundTimer] = useState<number>(0);
 
@@ -1199,15 +1210,15 @@ const SingleGame = () => {
 
     const handleUserAudioTranscriptEvent = useCallback((params: any) => {
         console.log('Received audio transcript:', params);
-        const { speaker, audioTranscript, responseId, currentRoundTime } = params;
-        setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker, responseId }]);
+        const { speaker, transcript, responseId, currentRoundTime } = params;
+        setUserInterrogationTranscript(prev => [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }]);
         setAudioTranscribing(false);
     }, [roundTimer]);
 
     const handleRealtimeAudioTranscriptEvent = (params: any) => {
         const { speaker, transcript, currentRoundTime, responseId } = params;
         console.log('Received audio transcript:', params);
-        setInterrogationTranscript(prev => {
+        setSuspectInterrogationTranscript(prev => {
             const lastItem = prev[prev.length - 1];
             if (!lastItem) {
                 // If there's no last item, create a new one
@@ -1272,7 +1283,8 @@ const SingleGame = () => {
             socket.on('game:updated', (newState: SingleGameState) => {
                 console.log('Received game state update:', newState);
                 setGameState(newState);
-                setInterrogationTranscript([]);
+                setUserInterrogationTranscript([]);
+                setSuspectInterrogationTranscript([]);
                 setDeductionLoading(false)
                 setResultsLoading(false);
             });
@@ -1289,11 +1301,12 @@ const SingleGame = () => {
                 setDeductionSubmitted(true);
             })
 
-
+            
             socket.on('game-over', () => {
                 setShowGameOver(true);
             });
-
+            socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
+            
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
 
             socket.on('realtime:transcript:delta:assistant', handleRealtimeAudioTranscriptEvent);
@@ -1331,7 +1344,6 @@ const SingleGame = () => {
             });
 
 
-            socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
 
             socket.on('leaderboard-stats-update', handleLeaderboardStatsUpdate);
 
@@ -1510,7 +1522,8 @@ const SingleGame = () => {
                         gameState={gameState}
                         roundTimer={roundTimer}
                         currentSuspect={activeSuspect}
-                        interrogationTranscript={interrogationTranscript}
+                        userInterrogationTranscript={userInterrogationTranscript}
+                        suspectInterrogationTranscript={suspectInterrogationTranscript}
                         handleEndInterrogation={handleEndInterrogation}
                         responseLoading={responseLoading}
                         audioTranscribing={audioTranscribing}

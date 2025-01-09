@@ -76,7 +76,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { socket } = useSocketContext();
+  const { socket, isConnected} = useSocketContext();
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [username, setUsername] = useState('');
 
@@ -110,7 +110,7 @@ const PlayMenu: React.FC = () => {
       console.error('Error creating room:', error);
       alert('Error creating room: ' + (error as Error).message);
     }
-  };
+};
 
   return (
     <>

@@ -119,7 +119,7 @@ export default class RealtimeEventHandler {
     this.lastAudioMessageDeltas = [];
 
     const playerConversationItem = {
-      audioTranscript: event.transcript,
+      transcript: event.transcript,
       responseId:`${event.message_id}_${event.response_id}`,
       speaker: "user",
       currentRoundTime: this.gameManager.roundTimer,
