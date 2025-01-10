@@ -132,6 +132,7 @@ export const SinglePlayerGameStateSchema = z
         time: z.string(),
         offenseReport: z.array(
           z.object({
+            id: z.string(),
             location: z.string(),
             time: z.string(),
             description: z.string(),

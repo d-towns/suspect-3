@@ -21,6 +21,7 @@
     "moment": "^2.30.1",
     "node-cache": "^5.1.2",
     "openai": "^4.65.0",
+    "replicate": "^1.0.1",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.8.0",
     "uuid": "^11.0.3",

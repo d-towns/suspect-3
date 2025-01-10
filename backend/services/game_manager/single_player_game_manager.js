@@ -1,9 +1,9 @@
 import { GameRoomService } from "../game_room/game_room.service.js";
 import { LeaderboardService } from "../leaderboard/leaderboard.service.js";
 import { GameManager } from "./game_manager.js";
-import OpenAIGameService from "../llm/openai_game_service.js";
+import OpenAIGameService from "../llm/game/openai_game_service.js";
 import OpenAIEloService from "../llm/elo/openai-elo.service.js";
-
+import { StorageService, ImageBuckets } from "../image/storage.service.js";
 import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player_realtime_handler.js";
 import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
@@ -11,6 +11,7 @@ import dotenv from "dotenv";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
+import ReplicateImageService from "../llm/image/replicate_image.service.js";
 
 /** the game loop
  * Single Player:
@@ -38,6 +39,7 @@ export class SinglePlayerGameManager extends GameManager {
     super();
     this.llmGameService = new OpenAIGameService();
     this.llmEloService = OpenAIEloService;
+    this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
@@ -81,6 +83,9 @@ export class SinglePlayerGameManager extends GameManager {
         process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
         thread.id
       );
+
+
+
       if (!this.gameState) {
         console.error("Error creating initial game state");
         return null;
@@ -99,6 +104,11 @@ export class SinglePlayerGameManager extends GameManager {
 
         this.gameState.status = "setup";
 
+        // create images for the game
+        await this.#createImagesForGame();
+
+        console.log(" \n\n\n game state post image creation", this.gameState, '\n\n\n'); 
+
         // add the game state and thread id to the database
         await GameRoomService.updateGameRoom(this.roomId, {
           thread_id: this.threadId,
@@ -110,6 +120,7 @@ export class SinglePlayerGameManager extends GameManager {
         this.emit("game:created", { gameState: this.gameState });
       }
     } catch (error) {
+      console.error("Error creating initial game state:", error);
       this.emit("error", error.message);
     }
   }
@@ -736,6 +747,44 @@ export class SinglePlayerGameManager extends GameManager {
       zodResponseFormat(summarySchema, "summary")
     );
     return response.summary;
+  }
+
+
+  async #createImagesForGame() {
+    try {
+      let basePrompt = 'a 16-bit';
+      console.log('\n creating images for suspects \n');
+      
+      for (let i = 0; i < this.gameState.suspects.length; i++) {
+        const suspect = this.gameState.suspects[i];
+        const suspectPrompt = `${basePrompt} headshot of ${suspect.name}, a ${suspect.identity} with a ${suspect.temperment} temperment.`;
+        const image = await this.llmImageService.createImage(suspectPrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Suspect, `${this.roomId}_${suspect.id}.png`);
+        this.gameState.suspects[i].imgSrc = publicUrl;
+      }
+      
+      console.log(' \n creating images for evidence \n');
+      
+      for ( let i = 0; i < this.gameState.allEvidence.length; i++) {
+        const evidence = this.gameState.allEvidence[i];
+        const evidencePrompt = `${basePrompt} image of ${evidence.description}`;
+        const image = await this.llmImageService.createImage(evidencePrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Evidence, `${this.roomId}_${evidence.id}.png`);
+        this.gameState.allEvidence[i].imgSrc = publicUrl;
+      }
+      
+      console.log('\n creating images for offense report \n');
+      
+      for (let i = 0; i < this.gameState.crime.offenseReport.length; i++) {
+        const report = this.gameState.crime.offenseReport[i];
+        const reportPrompt = `${basePrompt} image of ${report.description}`;
+        const image = await this.llmImageService.createImage(reportPrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.OffenseReport, `${this.roomId}_${report.id}.png`);
+        this.gameState.crime.offenseReport[i].imgSrc = publicUrl;
+      }
+    } catch (error) {
+      console.log(error);
+    }
   }
 
 

@@ -19,7 +19,7 @@ import AnimatedText from '../../components/animatedText';
 import { ReactFlow, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
 import { OffenseReportCard } from '../../components/OffenseCard';
 import Dagre from '@dagrejs/dagre';
-import { findImplicatedSuspect } from '../../utils/helpers';
+import { findImplicatedSuspect, getSupabaseImageURL} from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
 
 /**
@@ -261,7 +261,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
             <Card variant={variant} onClick={onClick} className='cursor-pointer' >
                 <Box key={suspect.id}>
                     <Flex gap="4" align="center">
-                        <Avatar fallback={suspect.name.charAt(0)} src={suspect.imgSrc} />
+                        <Avatar fallback={suspect.name.charAt(0)} src={getSupabaseImageURL(suspect.imgSrc)} />
                         <Box>
                             <Text as="p" weight="bold" size="4">
                                 {suspect.name}
@@ -282,7 +282,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
             className="flex flex-col items-center cursor-pointer p-4 transition-transform hover:scale-105 hover:shadow-[0_0_10px_5px_rgba(255,255,255,0.25)]"
 
         >
-            <Avatar fallback={suspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
+            <Avatar fallback={suspect?.name.charAt(0)} src={getSupabaseImageURL(suspect.imgSrc)} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
             <Text as="p" weight="bold" size="8" mt="3">
                 {suspect.name}
             </Text>
@@ -781,7 +781,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                 >
                     <Flex className='h-full'>
                         <Flex className='min-w-[400px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
-                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" className='min-w-[300px] min-h-[300px]' />
+                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
                         </Flex>
                         <Box>
 
@@ -1621,7 +1621,7 @@ const SingleGame = () => {
                                             <Flex direction="column" gap="4">
                                                 {gameState.crime.offenseReport?.map((item, index) => (
                                                     <Card key={index} className="flex items-center p-4 gap-4">
-                                                        <Avatar size="6" fallback={item.time.charAt(0)} src='/backdoor.webp' className='w-32 h-32' />
+                                                        <Avatar size="6" fallback={item.time.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
                                                         <Flex direction="column">
                                                             <Text size="2" weight="bold">{item.time} @ {item.location}</Text>
                                                             <Text size="3">{item.description}</Text>
@@ -1635,10 +1635,11 @@ const SingleGame = () => {
                                 </Tabs.Content>
                                 <Tabs.Content value="evidence">
                                     <h3 className="text-2xl font-bold mb-2">Evidence</h3>
-                                    <Grid columns="2" gap="4">
+                                    <Flex gap="4" direction="column">
                                         {gameState?.allEvidence?.map((item, index) => (
                                             <Card key={index} variant="surface" className="p-4">
                                                 <Flex gap="2" align="center">
+                                                <Avatar size="6" fallback={item.description.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
                                                     <Box>
                                                         <Text>{item.description}</Text>
                                                     </Box>
@@ -1649,7 +1650,7 @@ const SingleGame = () => {
                                                     <Text>No evidence available</Text>
                                                 </Card>
                                             )}
-                                    </Grid>
+                                    </Flex>
                                 </Tabs.Content>
                                 <Tabs.Content value="suspects">
                                     <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>
