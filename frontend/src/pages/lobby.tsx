@@ -104,6 +104,10 @@ export const Lobby: React.FC = () => {
 
         socket.on('player-left', removePlayer);
         socket.on('player-joined', addPlayer);
+        socket.on('error', (error: string) => { 
+          console.error('Socket error:', error);
+          addToast('Game Creation Error, please refresh and try again: ' + error);
+        });
       }
 
       return () => {

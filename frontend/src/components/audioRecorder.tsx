@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { WavRecorder } from 'wavtools'
 import { FaMicrophone } from 'react-icons/fa6';
-import { Text, Flex, IconButton, Button, Spinner } from '@radix-ui/themes';
+import { Flex, IconButton, Button, Spinner } from '@radix-ui/themes';
 
 interface AudioRecorderParams {
   socket: Socket;

@@ -8,7 +8,7 @@ import { roomsService } from '../../services/rooms.service';
 import { useAuth } from '../../context/auth.context';
 import { FiChevronUp, FiChevronDown, FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 import { FaChevronDown } from 'react-icons/fa';
-import AudioRecorder from '../../components/audioRecorder';
+// import AudioRecorder from '../../components/audioRecorder';
 import ResponseLoading from '../../components/responseLoading';
 import * as Accordion from '@radix-ui/react-accordion';
 import { Card, Flex, AlertDialog, Box, Text, Grid, Button, Container, Table, Avatar, Progress, Separator, RadioCards, Heading, ScrollArea, Badge, TextField } from '@radix-ui/themes';
@@ -160,9 +160,9 @@ const Interrogation: React.FC<InterrogationProps> = ({
   interrogationTranscript,
   responseLoading,
   audioTranscribing,
-  socket,
-  emitEvent,
-  handleAudioRecorded,
+  // socket,
+  // emitEvent,
+  // handleAudioRecorded,
 }) => {
   return (
     <>
@@ -211,13 +211,13 @@ const Interrogation: React.FC<InterrogationProps> = ({
         )}
       </Box>
       <div className="flex justify-center">
-        {socket && (
+        {/* {socket && (
           <AudioRecorder
             socket={socket}
             emitEvent={emitEvent}
             onAudioRecorded={handleAudioRecorded}
           />
-        )}
+        )} */}
       </div>
     </>
   );

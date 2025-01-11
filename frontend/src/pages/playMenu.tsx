@@ -76,7 +76,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
 const PlayMenu: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { socket, isConnected} = useSocketContext();
+  const { socket} = useSocketContext();
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [username, setUsername] = useState('');
 
