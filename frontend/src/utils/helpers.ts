@@ -52,3 +52,7 @@ export function findImplicatedSuspect(gameState: SingleGameState) : string | nul
     }
     return implicatedSuspect || null
 }
+
+export function getSupabaseImageURL(src: string) {
+  return `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${src}`
+}

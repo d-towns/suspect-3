@@ -75,32 +75,6 @@ export const Lobby: React.FC = () => {
 
   useEffect(() => {
     console.log('Lobby mounted');
-    const initializeLobby = async () => {
-      console.log(`user: ${user}`)
-      console.log(`roomId: ${roomId}`)
-      if (!user || !roomId) return;
-      console.log('Initializing lobby for room:', roomId);
-      try {
-        joinRoom(roomId);
-        const players = await getPlayersInRoom();
-        console.log('Players in room:', players);
-        updatePlayerList(players);
-        const room = await roomsService.getRoom(roomId);
-
-        console.log('Room:', room);
-
-        setLobbyState(prevState => ({
-          ...prevState,
-          room,
-          gameStatus: {
-            ...prevState.gameStatus,
-            userIsHost: room.host_id === user.id,
-          },
-        }));
-      } catch (error) {
-        console.error('Error initializing lobby:', error);
-      }
-    };
 
 
     const setupListeners = () => {
@@ -145,7 +119,6 @@ export const Lobby: React.FC = () => {
       };
     }
     let cleanupListeners: Function;
-    initializeLobby();
     if (socket && socket.connected) {
       
       cleanupListeners = setupListeners();
@@ -154,7 +127,37 @@ export const Lobby: React.FC = () => {
     return () => {
       if (cleanupListeners) cleanupListeners();
     }
-  }, [socket, isConnected, roomId]);
+  }, [socket, roomId]);
+
+  useEffect(() => {
+    const initializeLobby = async () => {
+      console.log(`user: ${user}`)
+      console.log(`roomId: ${roomId}`)
+      if (!user || !roomId) return;
+      console.log('Initializing lobby for room:', roomId);
+      try {
+        joinRoom(roomId);
+        const players = await getPlayersInRoom();
+        console.log('Players in room:', players);
+        updatePlayerList(players);
+        const room = await roomsService.getRoom(roomId);
+
+        console.log('Room:', room);
+
+        setLobbyState(prevState => ({
+          ...prevState,
+          room,
+          gameStatus: {
+            ...prevState.gameStatus,
+            userIsHost: room.host_id === user.id,
+          },
+        }));
+      } catch (error) {
+        console.error('Error initializing lobby:', error);
+      }
+    };
+    initializeLobby();
+  } , [user, roomId]);
 
   useEffect(() => {
     if (lobbyState.room && typeof lobbyState.room.game_state !== 'string' && lobbyState.room.game_state?.status == 'active') {

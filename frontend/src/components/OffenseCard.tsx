@@ -1,6 +1,7 @@
 import { Card, Flex, Inset, Text } from "@radix-ui/themes";
 import { OffenseReportItem } from "../models";
 import AnimatedText from "./animatedText";
+import GameImage from "./GameImage";
 
 interface OffenseReportCardProps {
     offenseReport: OffenseReportItem;
@@ -36,11 +37,7 @@ export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseRep
             <Card className="p-8 offenseReport flex h-full" style={{ width: '1400px' }} onClick={handleNext}>
                 <Flex direction={'column'} className='w-full'>
                     <Flex className='w-full'>
-                        <img
-                            src={offenseReport.imgSrc || sampleImage[index || 0]}
-                            className="block object-cover w-full max-h-[800px] bg-gray-200 rounded"
-                        />
-
+                        <GameImage src={offenseReport.imgSrc || sampleImage[index || 0]} alt='Offense Report' className="block object-cover w-full h-[600px] bg-gray-200 rounded" />
                         <Flex direction='column' gap='9' className='w-full ml-5'>
                             <div>
                                 <Text size="9" as="span" align="center" mt="2" mr={'4'}>

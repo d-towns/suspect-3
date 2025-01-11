@@ -62,6 +62,7 @@ export interface Crime {
 export interface Evidence {
   id: string;
   description: string;
+  imgSrc: string;
 }
 
 export interface GameState {

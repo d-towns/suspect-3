@@ -154,7 +154,6 @@ export const useSocket = () => {
   useEffect(() => {
     console.log('useEffect: connectSocket');
     const cleanup = connectSocket();
-
     return cleanup;
   } , [] );
 

@@ -1,15 +1,18 @@
 import fs from "fs";
-import { convertAudioMessageDeltasToAudio, base64ToPCM } from "../../utils/audio-helpers.js";
+import {
+  convertAudioMessageDeltasToAudio,
+  base64ToPCM,
+} from "../../utils/audio-helpers.js";
 
 export default class RealtimeEventHandler {
   constructor(ws, gameManager, responder) {
     this.ws = ws;
     this.gameManager = gameManager;
-    this.responder = responder
+    this.responder = responder;
     this.lastAudioMessageDeltas = [];
     this.lastAudioMessageTranscript = [];
     this.eventListeners = {};
-    this.realtimeInstructions = null
+    this.realtimeInstructions = null;
     this.ws.on("message", async (data) => {
       this.handleMessage(data, responder);
     });
@@ -21,20 +24,17 @@ export default class RealtimeEventHandler {
     });
   }
 
-  createRealtimeInstructions() {
-
-  }
+  createRealtimeInstructions() {}
 
   handleOpen() {
-    this.gameManager.emit("realtime:connected", {  });
+    this.gameManager.emit("realtime:connected", {});
   }
 
   handleDisconnect() {
-    this.gameManager.emit("realtime:disconnected", {  });
+    this.gameManager.emit("realtime:disconnected", {});
   }
 
   async handleMessage(data, responder) {
-
     try {
       const event = JSON.parse(data);
       switch (event.type) {
@@ -51,10 +51,7 @@ export default class RealtimeEventHandler {
           break;
 
         case "conversation.item.input_audio_transcription.completed":
-          await this.handleUserAudioTranscriptCompleted(
-            event,
-            responder
-          );
+          await this.handleUserAudioTranscriptCompleted(event, responder);
           break;
 
         case "response.audio.done":
@@ -90,17 +87,20 @@ export default class RealtimeEventHandler {
     console.error("Error from OpenAI Realtime API:", event);
   }
 
-  handleSessionCreated(event, responder) {
+  async handleSessionCreated(event, responder) {
     const session = event.session;
     session.instructions = this.realtimeInstructions;
+    const previousConversationsSummary = await this.gameManager.summarizePreviousConversations(
+      responder
+    );
+    session.instructions += previousConversationsSummary;
     session.turn_detection = {
-      type: 'server_vad',
+      type: "server_vad",
       threshold: 0.5,
       prefix_padding_ms: 300,
       silence_duration_ms: 500,
       create_response: true,
-
-    }
+    };
     session.input_audio_transcription = { model: "whisper-1" };
     session.voice = this.gameManager.assignVoiceToSuspect(responder);
     delete session.id;
@@ -119,20 +119,24 @@ export default class RealtimeEventHandler {
     this.lastAudioMessageDeltas = [];
 
     const playerConversationItem = {
-      audioTranscript: event.transcript,
-      responseId:`${event.message_id}_${event.response_id}`,
+      transcript: event.transcript,
+      responseId: `${event.message_id}_${event.response_id}`,
       speaker: "user",
       currentRoundTime: this.gameManager.roundTimer,
     };
 
-    await this.gameManager.llmGameService.addMessageToThread(this.gameManager.threadId, {
-      role: "user",
-      content: `Detective: ${event.transcript}`,
-    });
+    await this.gameManager.llmGameService.addMessageToThread(
+      this.gameManager.threadId,
+      {
+        role: "user",
+        content: `Detective: ${event.transcript}`,
+      }
+    );
 
-
-
-    this.gameManager.emit("realtime:transcript:done:user", playerConversationItem);
+    this.gameManager.emit(
+      "realtime:transcript:done:user",
+      playerConversationItem
+    );
 
     this.ws.send(JSON.stringify({ type: "response.create" }));
   }
@@ -140,12 +144,12 @@ export default class RealtimeEventHandler {
   async handleResponseAudioDone(event) {
     console.log("Audio response received from OpenAI Realtime API");
     const audioBuffer = await convertAudioMessageDeltasToAudio([
-      ...this.lastAudioMessageDeltas
+      ...this.lastAudioMessageDeltas,
     ]);
-    const audioTranscript =  this.lastAudioMessageTranscript.join(" ")
+    const audioTranscript = this.lastAudioMessageTranscript.join(" ");
     const conversationItem = {
       audioBuffer,
-      audioTranscript
+      audioTranscript,
     };
     fs.writeFileSync(
       `./test_response_data/${event.response_id}_audio`,
@@ -155,10 +159,7 @@ export default class RealtimeEventHandler {
       `./test_response_data/${event.response_id}_audio_transcript.txt`,
       audioTranscript
     );
-    this.gameManager.emit(
-      "realtime:audio:done:assistant",
-      conversationItem
-    );
+    this.gameManager.emit("realtime:audio:done:assistant", conversationItem);
     this.lastAudioMessageDeltas = [];
     this.lastAudioMessageTranscript = [];
   }
@@ -173,14 +174,15 @@ export default class RealtimeEventHandler {
     }
   }
 
-
-
   async handleAudioTranscriptDone(event, activeSuspect) {
     const interrogatorTranscript = event.transcript;
-    await this.gameManager.llmGameService.addMessageToThread(this.gameManager.threadId, {
-      role: "assistant",
-      content: `${activeSuspect.name}: ${interrogatorTranscript}`,
-    });
+    await this.gameManager.llmGameService.addMessageToThread(
+      this.gameManager.threadId,
+      {
+        role: "assistant",
+        content: `${activeSuspect.name}: ${interrogatorTranscript}`,
+      }
+    );
     console.log("Added assistant transcript to game thread");
   }
 
@@ -188,10 +190,9 @@ export default class RealtimeEventHandler {
     console.log("Realtime audio delta received");
     this.gameManager.emit("realtime:audio:delta:assistant", {
       audio: base64ToPCM(event.delta),
-      responseId:`${event.message_id}_${event.response_id}`,
+      responseId: `${event.message_id}_${event.response_id}`,
       speaker: "assistant",
-      currentRoundTime:
-        this.gameManager.roundTimer,
+      currentRoundTime: this.gameManager.roundTimer,
     });
   }
 
@@ -199,7 +200,7 @@ export default class RealtimeEventHandler {
     console.log("Realtime audio transcript delta received");
     this.gameManager.emit("realtime:transcript:delta:assistant", {
       transcript: event.delta,
-      responseId:`${event.message_id}_${event.response_id}`,
+      responseId: `${event.message_id}_${event.response_id}`,
       speaker: "assistant",
       currentRoundTime: this.gameManager.roundTimer,
     });
@@ -217,30 +218,32 @@ export default class RealtimeEventHandler {
     this.ws.send(JSON.stringify(message));
   }
 
-    /**
+  /**
    * Adds audio to the input buffer.
    * @param {ArrayBuffer} audio
    * @returns {Promise<any>}
    */
-    async addAudioToInputBuffer(audio) {
-      try {
-        if (!this.ws) {
-          console.error("addAudioToInputBuffer error: websocket is required.");
-          return null;
-        }
-        if (!audio) {
-          console.error("addAudioToInputBuffer error: audio is required.");
-          return null;
-        }
-        this.ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio }));
-        return { status: "audio_appended" };
-      } catch (error) {
-        console.error("Error in addAudioToInputBuffer:", error);
+  async addAudioToInputBuffer(audio) {
+    try {
+      if (!this.ws) {
+        console.error("addAudioToInputBuffer error: websocket is required.");
         return null;
       }
+      if (!audio) {
+        console.error("addAudioToInputBuffer error: audio is required.");
+        return null;
+      }
+      this.ws.send(
+        JSON.stringify({ type: "input_audio_buffer.append", audio })
+      );
+      return { status: "audio_appended" };
+    } catch (error) {
+      console.error("Error in addAudioToInputBuffer:", error);
+      return null;
     }
+  }
 
-      /**
+  /**
    * TODO: this may not be needed once we are using turn detection
    * Commits the audio buffer to produce a response.
    * @returns {Promise<any>}
@@ -259,26 +262,25 @@ export default class RealtimeEventHandler {
     }
   }
 
-    /**
+  /**
    * Closes a real-time conversation by closing the provided WebSocket connection.
    *
    * @param {WebSocket} ws - The WebSocket connection to be closed.
    * @returns {{ status: 'realtime-closed' } | null} An object with a status message if the WebSocket is successfully closed, or null if an error occurs or the WebSocket is not provided.
    */
-    closeRealtimeConversation() {
-      try {
-        if (!this.ws) {
-          console.error(
-            "closeRealtimeConversation error: websocket is required."
-          );
-          return null;
-        }
-        this.ws.close();
-        return { status: "realtime_closed" };
-      } catch (error) {
-        console.error("Error sin closeRealtimeConversation:", error);
+  closeRealtimeConversation() {
+    try {
+      if (!this.ws) {
+        console.error(
+          "closeRealtimeConversation error: websocket is required."
+        );
         return null;
       }
+      this.ws.close();
+      return { status: "realtime_closed" };
+    } catch (error) {
+      console.error("Error sin closeRealtimeConversation:", error);
+      return null;
     }
-  
+  }
 }

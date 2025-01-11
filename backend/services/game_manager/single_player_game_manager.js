@@ -1,18 +1,17 @@
 import { GameRoomService } from "../game_room/game_room.service.js";
 import { LeaderboardService } from "../leaderboard/leaderboard.service.js";
 import { GameManager } from "./game_manager.js";
-import OpenAIGameService from "../llm/openai_game_service.js";
+import OpenAIGameService from "../llm/game/openai_game_service.js";
 import OpenAIEloService from "../llm/elo/openai-elo.service.js";
-
+import { StorageService, ImageBuckets } from "../image/storage.service.js";
 import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player_realtime_handler.js";
-import {
-  SinglePlayerGameStateSchema,
-} from "../../models/game-state-schema.js";
+import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
+import ReplicateImageService from "../llm/image/replicate_image.service.js";
 
 /** the game loop
  * Single Player:
@@ -40,6 +39,7 @@ export class SinglePlayerGameManager extends GameManager {
     super();
     this.llmGameService = new OpenAIGameService();
     this.llmEloService = OpenAIEloService;
+    this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
@@ -83,6 +83,9 @@ export class SinglePlayerGameManager extends GameManager {
         process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
         thread.id
       );
+
+
+
       if (!this.gameState) {
         console.error("Error creating initial game state");
         return null;
@@ -90,11 +93,21 @@ export class SinglePlayerGameManager extends GameManager {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
         // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
-        if (this.gameState.rounds.find((round) => round.type === "interrogation").conversations.length !== 0) {
-          this.gameState.rounds.find((round) => round.type === "interrogation").conversations = [];
+        if (
+          this.gameState.rounds.find((round) => round.type === "interrogation")
+            .conversations.length !== 0
+        ) {
+          this.gameState.rounds.find(
+            (round) => round.type === "interrogation"
+          ).conversations = [];
         }
 
         this.gameState.status = "setup";
+
+        // create images for the game
+        await this.#createImagesForGame();
+
+        console.log(" \n\n\n game state post image creation", this.gameState, '\n\n\n'); 
 
         // add the game state and thread id to the database
         await GameRoomService.updateGameRoom(this.roomId, {
@@ -107,6 +120,7 @@ export class SinglePlayerGameManager extends GameManager {
         this.emit("game:created", { gameState: this.gameState });
       }
     } catch (error) {
+      console.error("Error creating initial game state:", error);
       this.emit("error", error.message);
     }
   }
@@ -131,13 +145,11 @@ export class SinglePlayerGameManager extends GameManager {
           determine if the game is in the correct state. If the game is not in the correct state, provide a new game state that is in the correct state.`,
         },
       ],
-      zodResponseFormat(
-        SinglePlayerGameStateSchema,
-        "gameState"
-      ), 1500
+      zodResponseFormat(SinglePlayerGameStateSchema, "gameState"),
+      1500
     );
 
-    console.log('\n\n\n' + "Game state check result:", result + '\n\n\n' );
+    console.log("\n\n\n" + "Game state check result:", result + "\n\n\n");
 
     return result;
   }
@@ -178,31 +190,33 @@ export class SinglePlayerGameManager extends GameManager {
 
   startInterrogationPhase() {
     if (this.roundTimer > 0) {
-      console.log("Round timer is still running, cannot start new phase");
-      return;
+      console.log("Round timer is still running, keeping the current timer");
+    } else {
+      const { clear } = startInterval(
+        this.interrogationTimer,
+        this.emitRoundTick.bind(this),
+        this.endInterrogationPhase.bind(this)
+      );
+
+      this.clearRoundTimer = clear;
     }
+
+    console.log("Starting interrogation phase...");
     this.currentPhase = "interrogation";
     this.emit("phase:started", { phase: this.currentPhase });
     // ... set up a 10-minute timer. On expire, go to next phase ...
     // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
 
-    const { clear } = startInterval(
-      this.interrogationTimer,
-      this.emitRoundTick.bind(this),
-      this.endInterrogationPhase.bind(this)
-    );
     // if there is an active conversation in the interrogation phase, we should open a realtime session using startInterrogation
     // if there is no active conversation, we should just wait for the player to initiate one
     const activeConversation = this.gameState.rounds
       .find((round) => round.type === "interrogation")
       .conversations.find((conversation) => conversation.active);
 
-      console.log("Active conversation", activeConversation);
+    console.log("Active conversation", activeConversation);
     if (activeConversation) {
       this.startInterrogation(activeConversation.suspect);
     }
-
-    this.clearRoundTimer = clear;
   }
 
   async createNewLead(sourceNode, targetNode, type) {
@@ -355,30 +369,33 @@ export class SinglePlayerGameManager extends GameManager {
     this.realtimeHandler.addCustomMessageListener(async (data) => {
       const parsed = JSON.parse(data);
 
-    const activeSuspect = this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.suspect;
-      if (parsed.type === "conversation.item.input_audio_transcription.completed") {
+      const activeSuspect = this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations?.at(-1)?.suspect;
+
+      const transcriptionEventTypes = [
+        "response.audio_transcript.done",
+        "conversation.item.input_audio_transcription.completed",
+      ];
+
+      if (transcriptionEventTypes.includes(parsed.type)) {
         // add the transcription to the game state active conversation
         this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.responses.push({
-          speaker: "Detective",
-          message: parsed.transcript
-        });
-      } else if (parsed.type === "response.audio_transcript.done") {
-        // add the transcription to the game state active conversation
-        this.gameState.rounds
-    .find((round) => round.type === "interrogation")
-    .conversations?.at(-1)?.responses.push({
-          speaker: activeSuspect,
-          message: parsed.transcript
+          .find((round) => round.type === "interrogation")
+          .conversations?.at(-1)
+          ?.responses.push({
+            speaker:
+              parsed.type === "response.audio_transcript.done"
+                ? activeSuspect
+                : "Detective",
+            message: parsed.transcript,
+          });
+
+        await GameRoomService.updateGameRoom(this.roomId, {
+          game_state: GameRoomService.encryptGameState(this.gameState),
         });
       }
     });
-
-
-        
 
     const activeConversation = this.gameState.rounds
       .find((round) => round.type === "interrogation")
@@ -447,26 +464,24 @@ export class SinglePlayerGameManager extends GameManager {
           // Remove this listener so we only handle one final response
           this.gameState.rounds
             .find((round) => round.type == "interrogation")
-            .conversations.find((conversation) => conversation.active).active = false;
+            .conversations.find(
+              (conversation) => conversation.active
+            ).active = false;
 
+          await GameRoomService.updateGameRoom(this.roomId, {
+            game_state: GameRoomService.encryptGameState(this.gameState),
+          });
 
-            await GameRoomService.updateGameRoom(this.roomId, {
-              game_state: GameRoomService.encryptGameState(this.gameState),
-            });
-          
-            setTimeout(() => {
-              this.emit("game:updated", this.gameState);
-            }, 5000);
-             
+          setTimeout(() => {
+            this.emit("game:updated", this.gameState);
+          }, 5000);
+
           // this.gameState = await this.llmGameService.runGameThread(
           //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
           //   this.threadId
           // );
 
           // set the most recent conversation to active false
-          
-
-
 
           // setTimeout(() => {
           //   this.emit("game:updated", this.gameState);
@@ -505,10 +520,25 @@ export class SinglePlayerGameManager extends GameManager {
       this.endInterrogation();
     }
     // run the game thread to process the conversation and generate the next game state
-    this.gameState = await this.llmGameService.runGameThread(
-      process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-      this.threadId
-    );
+    // this.gameState = await this.llmGameService.runGameThread(
+    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+    //   this.threadId
+    // );
+
+    if (
+      this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.some((conversation) => conversation.active)
+    ) {
+      this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.find(
+          (conversation) => conversation.active
+        ).active = false;
+    }
+    this.gameState.rounds.find(
+      (round) => round.type === "interrogation"
+    ).status = "completed";
     // save the game state to the database
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
@@ -585,10 +615,14 @@ export class SinglePlayerGameManager extends GameManager {
     // tell listeners that the deduction phase has ended
     this.emit("phase:ended", { phase: this.currentPhase });
     // run the thread to process the deduction and generate the finished game state
-    this.gameState = await this.llmGameService.runGameThread(
-      process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-      this.threadId
-    );
+    // this.gameState = await this.llmGameService.runGameThread(
+    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
+    //   this.threadId
+    // );
+
+    this.gameState.rounds.find((round) => round.type === "voting").status =
+      "completed";
+    this.gameState.status = "finished";
 
     // save the game state to the database
     await GameRoomService.updateGameRoom(this.roomId, {
@@ -598,7 +632,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("game:updated", this.gameState);
 
     // check if the game is over ( is should be ) and then run the elo rating calculation
-    this.checkWinCondition();
+    await this.calculateGameResults();
   }
 
   async runDeductionAnalysis() {
@@ -675,85 +709,85 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("game:updated", this.gameState);
   }
 
-  /**
-   * Take the deduction graph and traverse in a depth-first search from each statement node in order to build the dedudction analysis that will be sent to the chat completion.
-   * Each complete path create a string, incomplete paths will not be included in the analysis. the edge types will be used to connect the nodes in their logical order.
-   *
-   * @param {SinglePlayerGameStateSchema.deduction} deduction
-   */
-
-  analyzeDeductionGraph(deduction) {
-    const { nodes, edges } = deduction;
-    const adjacencyList = {};
-
-    // Build adjacency list
-    edges.forEach((edge) => {
-      if (!adjacencyList[edge.source_node]) {
-        adjacencyList[edge.source_node] = [];
-      }
-      adjacencyList[edge.source_node].push({
-        target: edge.target_node,
-        type: edge.type,
-      });
-    });
-
-    const analysisResults = [];
-    const visited = new Set();
-
-    const dfs = (currentNode, path, edgeTypes) => {
-      if (visited.has(currentNode)) return;
-      visited.add(currentNode);
-      path.push(currentNode);
-
-      if (
-        !adjacencyList[currentNode] ||
-        adjacencyList[currentNode].length === 0
-      ) {
-        // Complete path
-        const pathStrings = path.map((nodeId) => {
-          const node = nodes.find((n) => n.id === nodeId);
-          if (node.type === "statement" || node.type === "suspect") {
-            return node.data.message || node.data.identity;
-          }
-          return node.data;
-        });
-        const edgeDescriptions = edgeTypes.map((type) => {
-          switch (type) {
-            case "supports":
-              return "supports";
-            case "contradicts":
-              return "contradicts";
-            case "implicates":
-              return "implicates";
-            default:
-              return "";
-          }
-        });
-        let analysisString = "";
-        for (let i = 0; i < edgeDescriptions.length; i++) {
-          analysisString += `${pathStrings[i]} ${edgeDescriptions[i]} ${
-            pathStrings[i + 1]
-          }. `;
-        }
-        analysisResults.push(analysisString.trim());
-      } else {
-        adjacencyList[currentNode].forEach((edge) => {
-          dfs(edge.target, [...path], [...edgeTypes, edge.type]);
-        });
-      }
-
-      visited.delete(currentNode);
-    };
-
-    // Start DFS from each statement node
-    nodes.forEach((node) => {
-      if (node.type === "statement") {
-        dfs(node.id, [], []);
-      }
-    });
-
-    return analysisResults;
+  #getPreviousSuspectConversations(suspect) {
+    return this.gameState.rounds
+      .find((round) => round.type === "interrogation")
+      .conversations.filter(
+        (conversation) => conversation.suspect === suspect.id
+      );
   }
+
+  async summarizePreviousConversations(suspect) {
+    const previousConversations = this.#getPreviousSuspectConversations(suspect);
+    console.log("Previous conversations:", previousConversations);
+    if (previousConversations.length === 0) {
+      return "This is the first conversation with the detective.";
+    }
+
+    const summarySchema = z.object({
+      summary: z.string(),
+    });
+    const response = await this.llmGameService.createChatCompletion(
+      [
+        {
+          role: "system",
+          content: "You are an assistant summarizing previous conversations.",
+        },
+        {
+          role: "assistant",
+          content: `Summarize the previous conversations with suspect ${suspect.name}.`,
+        },
+        {
+          role: "user",
+          content: `Given the previous conversations with suspect ${suspect.name}: ${JSON.stringify(
+            previousConversations
+          )}`,
+        },
+      ],
+      zodResponseFormat(summarySchema, "summary")
+    );
+    return response.summary;
+  }
+
+
+  async #createImagesForGame() {
+    try {
+      let basePrompt = 'a 16-bit';
+      console.log('\n creating images for suspects \n');
+      
+      for (let i = 0; i < this.gameState.suspects.length; i++) {
+        const suspect = this.gameState.suspects[i];
+        const suspectPrompt = `${basePrompt} headshot of ${suspect.name}, a ${suspect.identity} with a ${suspect.temperment} temperment.`;
+        const image = await this.llmImageService.createImage(suspectPrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Suspect, `${this.roomId}_${suspect.id}.png`);
+        this.gameState.suspects[i].imgSrc = publicUrl;
+      }
+      
+      console.log(' \n creating images for evidence \n');
+      
+      for ( let i = 0; i < this.gameState.allEvidence.length; i++) {
+        const evidence = this.gameState.allEvidence[i];
+        const evidencePrompt = `${basePrompt} image of ${evidence.description}`;
+        const image = await this.llmImageService.createImage(evidencePrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Evidence, `${this.roomId}_${evidence.id}.png`);
+        this.gameState.allEvidence[i].imgSrc = publicUrl;
+      }
+      
+      console.log('\n creating images for offense report \n');
+      
+      for (let i = 0; i < this.gameState.crime.offenseReport.length; i++) {
+        const report = this.gameState.crime.offenseReport[i];
+        const reportPrompt = `${basePrompt} image of ${report.description}`;
+        const image = await this.llmImageService.createImage(reportPrompt);
+        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.OffenseReport, `${this.roomId}_${report.id}.png`);
+        this.gameState.crime.offenseReport[i].imgSrc = publicUrl;
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+
 
   async calculateGameResults() {
     // ... if deduction accepted -> check culprit
@@ -762,6 +796,8 @@ export class SinglePlayerGameManager extends GameManager {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
       console.log("Game finished, calculating ELO changes...");
+      if (this.clearRoundTimer) this.clearRoundTimer();
+
       const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
         this.playerId
       );

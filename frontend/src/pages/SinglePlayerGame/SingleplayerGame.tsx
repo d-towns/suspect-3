@@ -19,7 +19,7 @@ import AnimatedText from '../../components/animatedText';
 import { ReactFlow, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
 import { OffenseReportCard } from '../../components/OffenseCard';
 import Dagre from '@dagrejs/dagre';
-import { findImplicatedSuspect } from '../../utils/helpers';
+import { findImplicatedSuspect, getSupabaseImageURL} from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
 
 /**
@@ -261,7 +261,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
             <Card variant={variant} onClick={onClick} className='cursor-pointer' >
                 <Box key={suspect.id}>
                     <Flex gap="4" align="center">
-                        <Avatar fallback={suspect.name.charAt(0)} src={suspect.imgSrc} />
+                        <Avatar fallback={suspect.name.charAt(0)} src={getSupabaseImageURL(suspect.imgSrc)} />
                         <Box>
                             <Text as="p" weight="bold" size="4">
                                 {suspect.name}
@@ -282,7 +282,7 @@ const SuspectCard: React.FC<PlayerCardProps & { size?: 'small' | 'large' }> = ({
             className="flex flex-col items-center cursor-pointer p-4 transition-transform hover:scale-105 hover:shadow-[0_0_10px_5px_rgba(255,255,255,0.25)]"
 
         >
-            <Avatar fallback={suspect?.name.charAt(0)} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
+            <Avatar fallback={suspect?.name.charAt(0)} src={getSupabaseImageURL(suspect.imgSrc)} size="6" radius='full' className='min-w-[300px] min-h-[300px]' />
             <Text as="p" weight="bold" size="8" mt="3">
                 {suspect.name}
             </Text>
@@ -730,7 +730,8 @@ const ChooseInterrogation: React.FC<ChooseInterrogationProps> = ({ gameState, ha
 interface InterrogationProps {
     gameState: SingleGameState;
     currentSuspect: Suspect | undefined;
-    interrogationTranscript: ConversationItem[];
+    userInterrogationTranscript: ConversationItem[];
+    suspectInterrogationTranscript: ConversationItem[];
     wavStreamPlayerRef: React.MutableRefObject<WavStreamPlayer | null>;
     roundTimer: number
     responseLoading: boolean;
@@ -751,7 +752,8 @@ interface InterrogationProps {
  */
 
 const Interrogation: React.FC<InterrogationProps> = ({
-    interrogationTranscript,
+    userInterrogationTranscript,
+    suspectInterrogationTranscript,
     responseLoading,
     audioTranscribing,
     socket,
@@ -761,6 +763,14 @@ const Interrogation: React.FC<InterrogationProps> = ({
     handleEndInterrogation,
     loadingSessionEnd,
 }) => {
+
+    const interrogationTranscript: ConversationItem[] = [];
+    let i = 0;
+    while (i < userInterrogationTranscript.length || i < suspectInterrogationTranscript.length) {
+        if (userInterrogationTranscript[i]) interrogationTranscript.push(userInterrogationTranscript[i]);
+        if (suspectInterrogationTranscript[i]) interrogationTranscript.push(suspectInterrogationTranscript[i]);
+        i++;
+    }
     return (
         <>
             <div className='grid grid-cols-1 grid-rows-[auto_1fr] gap-4'>
@@ -771,7 +781,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                 >
                     <Flex className='h-full'>
                         <Flex className='min-w-[400px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
-                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={"https://i.ibb.co/GJWMFtf/chief-1.webp"} size="6" className='min-w-[300px] min-h-[300px]' />
+                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
                         </Flex>
                         <Box>
 
@@ -782,8 +792,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                         <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
                                     </Flex>
                                     {interrogationTranscript.map((conversationItem, index) => (
-                                        <Tooltip content={<Text size={'2'}>Create a new lead from this statement </Text>} className='p-1'>
-                                            <Flex key={index} className='col-span-8 gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer'>
+                                            <Flex key={index} className='col-span-8 gap-5 py-3'>
                                                 <Box ml="2" mb="2">
                                                     <Text as="p" weight="bold" size="3">
                                                         {Math.floor(conversationItem.timestamp / 60)}:
@@ -797,7 +806,6 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                                     </Text>
                                                 </Box>
                                             </Flex>
-                                        </Tooltip>
                                     ))}
                                     <Flex direction={'column'} className='w-full'>
                                         {responseLoading && (
@@ -820,9 +828,11 @@ const Interrogation: React.FC<InterrogationProps> = ({
                             socket={socket}
                             emitEvent={emitEvent}
                             onAudioRecorded={handleAudioRecorded}
+                            loadingSessionEnd={loadingSessionEnd}
+                            handleEndInterrogation={handleEndInterrogation}
                         />
                     )}
-                    <Button
+                    {/* <Button
                         size="4"
                         variant='outline'
                         radius='small'
@@ -832,7 +842,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                         onClick={() => handleEndInterrogation()}
                     >
                         {loadingSessionEnd ? <Spinner /> : 'End Interrogation'}
-                    </Button>
+                    </Button> */}
                 </div>
             </div>
         </>
@@ -1131,7 +1141,8 @@ const SingleGame = () => {
 
 
 
-    const [interrogationTranscript, setInterrogationTranscript] = useState<ConversationItem[]>([]);
+    const [userInterrogationTranscript, setUserInterrogationTranscript] = useState<ConversationItem[]>([]);
+    const [suspectInterrogationTranscript, setSuspectInterrogationTranscript] = useState<ConversationItem[]>([]);
     const nodeRef = useRef(null);
     const [roundTimer, setRoundTimer] = useState<number>(0);
 
@@ -1199,15 +1210,15 @@ const SingleGame = () => {
 
     const handleUserAudioTranscriptEvent = useCallback((params: any) => {
         console.log('Received audio transcript:', params);
-        const { speaker, audioTranscript, responseId, currentRoundTime } = params;
-        setInterrogationTranscript(prev => [...prev, { audioTranscript, timestamp: currentRoundTime, speaker, responseId }]);
+        const { speaker, transcript, responseId, currentRoundTime } = params;
+        setUserInterrogationTranscript(prev => [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }]);
         setAudioTranscribing(false);
     }, [roundTimer]);
 
     const handleRealtimeAudioTranscriptEvent = (params: any) => {
         const { speaker, transcript, currentRoundTime, responseId } = params;
         console.log('Received audio transcript:', params);
-        setInterrogationTranscript(prev => {
+        setSuspectInterrogationTranscript(prev => {
             const lastItem = prev[prev.length - 1];
             if (!lastItem) {
                 // If there's no last item, create a new one
@@ -1272,7 +1283,8 @@ const SingleGame = () => {
             socket.on('game:updated', (newState: SingleGameState) => {
                 console.log('Received game state update:', newState);
                 setGameState(newState);
-                setInterrogationTranscript([]);
+                setUserInterrogationTranscript([]);
+                setSuspectInterrogationTranscript([]);
                 setDeductionLoading(false)
                 setResultsLoading(false);
             });
@@ -1289,11 +1301,12 @@ const SingleGame = () => {
                 setDeductionSubmitted(true);
             })
 
-
+            
             socket.on('game-over', () => {
                 setShowGameOver(true);
             });
-
+            socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
+            
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
 
             socket.on('realtime:transcript:delta:assistant', handleRealtimeAudioTranscriptEvent);
@@ -1331,7 +1344,6 @@ const SingleGame = () => {
             });
 
 
-            socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
 
             socket.on('leaderboard-stats-update', handleLeaderboardStatsUpdate);
 
@@ -1510,7 +1522,8 @@ const SingleGame = () => {
                         gameState={gameState}
                         roundTimer={roundTimer}
                         currentSuspect={activeSuspect}
-                        interrogationTranscript={interrogationTranscript}
+                        userInterrogationTranscript={userInterrogationTranscript}
+                        suspectInterrogationTranscript={suspectInterrogationTranscript}
                         handleEndInterrogation={handleEndInterrogation}
                         responseLoading={responseLoading}
                         audioTranscribing={audioTranscribing}
@@ -1608,7 +1621,7 @@ const SingleGame = () => {
                                             <Flex direction="column" gap="4">
                                                 {gameState.crime.offenseReport?.map((item, index) => (
                                                     <Card key={index} className="flex items-center p-4 gap-4">
-                                                        <Avatar size="6" fallback={item.time.charAt(0)} src='/backdoor.webp' className='w-32 h-32' />
+                                                        <Avatar size="6" fallback={item.time.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
                                                         <Flex direction="column">
                                                             <Text size="2" weight="bold">{item.time} @ {item.location}</Text>
                                                             <Text size="3">{item.description}</Text>
@@ -1622,10 +1635,11 @@ const SingleGame = () => {
                                 </Tabs.Content>
                                 <Tabs.Content value="evidence">
                                     <h3 className="text-2xl font-bold mb-2">Evidence</h3>
-                                    <Grid columns="2" gap="4">
+                                    <Flex gap="4" direction="column">
                                         {gameState?.allEvidence?.map((item, index) => (
                                             <Card key={index} variant="surface" className="p-4">
                                                 <Flex gap="2" align="center">
+                                                <Avatar size="6" fallback={item.description.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
                                                     <Box>
                                                         <Text>{item.description}</Text>
                                                     </Box>
@@ -1636,7 +1650,7 @@ const SingleGame = () => {
                                                     <Text>No evidence available</Text>
                                                 </Card>
                                             )}
-                                    </Grid>
+                                    </Flex>
                                 </Tabs.Content>
                                 <Tabs.Content value="suspects">
                                     <Flex p={'2'} mt={'4'} direction={'column'} gap={'4'}>

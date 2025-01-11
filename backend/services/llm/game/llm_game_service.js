@@ -38,4 +38,8 @@ export default class LLMGameService {
     throw new Error('Method not implemented');
   }
 
+  createImage(prompt ) {
+    throw new Error('Method not implemented');
+  }
+
 }
