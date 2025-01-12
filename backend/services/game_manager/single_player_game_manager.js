@@ -565,10 +565,17 @@ export class SinglePlayerGameManager extends GameManager {
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, cannot start new phase");
       return;
-    }
-    this.currentPhase = "deduction";
-    this.emit("phase:started", { phase: this.currentPhase });
+    } else {
 
+    const { clear } = startInterval(
+      this.deductionTimer,
+      this.emitRoundTick.bind(this),
+      this.endDeductionPhase.bind(this)
+    );
+    this.clearRoundTimer = clear;
+  }
+  this.currentPhase = "deduction";
+  this.emit("phase:started", { phase: this.currentPhase });
     if(!this.gameState.rounds.some((round) => round.type === 'voting')) {
       this.gameState.rounds.push({
         type: 'voting',
@@ -620,12 +627,7 @@ export class SinglePlayerGameManager extends GameManager {
 
       this.emit("game:updated", this.gameState);
     }
-    const { clear } = startInterval(
-      this.deductionTimer,
-      this.emitRoundTick.bind(this),
-      this.endDeductionPhase.bind(this)
-    );
-    this.clearRoundTimer = clear;
+
   }
 
   async endDeductionPhase() {
