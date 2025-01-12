@@ -12,10 +12,11 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
+import { SocketEvents } from "../../socket/events_schema.js";
 
 /** the game loop
  * Single Player:
- * the player will enter the game room and send a joined-game event to the server
+ * the player will enter the game room and send a game:joined event to the server
  * this should be ignored until the host of the room sends a start-game event
  * the start-game event will be sent once the player has gone over the offense report and is ready to start the game
  * once the start-game event is sent, the server will start the game loop
@@ -844,7 +845,7 @@ export class SinglePlayerGameManager extends GameManager {
       console.log(oldRating, newRating, badges);
 
       // emit the leaderboard updates to the client
-      this.emit("leaderboard:finished", {
+      this.emit(SocketEvents.LEADERBOARD_FINISHED, {
         oldRating,
         newRating,
         badges,

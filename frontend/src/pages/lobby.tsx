@@ -18,7 +18,7 @@ import {
   Badge,
   Callout,
 } from '@radix-ui/themes';
-import { ChatMessage } from '../models/chat-message.model';
+import { ChatMessage } from '../models/chat:message.model';
 import { GameRoom } from '../models/room.model';
 import { User } from '../models/user.model';
 import { IoAlertCircle } from "react-icons/io5";
@@ -79,10 +79,10 @@ export const Lobby: React.FC = () => {
 
     const setupListeners = () => {
       if (socket && isConnected) {
-        socket.on('player-list', updatePlayerList);
-        socket.on('chat-message', addChatMessage);
-        socket.on('player-ready', updatePlayerReadyStatus);
-        socket.on('all-players-ready', () =>
+        socket.on('player:list', updatePlayerList);
+        socket.on('chat:message', addChatMessage);
+        socket.on('player:ready', updatePlayerReadyStatus);
+        socket.on('player:ready:all', () =>
           setLobbyState(prevState => ({
             ...prevState,
             gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
@@ -112,10 +112,10 @@ export const Lobby: React.FC = () => {
 
       return () => {
         if (socket) {
-          socket.off('player-list');
-          socket.off('chat-message');
-          socket.off('player-ready');
-          socket.off('all-players-ready');
+          socket.off('player:list');
+          socket.off('chat:message');
+          socket.off('player:ready');
+          socket.off('player:ready:all');
           socket.off('game-created');
           socket.off('player-left');
           socket.off('player-joined');

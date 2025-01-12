@@ -579,7 +579,6 @@ interface VotingRoundProps {
     gameState: SingleGameState;
     killerVote: string | undefined;
     deductionSubmitted: boolean;
-    handleStartNextRound: () => void;
     handleCreateNewLead: (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => void;
     handleRemoveLead: (id: string) => void;
     handleCreateNewdeductionNode: (node: DeductionNode) => void;
@@ -1264,13 +1263,6 @@ const SingleGame = () => {
         setPlayerBadges(badges);
     }
 
-    const handleStartNextRound = () => {
-        if (!gameState || !socket || !roomId) {
-            return;
-        }
-        emitEvent('start-next-round', {});
-    }
-
     const handleCreateNewLead = (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => {
 
         if (!gameState || !socket || !roomId || !sourceNode || !targetNode) {
@@ -1307,10 +1299,6 @@ const SingleGame = () => {
                 setResultsLoading(false);
             });
 
-            socket.on('game-state-updating', (roundEnd: boolean) => {
-                if (roundEnd) setResultsLoading(true);
-            });
-
             socket.on('deduction:completed', () => {
                 setDeductionSubmitted(false);
             })
@@ -1323,6 +1311,7 @@ const SingleGame = () => {
             socket.on('game-over', () => {
                 setShowGameOver(true);
             });
+
             socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
             
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
@@ -1363,7 +1352,7 @@ const SingleGame = () => {
 
 
 
-            socket.on('leaderboard-stats-update', handleLeaderboardStatsUpdate);
+            socket.on('leaderboard:updated', handleLeaderboardStatsUpdate);
 
 
             joinRoom(roomId);
@@ -1373,16 +1362,15 @@ const SingleGame = () => {
         return () => {
             if (socket) {
                 console.log('Removing listeners');
-                socket.off('game-state-update');
-                socket.off('game-state-updating');
+                socket.off('game:updated');
                 socket.off('round:tick');
                 socket.off('user-audio-transcript');
                 socket.off('realtime:transcript:delta:assistant');
                 socket.off('realtime:audio:delta:assistant');
                 socket.off('realtime:message');
                 socket.off('realtime:transcript:done:user');
-                socket.off('leaderboard-stats-update');
-                socket.off('chat-message');
+                socket.off('leaderboard:updated');
+                socket.off('chat:message');
 
                 // Remove other listeners
             }
@@ -1518,7 +1506,6 @@ const SingleGame = () => {
                     handleCreateNewLead={handleCreateNewLead}
                     handleRemoveLead={handleRemoveLead}
                     handleCreateNewdeductionNode={handleCreateNewdeductionNode}
-                    handleStartNextRound={handleStartNextRound}
                     handleVoteSubmission={handleVoteSubmission}
                     killerVote={killerVote}
                     setKillerVote={setKillerVote}

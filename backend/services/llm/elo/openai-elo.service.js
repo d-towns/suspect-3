@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import { EventEmitter } from "events";
 import { LeaderboardSchema } from "../../../models/leaderboard.schema.js";
+import { SocketEvents } from "../../../socket/events_schema.js";
 
 dotenv.config({ path: "../.env" });
 
@@ -254,7 +255,7 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       const { playerId, oldRating, newRating, badges } = results;
       const socketId = socketServer.getSocketForUser(playerId);
       if (socketId) {
-        socketServer.emitToSocket(socketId, "leaderboard-stats-update", {
+        socketServer.emitToSocket(socketId, SocketEvents.LEADERBOARD_UPDATED, {
           oldRating,
            newRating,
           badges,

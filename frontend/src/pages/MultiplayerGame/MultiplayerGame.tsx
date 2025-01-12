@@ -674,7 +674,7 @@ const MultiplayerGame = () => {
         setResultsLoading(true);
       });
 
-      socket.on('chat-message', addChatMessage);
+      socket.on('chat:message', addChatMessage);
 
       socket.on('realtime-audio-delta', handleRealtimeAudioDeltaEvent);
 
@@ -703,7 +703,7 @@ const MultiplayerGame = () => {
         socket.off('realtime-audio-transcript-delta');
         socket.off('realtime-audio-delta');
       socket.off('leaderboard-stats-update');
-      socket.off('chat-message');
+      socket.off('chat:message');
 
         // Remove other listeners
       }

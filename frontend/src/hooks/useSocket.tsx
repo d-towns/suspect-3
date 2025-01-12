@@ -66,13 +66,13 @@ export const useSocket = () => {
   const joinRoom = useCallback((gameRoomId : string | null = null) => {
     console.log('join room called')
     if (socket && isConnected && (roomId || gameRoomId) && user) {
-      socket.emit('join-room', { roomId: (roomId || gameRoomId), userId: user.id, userEmail: user.email, userName: user.username }, (response: { success: boolean; error?: string }) => {
+      socket.emit('room:join', { roomId: (roomId || gameRoomId), userId: user.id, userEmail: user.email, userName: user.username }, (response: { success: boolean; error?: string }) => {
         if (response.success) {
           console.warn(`Joined room: ${JSON.stringify(response)}`);
-          // if we are in a game room, we should send a joined-game event
+          // if we are in a game room, we should send a game:joined event
           // check if game is in the url using navigator
           if (window.location.pathname.includes('game')) {
-            socket.emit('joined-game', roomId);
+            socket.emit('game:joined', roomId);
 
           }
         } else {
@@ -88,7 +88,7 @@ export const useSocket = () => {
     if (socket && isConnected) {
       const interval = setInterval(() => {
         if (user) {
-          socket.emit('set-user', user.email, user.username, user.id, roomId);
+          socket.emit('user:set', user.email, user.username, user.id, roomId);
         socket.emit('heartbeat', roomId || 'global');
         }
       }, HEARTBEAT_INTERVAL);
@@ -103,7 +103,7 @@ export const useSocket = () => {
   const getPlayersInRoom = useCallback(() => {
     return new Promise<User[]>((resolve, reject) => {
       if (socket && isConnected && roomId) {
-        socket.emit('online-players-list', roomId, (response: { success: boolean; players?: User[]; error?: string }) => {
+        socket.emit('player:list', roomId, (response: { success: boolean; players?: User[]; error?: string }) => {
           console.log(`Got players response: ${JSON.stringify(response)}`);
           if (response.success && response.players) {
             console.log(`Got players: ${JSON.stringify(response.players)}`);
@@ -120,7 +120,7 @@ export const useSocket = () => {
 
   const sendChatMessage = useCallback((message: string) => {
     if (socket && isConnected && roomId && user) {
-      socket.emit('chat-message', roomId, user.email, user.username, message);
+      socket.emit('chat:message', roomId, user.email, user.username, message);
     }
   }, [socket, isConnected, roomId, user]);
 
@@ -132,7 +132,7 @@ export const useSocket = () => {
 
   const sendReadyStatus = useCallback((isReady: boolean) => {
     if (socket && isConnected && roomId && user) {
-      socket.emit('player-ready', roomId, user.email, user.username, isReady);
+      socket.emit('player:ready', roomId, user.email, user.username, isReady);
     }
   }, [socket, isConnected, roomId, user]);
 
@@ -164,11 +164,11 @@ export const useSocket = () => {
 
   useEffect(() => {
     if (socket) {
-      socket.on('invite-received', handleInviteReceived);
+      socket.on('invite:received', handleInviteReceived);
     }
     return () => {
       if (socket) {
-        socket.off('invite-received', handleInviteReceived);
+        socket.off('invite:received', handleInviteReceived);
       }
     };
   }, [socket, isConnected, handleInviteReceived]);

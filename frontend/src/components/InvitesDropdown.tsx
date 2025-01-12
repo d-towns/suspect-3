@@ -26,10 +26,10 @@ const InvitesDropdown: React.FC<InvitesDropdownProps> = ({ invites }) => {
         setNewInvites((prev) => prev + 1);
       };
 
-      socket.on('invite-received', handleInviteReceived);
+      socket.on('invite:received', handleInviteReceived);
 
       return () => {
-        socket.off('invite-received', handleInviteReceived);
+        socket.off('invite:received', handleInviteReceived);
       };
     }
   }, [socket]);
