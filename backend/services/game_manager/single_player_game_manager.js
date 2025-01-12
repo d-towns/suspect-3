@@ -810,13 +810,18 @@ export class SinglePlayerGameManager extends GameManager {
     } catch (error) {
       console.log(error);
     }
+    // fake loading time for testing
+  //   await new Promise((resolve) => {
+  //     setTimeout(() => {
+  //       this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 50 });
+  //       resolve();
+  //     }, 5000);
+  // });
   }
 
 
 
   async calculateGameResults() {
-    // ... if deduction accepted -> check culprit
-    // if correct -> emit('game-won'), else -> emit('game-lost')
     if (this.gameState.status === "finished") {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
@@ -874,12 +879,12 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   assignVoiceToSuspect(suspect) {
-    if (suspect.temperment.includes("aggressive")) {
-      return "verse";
-    } else if (suspect.temperment.includes("calm")) {
-      return "coral";
+    const maleVoices = ["ash", "ballad", "echo", "verse"];
+    const femaleVoices = ["coral", "alloy", "echo", "shimmer", "sage"];
+    if(suspect.gender === 'male') {
+      return maleVoices[Math.floor(Math.random() * maleVoices.length)];
     } else {
-      return "ash";
+      return femaleVoices[Math.floor(Math.random() * femaleVoices.length)];
     }
   }
 }

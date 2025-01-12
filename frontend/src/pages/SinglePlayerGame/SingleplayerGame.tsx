@@ -786,7 +786,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
                     <Flex className='h-full'>
                         <Flex className='min-w-[600px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
                             <CircleVisualizer amplitudeData={audioAmplitudeData} />
-                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
+                            <Avatar variant='solid' fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
                         </Flex>
                         <Box>
 
