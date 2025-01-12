@@ -181,7 +181,7 @@ export class SinglePlayerGameManager extends GameManager {
       (round) => round.status === "active"
     );
     console.log("Active round:", activeRound);
-    if (activeRound.type === "interrogation") {
+    if (activeRound && activeRound.type === "interrogation") {
       this.startInterrogationPhase();
     } else {
       this.startDeductionPhase();
@@ -559,6 +559,14 @@ export class SinglePlayerGameManager extends GameManager {
     }
     this.currentPhase = "deduction";
     this.emit("phase:started", { phase: this.currentPhase });
+
+    if(!this.gameState.rounds.some((round) => round.type === 'voting')) {
+      this.gameState.rounds.push({
+        type: 'voting',
+        status: 'active',
+        conversations: [],
+      });
+    }
     // if the game state dosent have a voting round object, we should create one
 
     // ... set up deduce window ...
