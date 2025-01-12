@@ -20,8 +20,8 @@ async function changeGameState(roomId) {
         return;
     }
 
-    gameState.rounds.find(round => round.type === 'interrogation').status = 'active';
-    gameState.rounds.find(round => round.type === 'voting').status = 'inactive';
+    gameState.rounds.find(round => round.type === 'interrogation').status = 'inactive';
+    gameState.rounds.find(round => round.type === 'voting').status = 'active';
 
     await GameRoomService.updateGameRoom(roomId, { game_state: GameRoomService.encryptGameState(gameState) });
 
@@ -31,4 +31,4 @@ async function changeGameState(roomId) {
 }
 
 
-changeGameState(process.argv[2]);
+await changeGameState(process.argv[2]);

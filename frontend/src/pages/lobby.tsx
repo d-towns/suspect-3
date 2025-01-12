@@ -17,8 +17,9 @@ import {
   ScrollArea,
   Badge,
   Callout,
+  Progress,
 } from '@radix-ui/themes';
-import { ChatMessage } from '../models/chat:message.model';
+import { ChatMessage } from '../models/chat-message.model';
 import { GameRoom } from '../models/room.model';
 import { User } from '../models/user.model';
 import { IoAlertCircle } from "react-icons/io5";
@@ -38,6 +39,7 @@ interface LobbyState {
     allPlayersReady: boolean;
     isReady: boolean;
   };
+  loadProgess: number;
 }
 
 export const Lobby: React.FC = () => {
@@ -60,6 +62,7 @@ export const Lobby: React.FC = () => {
     room: null,
     players: new Map(),
     gameStarting: false,
+    loadProgess: 10,
     chat: {
       messages: [],
       inputMessage: '',
@@ -82,18 +85,18 @@ export const Lobby: React.FC = () => {
         socket.on('player:list', updatePlayerList);
         socket.on('chat:message', addChatMessage);
         socket.on('player:ready', updatePlayerReadyStatus);
+        socket.on('game:load:updated', (params : {progress: number}) => {
+          setLobbyState(prevState => ({
+            ...prevState,
+            loadProgess: params.progress
+          }));
+        });
         socket.on('player:ready:all', () =>
           setLobbyState(prevState => ({
             ...prevState,
             gameStatus: { ...prevState.gameStatus, allPlayersReady: true },
           }))
         );
-        socket.on('game-creating', () => {
-          setLobbyState(prevState => ({
-            ...prevState,
-            gameStarting: true
-          }));
-        });
         socket.on('game:creating', () => {
           setLobbyState(prevState => ({
             ...prevState,
@@ -102,8 +105,8 @@ export const Lobby: React.FC = () => {
         });
         socket.on('game:created', () => navigate(`/game/${roomId}`));
 
-        socket.on('player-left', removePlayer);
-        socket.on('player-joined', addPlayer);
+        socket.on('player:left', removePlayer);
+        socket.on('player:joined', addPlayer);
         socket.on('error', (error: string) => { 
           console.error('Socket error:', error);
           addToast('Game Creation Error, please refresh and try again: ' + error);
@@ -117,8 +120,8 @@ export const Lobby: React.FC = () => {
           socket.off('player:ready');
           socket.off('player:ready:all');
           socket.off('game-created');
-          socket.off('player-left');
-          socket.off('player-joined');
+          socket.off('player:left');
+          socket.off('player:joined');
         }
       };
     }
@@ -301,8 +304,8 @@ export const Lobby: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" align="center" px="4" py="4" mt='4' className='w-full'>
-      <Card size="3" style={{ width: '100%', maxWidth: '800px' }}>
+    <Flex direction="column" align="center" px="4" py="4" mt='4' className={`w-full`}>
+      <Card size="3" className={`${lobbyState.gameStarting ? 'opacity-50' : ''}`} style={{ width: '100%', maxWidth: '800px' }}>
         <Heading size="6" mb="4" align="center">
           Lobby - {lobbyState.room?.id.split('-')[0] || 'Room'}
         </Heading>
@@ -407,18 +410,52 @@ lobbyState.players.size < 2    &&        <Callout.Root size='1' className='my-2 
             {lobbyState.gameStatus.isReady ? 'Cancel Ready' : 'Ready Up'}
           </Button>
           {/* Invite Player */}
-          {lobbyState.gameStarting && (
-            <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-              <div className="bg-white p-8 rounded-lg shadow-xl text-center">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
-                <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
-              </div>
-            </div>
-          )}
+          {/* {lobbyState.gameStarting && (
+              <Box as='div' className="fixed inset-0  opavity-75 flex items-center justify-center z-50">
+              <Card className='p-8 rounded-lg shadow-xl text-center'>
+                <Heading size="6" mb="4">Game Starting</Heading>
+                <Text mb="6">Prepare yourself for the interrogation!</Text>
+                <Box width="100%">
+                  <Progress value={50} max={100} size="3"/>
+                </Box>
+                <Text size="2" mt="4">This may take a few moments...</Text>
+              </Card>
+            </Box>
+            // <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+            //   <div className="bg-white p-8 rounded-lg shadow-xl text-center">
+            //     <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
+            //     <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
+            //     <Box width={'100%'}>
+            //     <Progress value={50 } max={100} size={'3'}/>
+            //     </Box>
+            //     <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
+            //   </div>
+            // </div>
+          )} */}
         </Flex>
       </Card>
+      {lobbyState.gameStarting && (
+              <Box as='div' className="absolute top-[-15vh] opavity-75 flex items-center justify-center z-50 w-full h-full">
+              <Card  variant='surface' className='p-8 rounded-lg shadow-xl text-center flex flex-col gap-3'>
+                <Heading size="8" mb="4">Game Starting</Heading>
+                <Text mb="3">Prepare yourself for the interrogation!</Text>
+                <Box width="100%">
+                  <Progress value={lobbyState.loadProgess} max={100} size="3"/>
+                </Box>
+                <Text size="2" mt="4">This may take a few moments...</Text>
+              </Card>
+            </Box>
+            // <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+            //   <div className="bg-white p-8 rounded-lg shadow-xl text-center">
+            //     <h2 className="text-3xl font-bold text-gray-900 mb-4">Game Starting</h2>
+            //     <p className="text-gray-600 mb-6">Prepare yourself for the interrogation!</p>
+            //     <Box width={'100%'}>
+            //     <Progress value={50 } max={100} size={'3'}/>
+            //     </Box>
+            //     <p className="text-sm text-gray-500 mt-4">This may take a few moments...</p>
+            //   </div>
+            // </div>
+          )}
     </Flex>
   );
 };

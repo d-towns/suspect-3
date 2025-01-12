@@ -187,13 +187,13 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
    * @param {Array<{id: string, elo: number}>} players - Array of player objects containing ID and ELO rating
    * @returns {Promise<void>}
    */
-  static async addPlayerEloToThread(threadId, players) {
+  static async addPlayerEloToThread(threadId, players, outcome) {
     try {
       const message = `Current player ratings:\n${players
         .map((p) => `Player ${p.user_id}: ${p.elo}`)
         .join(
           "\n"
-        )}\n\nPlease analyze the game and calculate ELO changes based on player performance.`;
+        )}\n\nPlease analyze the game and calculate ELO changes based on player performance. the outcome of the game for this player is ${outcome}`;
 
       await this.client.beta.threads.messages.create(threadId, {
         role: "user",

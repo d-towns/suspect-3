@@ -443,6 +443,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
         (changes: any) => {
             console.log("Edge changes", changes);
             const change = changes[0];
+            console.log("Change", change);
             if (change.type === 'remove' && handleRemoveLead) {
                 handleRemoveLead(change.id);
             }
@@ -487,7 +488,8 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
 
     const onConnect = useCallback(
         (params: any) => {
-            setEdges((eds) => addEdge({ ...params, label: params.targetHandle }, eds));
+            console.log('Connect params', params);
+            setEdges((eds) => addEdge({ ...params, id:`${params.source}_${params.target}`, label: params.targetHandle }, eds));
             const sourceNode = gameState.deduction.nodes.find((n) => n.id === params.source);
             const targetNode = gameState.deduction.nodes.find((n) => n.id === params.target);
             if (sourceNode && targetNode && handleCreateNewLead) handleCreateNewLead(sourceNode, targetNode, params.targetHandle);
@@ -676,7 +678,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                     </Flex>
                 </Tabs.Content>
 
-                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '90vh' }}>
+                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '70vh' }}>
                     <DeductionFlow
                         gameState={gameState}
                         handleRemoveLead={handleRemoveLead}
@@ -1173,8 +1175,8 @@ const SingleGame = () => {
     );
 
     const gameIsOver = useMemo(() => {
-        // return gameState?.status == 'finished';
-        return false;
+        return gameState?.status == 'finished';
+        // return false;
     }, [gameState])
 
     const activeRound = useMemo(() => {
@@ -1589,10 +1591,10 @@ const SingleGame = () => {
             <Box className=" flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
                 {!showSidebar && gameState.status === 'active' && (
-                    <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
+                    <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="absolute top-20 m-4">Open Case Files</Button>
                 )}
-                {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4" >
-                    <Flex px={'2'} py={'5'}>
+                {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4 z-10" >
+                    <Flex px={'2'} py={'5'} >
                         <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%', zIndex: 30 }}>
                             {/* Round Timer */}
                             <IconButton

@@ -8,7 +8,7 @@ import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player
 import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
-import { z } from "zod";
+import { set, z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
@@ -42,6 +42,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmEloService = OpenAIEloService;
     this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
+    this.loadProgress = 0;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
@@ -94,6 +95,8 @@ export class SinglePlayerGameManager extends GameManager {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
         // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
+
+        this.emit(SocketEvents.GAME_LOAD_UPDATED, {progress: this.loadProgress += 50})
         if (
           this.gameState.rounds.find((round) => round.type === "interrogation")
             .conversations.length !== 0
@@ -227,11 +230,16 @@ export class SinglePlayerGameManager extends GameManager {
       type: type,
     };
     this.gameState.deduction.edges.push(newLead);
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    this.emit("game:updated", this.gameState);
     await this.#calculateWarmth();
     this.emit("deduction:completed", {});
   }
 
   async removeLead(edgeId) {
+    console.log(" \n\n Removing edge", edgeId, '\n');
     try {
       const index = this.gameState.deduction.edges.findIndex((edge) => {
         const [sourceNodeId, targetNodeId] = edgeId.split("_");
@@ -761,35 +769,41 @@ export class SinglePlayerGameManager extends GameManager {
 
   async #createImagesForGame() {
     try {
-      let basePrompt = 'a 16-bit';
-      console.log('\n creating images for suspects \n');
-      
-      for (let i = 0; i < this.gameState.suspects.length; i++) {
-        const suspect = this.gameState.suspects[i];
-        const suspectPrompt = `${basePrompt} headshot of ${suspect.name}, a ${suspect.identity} with a ${suspect.temperment} temperment.`;
-        const image = await this.llmImageService.createImage(suspectPrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Suspect, `${this.roomId}_${suspect.id}.png`);
-        this.gameState.suspects[i].imgSrc = publicUrl;
-      }
-      
-      console.log(' \n creating images for evidence \n');
-      
-      for ( let i = 0; i < this.gameState.allEvidence.length; i++) {
-        const evidence = this.gameState.allEvidence[i];
-        const evidencePrompt = `${basePrompt} image of ${evidence.description}`;
-        const image = await this.llmImageService.createImage(evidencePrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Evidence, `${this.roomId}_${evidence.id}.png`);
-        this.gameState.allEvidence[i].imgSrc = publicUrl;
-      }
-      
-      console.log('\n creating images for offense report \n');
-      
-      for (let i = 0; i < this.gameState.crime.offenseReport.length; i++) {
-        const report = this.gameState.crime.offenseReport[i];
-        const reportPrompt = `${basePrompt} image of ${report.description}`;
-        const image = await this.llmImageService.createImage(reportPrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.OffenseReport, `${this.roomId}_${report.id}.png`);
-        this.gameState.crime.offenseReport[i].imgSrc = publicUrl;
+      const basePrompt = 'a retro 16-bit style';
+      const categories = [
+        {
+          type: 'suspects',
+          items: this.gameState.suspects,
+          bucket: ImageBuckets.Suspect,
+          description: (item) => `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
+          assignSrc: (i, url) => { this.gameState.suspects[i].imgSrc = url; },
+        },
+        {
+          type: 'evidence',
+          items: this.gameState.allEvidence,
+          bucket: ImageBuckets.Evidence,
+          description: (item) => `image of ${item.description}`,
+          assignSrc: (i, url) => { this.gameState.allEvidence[i].imgSrc = url; },
+        },
+        {
+          type: 'offenseReport',
+          items: this.gameState.crime.offenseReport,
+          bucket: ImageBuckets.OffenseReport,
+          description: (item) => `image of ${item.description}`,
+          assignSrc: (i, url) => { this.gameState.crime.offenseReport[i].imgSrc = url; },
+        },
+      ];
+
+      for (const category of categories) {
+        console.log(`\n creating images for ${category.type} \n`);
+        for (let i = 0; i < category.items.length; i++) {
+          const item = category.items[i];
+          const prompt = `${basePrompt} ${category.description(item)}`;
+          const image = await this.llmImageService.createImage(prompt);
+          const publicUrl = await StorageService.uploadImage(image, category.bucket, `${this.roomId}_${item.id}.png`);
+          category.assignSrc(i, publicUrl);
+          this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 5 });
+        }
       }
     } catch (error) {
       console.log(error);
@@ -813,7 +827,7 @@ export class SinglePlayerGameManager extends GameManager {
 
       console.log("Player stats:", playerStats);
 
-      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats);
+      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats, this.gameState.outcome);
       const leaderboardUpdates = await this.llmEloService.processGameThread(
         this.threadId
       );
