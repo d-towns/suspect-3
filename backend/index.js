@@ -44,12 +44,10 @@ const main = async () => {
             const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
             const { data: { user }, error } = await supabase.auth.getUser(token);
             if (!user) throw new Error('Invalid token');
-            
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = decoded;
+            if (error) throw new Error(error.message);
             next();
         } catch (error) {
-            res.status(401).json({ message: 'Authentication failed' });
+            res.status(401).json({ message: `Authentication failed: ${error.message}` });
         }
     };
     
