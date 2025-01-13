@@ -91,7 +91,8 @@ const Home: React.FC = () => {
       px="4"
     >
 
-      <AnimatedText className='text-7xl md:text-9xl main-header mb-5' animationSpeed={200}  message="Suspect" />
+      <AnimatedText className='text-7xl md:text-9xl main-header ' animationSpeed={200}  message="Suspect" />
+      <AnimatedText className='text-lg main-link mb-5' animationSpeed={300} message="v0.93-beta" />
       <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -99,13 +100,13 @@ const Home: React.FC = () => {
 
       >
       <Flex direction="row" gap="4" mb="6" className='h-full z-10'>
-        {user ? <Link to='/play'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link'>Play</Text></Link> :  <Text onClick={() => setLoginDialogOpen(true)} size={{initial: '6', md: '8'}} as='span' className='main-link'>Login</Text> }
+        {user ? <Link to='/play' className='hover:scale-105 transition ease-in-out duration-200'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link'>Play</Text></Link> :  <Text onClick={() => setLoginDialogOpen(true)} size={{initial: '6', md: '8'}} as='span' className='main-link'>Login</Text> }
        {!user && <LoginDialog open={loginDialogOpen} onOpenChange={() => setLoginDialogOpen(false)}/>}
         {/* <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> */}
         <Separator orientation="vertical" size={'2'} />
-        <Link to='/faq'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link z-10'>How To Play</Text></Link>
+        <Link to='/faq' className='hover:scale-105 transition ease-in-out duration-200'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link z-10'>How To Play</Text></Link>
         <Separator orientation="vertical" size={'2'} />
-        <Link to='/leaderboard'> <Text size={{initial: '6', md: '8'}}as='span' className='main-link'>Leaderboard </Text></Link>
+        <Link to='/leaderboard' className='hover:scale-105 transition ease-in-out duration-200'> <Text size={{initial: '6', md: '8'}}as='span' className='main-link'>Leaderboard </Text></Link>
       </Flex>
       </motion.div>
       </Flex>
@@ -147,7 +148,7 @@ const Home: React.FC = () => {
                 }}
                 animate={{
                   opacity: 0.2,
-                  x: Math.random() * 100,
+                  x: Math.random() * 400,
                   y: Math.random() * 700
                 }}
                 exit={{

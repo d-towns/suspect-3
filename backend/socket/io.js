@@ -1,11 +1,14 @@
 import { Server } from "socket.io";
 import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
 
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 const HEARTBEAT_TIMEOUT = 10000; // 10 seconds
 import { GameRoomService } from "../services/game_room/game_room.service.js";
 import { GameRoomManagerFactory } from "../services/game_manager/game_manager_factory.js";
 import { SocketEvents } from "./events_schema.js";
+
+dotenv.config({path: "../.env"});
 
 export class GameRoomSocketServer {
   static instance = null;
@@ -31,20 +34,9 @@ export class GameRoomSocketServer {
     }
 
     if (!httpServer) {
-      this.io = new Server(3001, {
-        cors: {
-          origin: "*", // Allow all origins
-          methods: ["GET", "POST"],
-        },
-      });
+      this.io = new Server(3001);
     }
-    this.io = new Server(httpServer, {
-      cors: {
-        origin: "*", // Allow all origins
-        methods: ["GET", "POST"],
-
-      },
-    });
+    this.io = new Server(httpServer);
 
     const supabase = createClient(
       process.env.SUPABASE_URL,
