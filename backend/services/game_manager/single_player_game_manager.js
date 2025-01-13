@@ -36,7 +36,6 @@ dotenv.config({ path: "../../.env" });
 
 export class SinglePlayerGameManager extends GameManager {
   constructor(gameRoom, player, gameState) {
-    // console.log("\n\n", gameRoom, player, gameState, "\n\n");
     super();
     this.llmGameService = new OpenAIGameService();
     this.llmEloService = OpenAIEloService;
@@ -94,7 +93,6 @@ export class SinglePlayerGameManager extends GameManager {
       } else {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
-        // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
 
         this.emit(SocketEvents.GAME_LOAD_UPDATED, {progress: this.loadProgress += 50})
         if (
@@ -331,7 +329,6 @@ export class SinglePlayerGameManager extends GameManager {
     } catch (error) {
       console.error("Error analyzing deduction graph:", error);
       this.emit("deduction:error", error);
-      // this.gameState.deduction.warmth = 0;
     }
 
     await GameRoomService.updateGameRoom(this.roomId, {
@@ -449,16 +446,8 @@ export class SinglePlayerGameManager extends GameManager {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
     }
-    // update the game state and set the conversation status to active
 
     this.emit("game:updated", this.gameState);
-
-    //   this.emit("realtime:message", {
-    //     transcript: `${activeSuspect.name} enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.`,
-    //     speaker: "assistant",
-    //     currentRoundTime:
-    //       this.roundTimer
-    // })
 
     this.emit("realtime:started", { suspectId });
   } catch (error) {
@@ -512,18 +501,6 @@ export class SinglePlayerGameManager extends GameManager {
           setTimeout(() => {
             this.emit("game:updated", this.gameState);
           }, 5000);
-
-          // this.gameState = await this.llmGameService.runGameThread(
-          //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-          //   this.threadId
-          // );
-
-          // set the most recent conversation to active false
-
-          // setTimeout(() => {
-          //   this.emit("game:updated", this.gameState);
-          // }, 5000);
-          // Emit that the realtime session ended
         }
         if (parsed.type === "response.audio_transcript.done") {
           await this.llmGameService.addMessageToThread(this.threadId, {
@@ -561,11 +538,6 @@ export class SinglePlayerGameManager extends GameManager {
     if (this.realtimeHandler) {
       this.endInterrogation();
     }
-    // run the game thread to process the conversation and generate the next game state
-    // this.gameState = await this.llmGameService.runGameThread(
-    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-    //   this.threadId
-    // );
 
     if (
       this.gameState.rounds
@@ -621,14 +593,6 @@ export class SinglePlayerGameManager extends GameManager {
         conversations: [],
       });
     }
-    // if the game state dosent have a voting round object, we should create one
-
-    // ... set up deduce window ...
-    // start the round timer for the deduction phase
-    // this.gameState.deduction.submissions = [];
-    // await GameRoomService.updateGameRoom(this.roomId, {
-    //   game_state: GameRoomService.encryptGameState(this.gameState),
-    // });
 
     // if the game state deduction object is empty, we should places nodes in the graph for each suspect and evidence
     if (this.gameState.deduction.nodes.length === 0) {
@@ -676,11 +640,6 @@ export class SinglePlayerGameManager extends GameManager {
     // tell listeners that the deduction phase has ended
     try {
     this.emit("phase:ended", { phase: this.currentPhase });
-    // run the thread to process the deduction and generate the finished game state
-    // this.gameState = await this.llmGameService.runGameThread(
-    //   process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
-    //   this.threadId
-    // );
 
     this.gameState.rounds.find((round) => round.type === "voting").status =
       "completed";
@@ -885,6 +844,7 @@ export class SinglePlayerGameManager extends GameManager {
     try {
     console.log("Ending game...");
     this.gameState.status = "finished";
+    this.gameState.outcome = "lose";
     
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
