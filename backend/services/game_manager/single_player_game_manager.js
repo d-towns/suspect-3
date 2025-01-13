@@ -8,7 +8,7 @@ import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player
 import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
-import { set, z } from "zod";
+import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
