@@ -9,6 +9,7 @@ import { createServer } from "node:http";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +24,24 @@ const main = async () => {
        origin : process.env.NODE_ENV === 'dev' ?  process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL,
         credentials: true
     }));
+
+    const validateOrigin = (req, res, next) => {
+        const origin = req.get('origin');
+        if (!origin || !origin.startsWith(process.env.FRONTEND_URL) && !origin.startsWith(process.env.PROD_FRONTEND_URL)) {
+            return res.status(403).json({ message: 'Unauthorized origin' });
+        }
+        next();
+    };
+
+    const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100
+    });
+    app.use(limiter);
+
+    app.use('/api', validateOrigin);
+
+    
 
 
 
