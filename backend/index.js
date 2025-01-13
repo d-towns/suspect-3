@@ -42,7 +42,7 @@ const main = async () => {
             const token = req.headers.authorization?.split(' ')[1];
             if (!token) throw new Error('No token provided');
             const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-            const { data: { user }, error } = await supabase.auth.getUser(jwt);
+            const { data: { user }, error } = await supabase.auth.getUser(token);
             if (!user) throw new Error('Invalid token');
             
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
