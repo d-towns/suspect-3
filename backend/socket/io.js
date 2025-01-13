@@ -32,11 +32,16 @@ export class GameRoomSocketServer {
     if (GameRoomSocketServer.instance) {
       return GameRoomSocketServer.instance;
     }
-
-    if (!httpServer) {
-      this.io = new Server(3001);
+    if(!httpServer) {
+      throw new Error("HTTP Server is required to create a socket server");
     }
-    this.io = new Server(httpServer);
+    this.io = new Server(httpServer, {
+      cors: {
+        origin: process.env.NODE_ENV === "dev" ? process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL,
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true,
+      },
+    });
 
     const supabase = createClient(
       process.env.SUPABASE_URL,
