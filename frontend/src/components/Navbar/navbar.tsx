@@ -19,7 +19,7 @@ const Navbar: React.FC = () => {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [playing, setPlaying] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const { socket, isConnected, connectSocket} = useSocketContext();
+  const { isConnected, connectSocket} = useSocketContext();
 
 
   const handleLogout = async () => {
