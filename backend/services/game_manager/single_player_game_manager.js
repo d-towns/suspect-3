@@ -42,8 +42,8 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
     this.loadProgress = 0;
-    this.interrogationTimer = 10 * 60; // 10 minutes in seconds
-    this.deductionTimer = 50 * 60; // 5 minutes in seconds
+    this.interrogationTimer = 9 * 60; // 10 minutes in seconds
+    this.deductionTimer = 9 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
