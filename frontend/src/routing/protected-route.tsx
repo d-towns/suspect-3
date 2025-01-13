@@ -1,11 +1,14 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/auth.context';
-import { Box, Card, Inset, Text } from '@radix-ui/themes';
+import { Box, Card, Inset, Text, Dialog, Button } from '@radix-ui/themes';
 import AnimatedText from '../components/animatedText';
+import Loading from '../components/loading';
+import { useSocketContext } from '../context/SocketContext/socket.context';
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
+  const {isConnected, connectSocket } = useSocketContext();
   const [isMobile, setIsMobile] = React.useState(() => window.innerWidth < 640);
 
   React.useEffect(() => {
@@ -16,11 +19,34 @@ const ProtectedRoute: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <h3 className="text-xl font-semibold">Loading...</h3>
-      </div>
+      <Loading />
     );
   }
+
+  if (!isConnected) {
+    return (
+      <Dialog.Root open={!isConnected}>
+        <Dialog.Content className='flex flex-col items-center justify-center'>
+          <Dialog.Title className="mb-4">
+            <AnimatedText message="Disconnected from server" className='dialogHeader' animationSpeed={80} />
+          </Dialog.Title>
+          <Dialog.Description className="mb-4">
+            <Text size="3" align="center">
+              Reconnect to server to continue playing
+            </Text>
+
+          </Dialog.Description>
+          <Button
+            className="mt-4"
+            onClick={connectSocket}
+            >
+            Reconnect
+            </Button>
+        </Dialog.Content>
+      </Dialog.Root>
+    )
+    }
+
 
   if (isMobile) {
     return (
@@ -30,10 +56,10 @@ const ProtectedRoute: React.FC = () => {
             <img src="/single-player-splash.webp" alt="Single Player Splash" />
           </Inset>
           <Text size="3" align="center" mt="6">
-              <AnimatedText message="Suspect is a desktop only experience detective!" animationSpeed={100}  />
-            </Text>
+            <AnimatedText message="Suspect is a desktop only experience detective!" animationSpeed={100} />
+          </Text>
         </Card>
-        </Box>
+      </Box>
     );
   }
 

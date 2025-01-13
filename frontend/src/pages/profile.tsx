@@ -5,6 +5,7 @@ import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 import { leaderboardService } from '../services/leaderboard.service';
 
 import { useAuth } from '../context/auth.context';
+import Loading from '../components/loading';
 
 const Profile = () => {
     const { user } = useAuth();
@@ -45,7 +46,7 @@ const Profile = () => {
         fetchData();
     }, [user, currentPage]);
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <Loading />;
     if (error || !user) return <div>Error: {error}</div>;
 
     return (
