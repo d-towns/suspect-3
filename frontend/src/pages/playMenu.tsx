@@ -50,7 +50,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
           <img
             src={imgSrc}
             alt={altText}
-            className="block object-cover w-full h-64 sm:h-80 md:h-96 bg-gray-200"
+            className="block object-cover w-full h-64 sm:h-80 md:h-[50vh] bg-gray-200"
           />
         </Inset>
         <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
@@ -142,7 +142,7 @@ const PlayMenu: React.FC = () => {
       >
         <ModeCard
           createRoom={createRoom}
-          imgSrc="single-player-splash-2.webp"
+          imgSrc="single-player-splash.webp"
           altText="Single Player"
           description="Enter the interrogation room as a detective! Interview the suspects in a real-time chat and use their testimonies along with the evidence to solve the case."
           mode="single"

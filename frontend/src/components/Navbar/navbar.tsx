@@ -6,10 +6,11 @@ import { Invite } from '../../models/invite.model';
 import moment from 'moment';
 import InvitesDropdown from '../InvitesDropdown';
 import ProfileDropdown from '../ProfileDropdown';
-import { Box, Flex, Text } from '@radix-ui/themes';
+import { Box, Button, Flex, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
 import './navbar.css';
+import { useSocketContext } from '../../context/SocketContext/socket.context';
 
 
 const Navbar: React.FC = () => {
@@ -18,6 +19,7 @@ const Navbar: React.FC = () => {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [playing, setPlaying] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const { socket, isConnected, connectSocket} = useSocketContext();
 
 
   const handleLogout = async () => {
@@ -106,6 +108,16 @@ const Navbar: React.FC = () => {
           </Text>
         </RouterLink>
         <Flex align="center" justify={'center'} gap="6" className=' main-header '>
+          {!isConnected && ( 
+            <Flex align="center" justify={'center'} gap="6" className='max-md:hidden'>
+            <Text size="6" color="red" className=''>
+              Disconneted from server
+              </Text>
+              <Button variant="ghost" size="2" onClick={connectSocket}>
+                Reconnect
+              </Button>
+            </Flex>
+              )}
           <Flex  align="center" justify={'center'} gap="6" className='max-md:hidden'>
             {renderNavLinks()}
           </Flex>

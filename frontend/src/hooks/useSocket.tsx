@@ -176,6 +176,7 @@ export const useSocket = () => {
   return {
     socket,
     isConnected,
+    connectSocket,
     joinRoom,
     getPlayersInRoom,
     sendChatMessage,
