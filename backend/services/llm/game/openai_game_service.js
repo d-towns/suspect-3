@@ -189,12 +189,4 @@ export default class OpenAIGameService extends LLMGameService {
       return null;
     }
   }
-
-  async createImage(prompt) {
-    const image = await this.client.image.generate({model: 'dall-e-3', prompt, style: 'natural', response_format: 'b64_json'});
-    //upload the image to supabase bucket and return the url to be saved in the game state
-    console.log("Image generated:", image);
-    return image
-
-  }
 }

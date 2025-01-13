@@ -40,7 +40,7 @@ export const SuspectSchema = z
     identity: z.string(),
     temperment: SuspectTermpemtmentSchema,
     interrogated: z.boolean(),
-
+    gender: z.enum(['male', 'female']),
     isCulprit: z.boolean(),
   })
   .strict();

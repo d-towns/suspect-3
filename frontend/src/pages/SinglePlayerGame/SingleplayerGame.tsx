@@ -21,6 +21,7 @@ import { OffenseReportCard } from '../../components/OffenseCard';
 import Dagre from '@dagrejs/dagre';
 import { findImplicatedSuspect, getSupabaseImageURL} from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
+import CircleVisualizer from '../../components/audioVisualizer';
 
 /**
  * TODO:
@@ -442,6 +443,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
         (changes: any) => {
             console.log("Edge changes", changes);
             const change = changes[0];
+            console.log("Change", change);
             if (change.type === 'remove' && handleRemoveLead) {
                 handleRemoveLead(change.id);
             }
@@ -486,7 +488,8 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
 
     const onConnect = useCallback(
         (params: any) => {
-            setEdges((eds) => addEdge({ ...params, label: params.targetHandle }, eds));
+            console.log('Connect params', params);
+            setEdges((eds) => addEdge({ ...params, id:`${params.source}_${params.target}`, label: params.targetHandle }, eds));
             const sourceNode = gameState.deduction.nodes.find((n) => n.id === params.source);
             const targetNode = gameState.deduction.nodes.find((n) => n.id === params.target);
             if (sourceNode && targetNode && handleCreateNewLead) handleCreateNewLead(sourceNode, targetNode, params.targetHandle);
@@ -577,9 +580,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
 interface VotingRoundProps {
     gameState: SingleGameState;
     killerVote: string | undefined;
-    roundTimer: number;
     deductionSubmitted: boolean;
-    handleStartNextRound: () => void;
     handleCreateNewLead: (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => void;
     handleRemoveLead: (id: string) => void;
     handleCreateNewdeductionNode: (node: DeductionNode) => void;
@@ -677,7 +678,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                     </Flex>
                 </Tabs.Content>
 
-                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '90vh' }}>
+                <Tabs.Content value="deduction" className="w-full h-full" style={{ width: '100%', height: '70vh' }}>
                     <DeductionFlow
                         gameState={gameState}
                         handleRemoveLead={handleRemoveLead}
@@ -733,7 +734,6 @@ interface InterrogationProps {
     userInterrogationTranscript: ConversationItem[];
     suspectInterrogationTranscript: ConversationItem[];
     wavStreamPlayerRef: React.MutableRefObject<WavStreamPlayer | null>;
-    roundTimer: number
     responseLoading: boolean;
     audioTranscribing: boolean;
     loadingSessionEnd: boolean;
@@ -741,6 +741,7 @@ interface InterrogationProps {
     emitEvent: (event: string, data: any) => void;
     handleAudioRecorded: (arrayBuffer: ArrayBuffer) => void;
     handleEndInterrogation: () => void
+    audioAmplitudeData: Float32Array
 }
 
 /**
@@ -762,6 +763,7 @@ const Interrogation: React.FC<InterrogationProps> = ({
     handleAudioRecorded,
     handleEndInterrogation,
     loadingSessionEnd,
+    audioAmplitudeData,
 }) => {
 
     const interrogationTranscript: ConversationItem[] = [];
@@ -771,6 +773,8 @@ const Interrogation: React.FC<InterrogationProps> = ({
         if (suspectInterrogationTranscript[i]) interrogationTranscript.push(suspectInterrogationTranscript[i]);
         i++;
     }
+
+
     return (
         <>
             <div className='grid grid-cols-1 grid-rows-[auto_1fr] gap-4'>
@@ -780,8 +784,9 @@ const Interrogation: React.FC<InterrogationProps> = ({
                     className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-[550px]"
                 >
                     <Flex className='h-full'>
-                        <Flex className='min-w-[400px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
-                            <Avatar fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
+                        <Flex className='min-w-[600px] min-h-full' justify={'center'} align={'center'} direction={'column'}>
+                            <CircleVisualizer amplitudeData={audioAmplitudeData} />
+                            <Avatar variant='solid' fallback={currentSuspect?.name.charAt(0) || 'E'} src={getSupabaseImageURL(currentSuspect?.imgSrc || '')} size="6" className='min-w-[300px] min-h-[300px]' />
                         </Flex>
                         <Box>
 
@@ -1163,15 +1168,15 @@ const SingleGame = () => {
     const [loadingSessionEnd, setLoadingSessionEnd] = useState<boolean>(false);
     const [playerElo, setPlayerElo] = useState<{ oldRating: number, newRating: number }>({ oldRating: 0, newRating: 0 });
     const [playerBadges, setPlayerBadges] = useState<GameResultBadge[]>([]);
-
+    const [audioAmplitudeData, setAudioAmplitudeData] = useState<Float32Array>(new Float32Array(0));
 
     const wavStreamPlayerRef = useRef<WavStreamPlayer>(
         new WavStreamPlayer({ sampleRate: 24000 })
     );
 
     const gameIsOver = useMemo(() => {
-        // return gameState?.status == 'finished';
-        return false;
+        return gameState?.status == 'finished';
+        // return false;
     }, [gameState])
 
     const activeRound = useMemo(() => {
@@ -1213,7 +1218,7 @@ const SingleGame = () => {
         const { speaker, transcript, responseId, currentRoundTime } = params;
         setUserInterrogationTranscript(prev => [...prev, { audioTranscript: transcript, timestamp: currentRoundTime, speaker, responseId }]);
         setAudioTranscribing(false);
-    }, [roundTimer]);
+    }, []);
 
     const handleRealtimeAudioTranscriptEvent = (params: any) => {
         const { speaker, transcript, currentRoundTime, responseId } = params;
@@ -1248,6 +1253,8 @@ const SingleGame = () => {
         const wavStreamPlayer = wavStreamPlayerRef.current;
         if (wavStreamPlayer) {
             wavStreamPlayer.add16BitPCM(new Int16Array(audio));
+            // const analysis = wavStreamPlayer.getFrequencies('voice');
+            // audioAmplitudeData.current = analysis.values;
         }
     }
 
@@ -1256,13 +1263,6 @@ const SingleGame = () => {
         const { oldRating, newRating, badges } = params;
         setPlayerElo({ oldRating, newRating });
         setPlayerBadges(badges);
-    }
-
-    const handleStartNextRound = () => {
-        if (!gameState || !socket || !roomId) {
-            return;
-        }
-        emitEvent('start-next-round', {});
     }
 
     const handleCreateNewLead = (sourceNode: DeductionNode, targetNode: DeductionNode, type: EdgeType) => {
@@ -1277,6 +1277,18 @@ const SingleGame = () => {
 
     }
 
+    useEffect(() => {
+        // set the amplitude dats in a callback function passed into requestAnimationFrame
+
+        const updateAmplitudeData = () => {
+            if (wavStreamPlayerRef.current && wavStreamPlayerRef.current?.analyser) {
+                requestAnimationFrame(updateAmplitudeData);
+                setAudioAmplitudeData(wavStreamPlayerRef.current?.getFrequencies('voice').values);
+            }
+        }
+        updateAmplitudeData();
+    }, [wavStreamPlayerRef.current , wavStreamPlayerRef.current.analyser]);
+
 
     useEffect(() => {
         if (socket) {
@@ -1287,10 +1299,6 @@ const SingleGame = () => {
                 setSuspectInterrogationTranscript([]);
                 setDeductionLoading(false)
                 setResultsLoading(false);
-            });
-
-            socket.on('game-state-updating', (roundEnd: boolean) => {
-                if (roundEnd) setResultsLoading(true);
             });
 
             socket.on('deduction:completed', () => {
@@ -1305,6 +1313,7 @@ const SingleGame = () => {
             socket.on('game-over', () => {
                 setShowGameOver(true);
             });
+
             socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
             
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
@@ -1345,7 +1354,7 @@ const SingleGame = () => {
 
 
 
-            socket.on('leaderboard-stats-update', handleLeaderboardStatsUpdate);
+            socket.on('leaderboard:updated', handleLeaderboardStatsUpdate);
 
 
             joinRoom(roomId);
@@ -1355,16 +1364,15 @@ const SingleGame = () => {
         return () => {
             if (socket) {
                 console.log('Removing listeners');
-                socket.off('game-state-update');
-                socket.off('game-state-updating');
+                socket.off('game:updated');
                 socket.off('round:tick');
                 socket.off('user-audio-transcript');
                 socket.off('realtime:transcript:delta:assistant');
                 socket.off('realtime:audio:delta:assistant');
                 socket.off('realtime:message');
                 socket.off('realtime:transcript:done:user');
-                socket.off('leaderboard-stats-update');
-                socket.off('chat-message');
+                socket.off('leaderboard:updated');
+                socket.off('chat:message');
 
                 // Remove other listeners
             }
@@ -1492,7 +1500,7 @@ const SingleGame = () => {
         if (activeRound?.type === 'voting') {
             return (
                 <VotingRound
-                    roundTimer={roundTimer}
+                    // roundTimer={roundTimer}
                     gameState={gameState}
                     handleShowGameOver={() => setShowGameOver(true)}
                     deductionSubmitted={deductionSubmitted}
@@ -1500,7 +1508,6 @@ const SingleGame = () => {
                     handleCreateNewLead={handleCreateNewLead}
                     handleRemoveLead={handleRemoveLead}
                     handleCreateNewdeductionNode={handleCreateNewdeductionNode}
-                    handleStartNextRound={handleStartNextRound}
                     handleVoteSubmission={handleVoteSubmission}
                     killerVote={killerVote}
                     setKillerVote={setKillerVote}
@@ -1520,7 +1527,6 @@ const SingleGame = () => {
                         wavStreamPlayerRef={wavStreamPlayerRef}
                         loadingSessionEnd={loadingSessionEnd}
                         gameState={gameState}
-                        roundTimer={roundTimer}
                         currentSuspect={activeSuspect}
                         userInterrogationTranscript={userInterrogationTranscript}
                         suspectInterrogationTranscript={suspectInterrogationTranscript}
@@ -1530,6 +1536,7 @@ const SingleGame = () => {
                         socket={socket}
                         emitEvent={emitEvent}
                         handleAudioRecorded={handleAudioRecorded}
+                        audioAmplitudeData={audioAmplitudeData}
                     />
                 );
             } else {
@@ -1584,11 +1591,11 @@ const SingleGame = () => {
             <Box className=" flex w-full">
                 <AllowAutoplayDialog open={autoplayDialogOpen} onClose={closeAutoplayDialog} onAllow={connectWaveStreamPlayer} />
                 {!showSidebar && gameState.status === 'active' && (
-                    <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="fixed top-30 m-4">Open Case Files</Button>
+                    <Button variant="surface" size="4" onClick={() => setShowSidebar(!showSidebar)} className="absolute top-20 m-4">Open Case Files</Button>
                 )}
                 {gameState.status === 'active' && showSidebar && (<Box className="fixed top-30 m-4 z-10" >
                     <Flex px={'2'} py={'5'} >
-                        <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%' }}>
+                        <Card size="3" variant="classic" style={{ width: '100%', maxWidth: '500px', height: '100%', zIndex: 30 }}>
                             {/* Round Timer */}
                             <IconButton
                                 aria-label="Toggle Sidebar"
@@ -1604,7 +1611,7 @@ const SingleGame = () => {
                                 <FiSidebar size={24} />
                             </IconButton>
                             {/* Accordion for Identity, Evidence, and Guilt Scores */}
-                            <Tabs.Root defaultValue="crime">
+                            <Tabs.Root defaultValue="crime" className='z-30'>
                                 <Heading size="6" className="mb-4">Case Files</Heading>
                                 <Separator size={'4'} />
                                 <Tabs.List className="flex space-x-4 mb-4">

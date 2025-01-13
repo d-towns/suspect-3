@@ -69,7 +69,7 @@ const Navbar: React.FC = () => {
           How To Play
         </RouterLink>
         <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header' to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
-          Support
+          Donate 💜
         </RouterLink>
       </>
     );

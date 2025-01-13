@@ -8,14 +8,15 @@ import SinglePlayerRealtimeHandler from "../realtime_event_handler/single_player
 import { SinglePlayerGameStateSchema } from "../../models/game-state-schema.js";
 import { singlePlayerAssistantInstructions } from "../../utils/assistant_instructions.js";
 import dotenv from "dotenv";
-import { z } from "zod";
+import { set, z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
+import { SocketEvents } from "../../socket/events_schema.js";
 
 /** the game loop
  * Single Player:
- * the player will enter the game room and send a joined-game event to the server
+ * the player will enter the game room and send a game:joined event to the server
  * this should be ignored until the host of the room sends a start-game event
  * the start-game event will be sent once the player has gone over the offense report and is ready to start the game
  * once the start-game event is sent, the server will start the game loop
@@ -41,6 +42,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmEloService = OpenAIEloService;
     this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
+    this.loadProgress = 0;
     this.interrogationTimer = 10 * 60; // 10 minutes in seconds
     this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
@@ -93,6 +95,8 @@ export class SinglePlayerGameManager extends GameManager {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
         // if the interrogation round has a conversations array that is not length = 0, then set it to be an empty array
+
+        this.emit(SocketEvents.GAME_LOAD_UPDATED, {progress: this.loadProgress += 50})
         if (
           this.gameState.rounds.find((round) => round.type === "interrogation")
             .conversations.length !== 0
@@ -161,6 +165,7 @@ export class SinglePlayerGameManager extends GameManager {
 
   startGame() {
     // use the llm service to create a message in the thread that says the game has started
+    try {
     console.log("Starting game...");
     if (this.gameState.status !== "active") {
       this.llmGameService.addMessageToThread(this.threadId, {
@@ -181,14 +186,19 @@ export class SinglePlayerGameManager extends GameManager {
       (round) => round.status === "active"
     );
     console.log("Active round:", activeRound);
-    if (activeRound.type === "interrogation") {
+    if (activeRound && activeRound.type === "interrogation") {
       this.startInterrogationPhase();
     } else {
       this.startDeductionPhase();
     }
+  } catch (error) {
+    console.error("Error starting game:", error);
+    this.emit("error", error.message);
   }
+}
 
   startInterrogationPhase() {
+    try {
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, keeping the current timer");
     } else {
@@ -217,20 +227,34 @@ export class SinglePlayerGameManager extends GameManager {
     if (activeConversation) {
       this.startInterrogation(activeConversation.suspect);
     }
+  } catch (error) {
+    console.error("Error starting interrogation phase:", error);
+    this.emit("error", error.message);
   }
+}
 
   async createNewLead(sourceNode, targetNode, type) {
+    try{
     const newLead = {
       source_node: sourceNode,
       target_node: targetNode,
       type: type,
     };
     this.gameState.deduction.edges.push(newLead);
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+    });
+    this.emit("game:updated", this.gameState);
     await this.#calculateWarmth();
     this.emit("deduction:completed", {});
+  } catch (error) {
+    console.error("Error creating new lead:", error);
+    this.emit("deduction:error", error);
+  }
   }
 
   async removeLead(edgeId) {
+    console.log(" \n\n Removing edge", edgeId, '\n');
     try {
       const index = this.gameState.deduction.edges.findIndex((edge) => {
         const [sourceNodeId, targetNodeId] = edgeId.split("_");
@@ -325,15 +349,22 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async createNewDeductionNode(node) {
+    try{
     console.log("Creating new deduction node", this.gameState);
     this.gameState.deduction.nodes.push(node);
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
     this.emit("game:updated", this.gameState);
+  } catch (error) {
+
+    console.error("Error creating new deduction node:", error);
+    this.emit("deduction:error", error);
+  }
   }
 
   startNextPhase() {
+
     if (this.roundTimer == null) {
       console.log("game hasnt started, cannot start new phase");
       return;
@@ -354,6 +385,7 @@ export class SinglePlayerGameManager extends GameManager {
    * Open a realtime session using the llmService to start an interrogation with a suspect
    */
   async startInterrogation(suspectId) {
+    try {
     console.log("Starting interrogation with suspect", suspectId + "\n\n");
     const realtimeSocket = await this.llmGameService.openRealtimeConversation();
     const activeSuspect = this.gameState.suspects.find(
@@ -429,9 +461,14 @@ export class SinglePlayerGameManager extends GameManager {
     // })
 
     this.emit("realtime:started", { suspectId });
+  } catch (error) {
+    console.error("Error starting interrogation:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async endInterrogation() {
+    try{
     if (!this.realtimeHandler) {
       console.log("No realtime session.");
       return;
@@ -507,6 +544,10 @@ export class SinglePlayerGameManager extends GameManager {
       // Then send a response.create event
       this.realtimeHandler.sendMessage({ type: "response.create" });
     });
+  } catch (error) {
+    console.error("Error ending interrogation:", error);
+    this.emit("error", error);
+    }
   }
 
   /**
@@ -514,6 +555,7 @@ export class SinglePlayerGameManager extends GameManager {
    *
    */
   async endInterrogationPhase() {
+    try {
     this.emit("phase:ended", { phase: this.currentPhase });
 
     if (this.realtimeHandler) {
@@ -550,15 +592,35 @@ export class SinglePlayerGameManager extends GameManager {
     } else {
       this.emit("game:finished", {});
     }
+  } catch (error) {
+    console.error("Error ending interrogation phase:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async startDeductionPhase() {
+    try{
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, cannot start new phase");
       return;
+    } else {
+
+    const { clear } = startInterval(
+      this.deductionTimer,
+      this.emitRoundTick.bind(this),
+      this.endDeductionPhase.bind(this)
+    );
+    this.clearRoundTimer = clear;
+  }
+  this.currentPhase = "deduction";
+  this.emit("phase:started", { phase: this.currentPhase });
+    if(!this.gameState.rounds.some((round) => round.type === 'voting')) {
+      this.gameState.rounds.push({
+        type: 'voting',
+        status: 'active',
+        conversations: [],
+      });
     }
-    this.currentPhase = "deduction";
-    this.emit("phase:started", { phase: this.currentPhase });
     // if the game state dosent have a voting round object, we should create one
 
     // ... set up deduce window ...
@@ -603,16 +665,16 @@ export class SinglePlayerGameManager extends GameManager {
 
       this.emit("game:updated", this.gameState);
     }
-    const { clear } = startInterval(
-      this.deductionTimer,
-      this.emitRoundTick.bind(this),
-      this.endDeductionPhase.bind(this)
-    );
-    this.clearRoundTimer = clear;
+  } catch (error) {
+    console.error("Error starting deduction phase:", error);
+    this.emit("error", error.message);
+  }
+
   }
 
   async endDeductionPhase() {
     // tell listeners that the deduction phase has ended
+    try {
     this.emit("phase:ended", { phase: this.currentPhase });
     // run the thread to process the deduction and generate the finished game state
     // this.gameState = await this.llmGameService.runGameThread(
@@ -633,9 +695,14 @@ export class SinglePlayerGameManager extends GameManager {
 
     // check if the game is over ( is should be ) and then run the elo rating calculation
     await this.calculateGameResults();
+  } catch (error) {
+    console.error("Error ending deduction phase:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async runDeductionAnalysis() {
+    try {
     console.log("Running deduction analysis...");
     this.emit("deduction:started", {});
 
@@ -707,17 +774,27 @@ export class SinglePlayerGameManager extends GameManager {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
     this.emit("game:updated", this.gameState);
+  } catch (error) {
+    console.error("Error running deduction analysis:", error);
+    this.emit("error", error);
+  }
   }
 
   #getPreviousSuspectConversations(suspect) {
+    try {
     return this.gameState.rounds
       .find((round) => round.type === "interrogation")
       .conversations.filter(
         (conversation) => conversation.suspect === suspect.id
       );
+    } catch (error) {
+      console.error("Error getting previous suspect conversations:", error);
+      this.emit("error", error);
+    }
   }
 
   async summarizePreviousConversations(suspect) {
+    try {
     const previousConversations = this.#getPreviousSuspectConversations(suspect);
     console.log("Previous conversations:", previousConversations);
     if (previousConversations.length === 0) {
@@ -747,51 +824,84 @@ export class SinglePlayerGameManager extends GameManager {
       zodResponseFormat(summarySchema, "summary")
     );
     return response.summary;
+  } catch (error) {
+    console.error("Error summarizing previous conversations:", error);
+    this.emit("error", error);
+  }
   }
 
 
   async #createImagesForGame() {
     try {
-      let basePrompt = 'a 16-bit';
-      console.log('\n creating images for suspects \n');
-      
-      for (let i = 0; i < this.gameState.suspects.length; i++) {
-        const suspect = this.gameState.suspects[i];
-        const suspectPrompt = `${basePrompt} headshot of ${suspect.name}, a ${suspect.identity} with a ${suspect.temperment} temperment.`;
-        const image = await this.llmImageService.createImage(suspectPrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Suspect, `${this.roomId}_${suspect.id}.png`);
-        this.gameState.suspects[i].imgSrc = publicUrl;
-      }
-      
-      console.log(' \n creating images for evidence \n');
-      
-      for ( let i = 0; i < this.gameState.allEvidence.length; i++) {
-        const evidence = this.gameState.allEvidence[i];
-        const evidencePrompt = `${basePrompt} image of ${evidence.description}`;
-        const image = await this.llmImageService.createImage(evidencePrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.Evidence, `${this.roomId}_${evidence.id}.png`);
-        this.gameState.allEvidence[i].imgSrc = publicUrl;
-      }
-      
-      console.log('\n creating images for offense report \n');
-      
-      for (let i = 0; i < this.gameState.crime.offenseReport.length; i++) {
-        const report = this.gameState.crime.offenseReport[i];
-        const reportPrompt = `${basePrompt} image of ${report.description}`;
-        const image = await this.llmImageService.createImage(reportPrompt);
-        const publicUrl = await StorageService.uploadImage(image, ImageBuckets.OffenseReport, `${this.roomId}_${report.id}.png`);
-        this.gameState.crime.offenseReport[i].imgSrc = publicUrl;
+      const basePrompt = 'a retro 16-bit style';
+      const categories = [
+        {
+          type: 'suspects',
+          items: this.gameState.suspects,
+          bucket: ImageBuckets.Suspect,
+          description: (item) => `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
+          assignSrc: (i, url) => { this.gameState.suspects[i].imgSrc = url; },
+        },
+        {
+          type: 'evidence',
+          items: this.gameState.allEvidence,
+          bucket: ImageBuckets.Evidence,
+          description: (item) => `image of ${item.description}`,
+          assignSrc: (i, url) => { this.gameState.allEvidence[i].imgSrc = url; },
+        },
+        {
+          type: 'offenseReport',
+          items: this.gameState.crime.offenseReport,
+          bucket: ImageBuckets.OffenseReport,
+          description: (item) => `image of ${item.description}`,
+          assignSrc: (i, url) => { this.gameState.crime.offenseReport[i].imgSrc = url; },
+        },
+      ];
+
+      for (const category of categories) {
+        console.log(`\n creating images for ${category.type} \n`);
+        for (let i = 0; i < category.items.length; i++) {
+          const item = category.items[i];
+          const prompt = `${basePrompt} ${category.description(item)}`;
+          const image = await this.llmImageService.createImage(prompt);
+          const publicUrl = await StorageService.uploadImage(image, category.bucket, `${this.roomId}_${item.id}.png`);
+          category.assignSrc(i, publicUrl);
+          this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 5 });
+        }
       }
     } catch (error) {
       console.log(error);
     }
+    // fake loading time for testing
+  //   await new Promise((resolve) => {
+  //     setTimeout(() => {
+  //       this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 50 });
+  //       resolve();
+  //     }, 5000);
+  // });
+  }
+
+  async endGame() {
+    try {
+    console.log("Ending game...");
+    this.gameState.status = "finished";
+    
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+      status: "finished",
+    });
+    this.emit("game:updated", this.gameState);
+    this.calculateGameResults();
+  } catch (error) {
+    console.error("Error ending game:", error);
+    this.emit("error", error);
+  }
   }
 
 
 
   async calculateGameResults() {
-    // ... if deduction accepted -> check culprit
-    // if correct -> emit('game-won'), else -> emit('game-lost')
+    try {
     if (this.gameState.status === "finished") {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
@@ -804,7 +914,7 @@ export class SinglePlayerGameManager extends GameManager {
 
       console.log("Player stats:", playerStats);
 
-      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats);
+      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats, this.gameState.outcome);
       const leaderboardUpdates = await this.llmEloService.processGameThread(
         this.threadId
       );
@@ -836,7 +946,7 @@ export class SinglePlayerGameManager extends GameManager {
       console.log(oldRating, newRating, badges);
 
       // emit the leaderboard updates to the client
-      this.emit("leaderboard:finished", {
+      this.emit(SocketEvents.LEADERBOARD_FINISHED, {
         oldRating,
         newRating,
         badges,
@@ -846,15 +956,19 @@ export class SinglePlayerGameManager extends GameManager {
     } else {
       return false;
     }
+  } catch (error) {
+    console.error("Error calculating game results:", error);
+    this.emit("error", error);
+  }
   }
 
   assignVoiceToSuspect(suspect) {
-    if (suspect.temperment.includes("aggressive")) {
-      return "verse";
-    } else if (suspect.temperment.includes("calm")) {
-      return "coral";
+    const maleVoices = ["ash", "ballad", "echo", "verse"];
+    const femaleVoices = ["coral", "alloy", "echo", "shimmer", "sage"];
+    if(suspect.gender === 'male') {
+      return maleVoices[Math.floor(Math.random() * maleVoices.length)];
     } else {
-      return "ash";
+      return femaleVoices[Math.floor(Math.random() * femaleVoices.length)];
     }
   }
 }

@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import { EventEmitter } from "events";
 import { LeaderboardSchema } from "../../../models/leaderboard.schema.js";
+import { SocketEvents } from "../../../socket/events_schema.js";
 
 dotenv.config({ path: "../.env" });
 
@@ -186,13 +187,13 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
    * @param {Array<{id: string, elo: number}>} players - Array of player objects containing ID and ELO rating
    * @returns {Promise<void>}
    */
-  static async addPlayerEloToThread(threadId, players) {
+  static async addPlayerEloToThread(threadId, players, outcome) {
     try {
       const message = `Current player ratings:\n${players
         .map((p) => `Player ${p.user_id}: ${p.elo}`)
         .join(
           "\n"
-        )}\n\nPlease analyze the game and calculate ELO changes based on player performance.`;
+        )}\n\nPlease analyze the game and calculate ELO changes based on player performance. the outcome of the game for this player is ${outcome}`;
 
       await this.client.beta.threads.messages.create(threadId, {
         role: "user",
@@ -254,7 +255,7 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       const { playerId, oldRating, newRating, badges } = results;
       const socketId = socketServer.getSocketForUser(playerId);
       if (socketId) {
-        socketServer.emitToSocket(socketId, "leaderboard-stats-update", {
+        socketServer.emitToSocket(socketId, SocketEvents.LEADERBOARD_UPDATED, {
           oldRating,
            newRating,
           badges,

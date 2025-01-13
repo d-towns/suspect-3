@@ -7,9 +7,10 @@ import { useSocketContext } from '../context/SocketContext/socket.context';
 import { supabase } from '../utils/supabase-client';
 import AnimatedText from '../components/animatedText';
 import './playMenu.css';
+import { GameRoom } from '../models';
 
 interface ModeCardProps {
-  createRoom: (mode: string) => void;
+  createRoom: (mode: 'single' | 'multi') => void;
   imgSrc: string;
   altText: string;
   description?: string;
@@ -79,13 +80,25 @@ const PlayMenu: React.FC = () => {
   const { socket} = useSocketContext();
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [username, setUsername] = useState('');
+  const [activeGames, setActiveGames] = useState<GameRoom[]>([]);
+  const [showActiveGameModal, setShowActiveGameModal] = useState(false);
+  const [roomMode, setRoomMode] = useState<'single' | 'multi' | null>(null);
 
   useEffect(() => {
     if (user && !user?.username) {
       const defaultName = user?.email?.split('@')[0] || '';
       setUsername(defaultName);
       setShowUsernameModal(true);
+      
     }
+  }, [user]);
+
+
+  useEffect(() => {
+    if (!user) return;
+    roomsService.getActiveGamesForUser(user.id).then((games) => {
+      setActiveGames(games);
+    });
   }, [user]);
 
   const handleSetUsername = async () => {
@@ -101,8 +114,14 @@ const PlayMenu: React.FC = () => {
     console.log('socket connected');
   }
 
-  const createRoom = async (mode: string) => {
+  const createRoom = async (mode: 'single' | 'multi') => {
     if (!user) return;
+    // if user has an active game, prompt them to join or end game
+    if (activeGames.length > 0) {
+      setShowActiveGameModal(true);
+      setRoomMode(mode);
+      return;
+    }
     try {
       const roomId = await roomsService.createRoom(user.id, mode);
       navigate(`/lobby/${roomId}`);
@@ -110,15 +129,16 @@ const PlayMenu: React.FC = () => {
       console.error('Error creating room:', error);
       alert('Error creating room: ' + (error as Error).message);
     }
-};
+  };
 
   return (
-    <>
+    <Box>
+
       <Flex
         direction={{ initial: 'column', md: 'row' }}
         gap="6"
         className="h-full self-center items-center justify-self-center"
-        mt={{ initial: '6', md: '9' }}
+        mt={{ initial: '6' }}
       >
         <ModeCard
           createRoom={createRoom}
@@ -137,6 +157,45 @@ const PlayMenu: React.FC = () => {
         />
       </Flex>
 
+
+ 
+
+      <Dialog.Root open={showActiveGameModal} onOpenChange={setShowActiveGameModal}>
+        <Dialog.Content>
+          <Dialog.Title>You have an active game</Dialog.Title>
+          <Dialog.Description>
+            Do you want to rejoin or end your previous game? Ending it will result in a loss and rating update.
+          </Dialog.Description>
+          <Flex gap="3" mt="4" justify="center">
+            <Button
+              onClick={() => {
+                navigate(`/game/${activeGames[0]?.id}`);
+                setShowActiveGameModal(false);
+              }}
+            >
+              Rejoin
+            </Button>
+            <Button
+              variant="soft"
+              onClick={async () => {
+                socket?.emit('game:end', { roomId: activeGames[0]?.id, userId: user?.id });
+                setShowActiveGameModal(false);
+
+                try {
+                  if(!user) return;
+                  const roomId = await roomsService.createRoom(user.id, roomMode || 'single');
+                  navigate(`/lobby/${roomId}`);
+                } catch (error) {
+                  console.error('Error creating room:', error);
+                  alert('Error creating room: ' + (error as Error).message);
+                }
+              }}
+            >
+              End and Create New
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
       <Dialog.Root open={showUsernameModal} onOpenChange={setShowUsernameModal}>
         <Dialog.Content className='flex flex-col items-center justify-center'>
           <Dialog.Title className="mb-4">
@@ -157,7 +216,7 @@ const PlayMenu: React.FC = () => {
 
         </Dialog.Content>
       </Dialog.Root>
-    </>
+    </Box>
   );
 };
 
