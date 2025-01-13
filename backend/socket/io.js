@@ -135,6 +135,7 @@ export class GameRoomSocketServer {
       socket.on(SocketEvents.GAME_START, this.handleStartGame.bind(this, socket));
       // called when a player navigates to the game page
       socket.on(SocketEvents.GAME_JOINED, this.handleJoinedGame.bind(this, socket));
+      socket.on(SocketEvents.GAME_END, this.handleEndGame.bind(this, socket));
       // called when a player readies up in the game lobby
       socket.on(SocketEvents.PLAYER_READY, this.handlePlayerReady.bind(this, socket));
 
@@ -286,6 +287,29 @@ export class GameRoomSocketServer {
       console.error(`Error in handleStartGame: ${error.message}`);
       this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
     }
+  }
+
+  async handleEndGame(socket, params) {
+    try {
+      // if there is no game room manager i need to create one and 
+      const manager = this.roomGameManagers.get(params.roomId)
+      if(manager) {
+        manager.endGame();
+      } else {
+        const gameRoom = await GameRoomService.getGameRoom(params.roomId || roomId);
+        const game_state = GameRoomService.decryptGameState(
+          gameRoom.game_state
+        );
+        const playerIds = [{id: params.userId}];
+        const gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, game_state);
+
+
+        gameManager.endGame();
+      }
+    } catch (error) {
+      console.error(`Error in handleEndGame: ${error.message}`);
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+    } 
   }
 
   /**

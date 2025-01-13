@@ -56,6 +56,19 @@ export const roomsService = {
     return { ...data, game_state };
   },
 
+  getActiveGamesForUser: async (userId: string): Promise<GameRoom[]> => {
+    const { data, error } = await supabase
+      .from('game_rooms')
+      .select('*')
+      .eq('host_id', userId)
+      .eq('status', 'active');
+    if (error) {
+      console.error(error);
+      throw new Error('Failed to fetch active games');
+    }
+    return data as GameRoom[];
+  },
+
   updateGameState: async (roomId: string, gameState: GameState): Promise<void> => {
     try {
       const response = await axiosInstance.post(`/games/update-game/${roomId}`, { gameState });

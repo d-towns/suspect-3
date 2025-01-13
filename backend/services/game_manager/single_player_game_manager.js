@@ -819,6 +819,18 @@ export class SinglePlayerGameManager extends GameManager {
   // });
   }
 
+  async endGame() {
+    console.log("Ending game...");
+    this.gameState.status = "finished";
+    
+    await GameRoomService.updateGameRoom(this.roomId, {
+      game_state: GameRoomService.encryptGameState(this.gameState),
+      status: "finished",
+    });
+    this.emit("game:updated", this.gameState);
+    this.calculateGameResults();
+  }
+
 
 
   async calculateGameResults() {

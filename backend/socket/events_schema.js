@@ -20,6 +20,7 @@ export const SocketEvents = {
     GAME_LEFT: "game:left",
     GAME_CREATE: "game:create",
     GAME_START: "game:start",
+    GAME_END: "game:end",
     GAME_ERROR: "game:error",
     GAME_LOAD_UPDATED: "game:load:updated",
     PHASE_STARTED: "phase:started",
