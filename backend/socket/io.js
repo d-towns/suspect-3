@@ -30,7 +30,6 @@ export class GameRoomSocketServer {
       return GameRoomSocketServer.instance;
     }
 
-    // this.openaiGameService = new OpenaiGameService();
     if (!httpServer) {
       this.io = new Server(3001, {
         cors: {

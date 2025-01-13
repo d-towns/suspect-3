@@ -165,6 +165,7 @@ export class SinglePlayerGameManager extends GameManager {
 
   startGame() {
     // use the llm service to create a message in the thread that says the game has started
+    try {
     console.log("Starting game...");
     if (this.gameState.status !== "active") {
       this.llmGameService.addMessageToThread(this.threadId, {
@@ -190,9 +191,14 @@ export class SinglePlayerGameManager extends GameManager {
     } else {
       this.startDeductionPhase();
     }
+  } catch (error) {
+    console.error("Error starting game:", error);
+    this.emit("error", error.message);
   }
+}
 
   startInterrogationPhase() {
+    try {
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, keeping the current timer");
     } else {
@@ -221,9 +227,14 @@ export class SinglePlayerGameManager extends GameManager {
     if (activeConversation) {
       this.startInterrogation(activeConversation.suspect);
     }
+  } catch (error) {
+    console.error("Error starting interrogation phase:", error);
+    this.emit("error", error.message);
   }
+}
 
   async createNewLead(sourceNode, targetNode, type) {
+    try{
     const newLead = {
       source_node: sourceNode,
       target_node: targetNode,
@@ -236,6 +247,10 @@ export class SinglePlayerGameManager extends GameManager {
     this.emit("game:updated", this.gameState);
     await this.#calculateWarmth();
     this.emit("deduction:completed", {});
+  } catch (error) {
+    console.error("Error creating new lead:", error);
+    this.emit("deduction:error", error);
+  }
   }
 
   async removeLead(edgeId) {
@@ -334,15 +349,22 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async createNewDeductionNode(node) {
+    try{
     console.log("Creating new deduction node", this.gameState);
     this.gameState.deduction.nodes.push(node);
     await GameRoomService.updateGameRoom(this.roomId, {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
     this.emit("game:updated", this.gameState);
+  } catch (error) {
+
+    console.error("Error creating new deduction node:", error);
+    this.emit("deduction:error", error);
+  }
   }
 
   startNextPhase() {
+
     if (this.roundTimer == null) {
       console.log("game hasnt started, cannot start new phase");
       return;
@@ -363,6 +385,7 @@ export class SinglePlayerGameManager extends GameManager {
    * Open a realtime session using the llmService to start an interrogation with a suspect
    */
   async startInterrogation(suspectId) {
+    try {
     console.log("Starting interrogation with suspect", suspectId + "\n\n");
     const realtimeSocket = await this.llmGameService.openRealtimeConversation();
     const activeSuspect = this.gameState.suspects.find(
@@ -438,9 +461,14 @@ export class SinglePlayerGameManager extends GameManager {
     // })
 
     this.emit("realtime:started", { suspectId });
+  } catch (error) {
+    console.error("Error starting interrogation:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async endInterrogation() {
+    try{
     if (!this.realtimeHandler) {
       console.log("No realtime session.");
       return;
@@ -516,6 +544,10 @@ export class SinglePlayerGameManager extends GameManager {
       // Then send a response.create event
       this.realtimeHandler.sendMessage({ type: "response.create" });
     });
+  } catch (error) {
+    console.error("Error ending interrogation:", error);
+    this.emit("error", error);
+    }
   }
 
   /**
@@ -523,6 +555,7 @@ export class SinglePlayerGameManager extends GameManager {
    *
    */
   async endInterrogationPhase() {
+    try {
     this.emit("phase:ended", { phase: this.currentPhase });
 
     if (this.realtimeHandler) {
@@ -559,9 +592,14 @@ export class SinglePlayerGameManager extends GameManager {
     } else {
       this.emit("game:finished", {});
     }
+  } catch (error) {
+    console.error("Error ending interrogation phase:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async startDeductionPhase() {
+    try{
     if (this.roundTimer > 0) {
       console.log("Round timer is still running, cannot start new phase");
       return;
@@ -627,11 +665,16 @@ export class SinglePlayerGameManager extends GameManager {
 
       this.emit("game:updated", this.gameState);
     }
+  } catch (error) {
+    console.error("Error starting deduction phase:", error);
+    this.emit("error", error.message);
+  }
 
   }
 
   async endDeductionPhase() {
     // tell listeners that the deduction phase has ended
+    try {
     this.emit("phase:ended", { phase: this.currentPhase });
     // run the thread to process the deduction and generate the finished game state
     // this.gameState = await this.llmGameService.runGameThread(
@@ -652,9 +695,14 @@ export class SinglePlayerGameManager extends GameManager {
 
     // check if the game is over ( is should be ) and then run the elo rating calculation
     await this.calculateGameResults();
+  } catch (error) {
+    console.error("Error ending deduction phase:", error);
+    this.emit("error", error.message);
+  }
   }
 
   async runDeductionAnalysis() {
+    try {
     console.log("Running deduction analysis...");
     this.emit("deduction:started", {});
 
@@ -726,17 +774,27 @@ export class SinglePlayerGameManager extends GameManager {
       game_state: GameRoomService.encryptGameState(this.gameState),
     });
     this.emit("game:updated", this.gameState);
+  } catch (error) {
+    console.error("Error running deduction analysis:", error);
+    this.emit("error", error);
+  }
   }
 
   #getPreviousSuspectConversations(suspect) {
+    try {
     return this.gameState.rounds
       .find((round) => round.type === "interrogation")
       .conversations.filter(
         (conversation) => conversation.suspect === suspect.id
       );
+    } catch (error) {
+      console.error("Error getting previous suspect conversations:", error);
+      this.emit("error", error);
+    }
   }
 
   async summarizePreviousConversations(suspect) {
+    try {
     const previousConversations = this.#getPreviousSuspectConversations(suspect);
     console.log("Previous conversations:", previousConversations);
     if (previousConversations.length === 0) {
@@ -766,6 +824,10 @@ export class SinglePlayerGameManager extends GameManager {
       zodResponseFormat(summarySchema, "summary")
     );
     return response.summary;
+  } catch (error) {
+    console.error("Error summarizing previous conversations:", error);
+    this.emit("error", error);
+  }
   }
 
 
@@ -820,6 +882,7 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async endGame() {
+    try {
     console.log("Ending game...");
     this.gameState.status = "finished";
     
@@ -829,11 +892,16 @@ export class SinglePlayerGameManager extends GameManager {
     });
     this.emit("game:updated", this.gameState);
     this.calculateGameResults();
+  } catch (error) {
+    console.error("Error ending game:", error);
+    this.emit("error", error);
+  }
   }
 
 
 
   async calculateGameResults() {
+    try {
     if (this.gameState.status === "finished") {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
@@ -888,6 +956,10 @@ export class SinglePlayerGameManager extends GameManager {
     } else {
       return false;
     }
+  } catch (error) {
+    console.error("Error calculating game results:", error);
+    this.emit("error", error);
+  }
   }
 
   assignVoiceToSuspect(suspect) {
