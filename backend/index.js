@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { createClient } from "@supabase/supabase-js";
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,8 @@ const main = async () => {
         credentials: true
     }));
 
+    
+
     const validateOrigin = (req, res, next) => {
         const origin = req.get('origin');
         if (!origin || !origin.startsWith(process.env.FRONTEND_URL) && !origin.startsWith(process.env.PROD_FRONTEND_URL)) {
@@ -33,13 +36,31 @@ const main = async () => {
         next();
     };
 
+    const validateAuthToken = async (req, res, next) => {
+        try {
+            
+            const token = req.headers.authorization?.split(' ')[1];
+            if (!token) throw new Error('No token provided');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+            const { data: { user }, error } = await supabase.auth.getUser(jwt);
+            if (!user) throw new Error('Invalid token');
+            
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            req.user = decoded;
+            next();
+        } catch (error) {
+            res.status(401).json({ message: 'Authentication failed' });
+        }
+    };
+    
+
     const limiter = rateLimit({
         windowMs: 15 * 60 * 1000,
         max: 100
     });
     app.use(limiter);
 
-    app.use('/api', validateOrigin);
+    app.use('/api', validateOrigin, validateAuthToken);
 
     
 

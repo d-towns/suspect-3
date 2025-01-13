@@ -27,9 +27,6 @@ const asyncHandler = (fn) => (req, res, next) => {
 // POST /create-room
 router.post("/create-room", asyncHandler(createGameRoom));
 
-// GET /get-rooms
-router.get("/get-rooms", asyncHandler(getGameRooms));
-
 // GET /get-room/:roomId
 router.get("/get-room/:roomId", asyncHandler(getRoom));
 
