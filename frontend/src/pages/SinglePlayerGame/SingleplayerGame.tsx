@@ -19,7 +19,7 @@ import AnimatedText from '../../components/animatedText';
 import { ReactFlow, Edge, Node, Background, Controls, applyEdgeChanges, applyNodeChanges, Handle, Position, addEdge, Panel } from '@xyflow/react';
 import { OffenseReportCard } from '../../components/OffenseCard';
 import Dagre from '@dagrejs/dagre';
-import { findImplicatedSuspect, getSupabaseImageURL} from '../../utils/helpers';
+import { findImplicatedSuspect, getSupabaseImageURL } from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
 import CircleVisualizer from '../../components/audioVisualizer';
 
@@ -130,10 +130,10 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) 
                     />
                     {unreadCount > 0 && (
                         <Box
-                            className="absolute top-3 right-0 w-4 h-4 rounded-full"
+                            className="absolute top-3 right-0 w-10 h-4 rounded-full"
 
                         >
-                            <Text size="3" align="center" mb={'4'} style={{ backgroundColor: 'darkred' }} className='rounded-xl py-1 px-2'>
+                            <Text size="1" align="center" mb={'4'} style={{ backgroundColor: 'darkred' }} className='rounded-xl py-1 px-2'>
                                 {unreadCount}
                             </Text>
                         </Box>
@@ -143,7 +143,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) 
                     </Text>
                 </Box>
                 {isOpen && openMessage === null && (
-                    <ScrollArea style={{ height: 'fit', width: '100%' }}>
+                    <ScrollArea style={{ height: '300px', width: '100%' }}>
                         <Flex direction="column" gap="2">
                             {messages.length > 0 ? (
                                 messages.map((_, index) => (
@@ -156,7 +156,7 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) 
                                     </Box>
                                 ))
                             ) : (
-                                <Text size='3'>
+                                <Text size='1'>
                                     {defaultMessage}
                                 </Text>
                             )}
@@ -172,9 +172,11 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) 
                         >
                             Back
                         </Button>
+                        <ScrollArea style={{ height: '300px', width: '100%' }}>
                         <Box className="w-full p-2 rounded">
-                            <Text size="3">{messages[openMessage]}</Text>
+                            <Text size="2">{messages[openMessage]}</Text>
                         </Box>
+                        </ScrollArea>
                     </Box>
                 )}
                 <Button
@@ -380,7 +382,8 @@ const getLayoutedElements = (
     options: { direction: string },
 ) => {
     const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: options.direction, ranksep: 250, nodesep: 150 });
+    // create a ranking function that will order the nodes based on their type
+    g.setGraph({ rankdir: options.direction, align: 'DR', ranksep: 50, nodesep: 50  });
 
     edges.forEach((edge) => g.setEdge(edge.source, edge.target));
     nodes.forEach((node) =>
@@ -489,7 +492,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
     const onConnect = useCallback(
         (params: any) => {
             console.log('Connect params', params);
-            setEdges((eds) => addEdge({ ...params, id:`${params.source}_${params.target}`, label: params.targetHandle }, eds));
+            setEdges((eds) => addEdge({ ...params, id: `${params.source}_${params.target}`, label: params.targetHandle }, eds));
             const sourceNode = gameState.deduction.nodes.find((n) => n.id === params.source);
             const targetNode = gameState.deduction.nodes.find((n) => n.id === params.target);
             if (sourceNode && targetNode && handleCreateNewLead) handleCreateNewLead(sourceNode, targetNode, params.targetHandle);
@@ -513,8 +516,8 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
             <Panel position="top-right" className="flex flex-col gap-4">
                 <Heading size="3" className='w-full text-center'>Layout Controls</Heading>
                 <Flex gap={'4'}>
-                    <Button variant='outline' onClick={() => onLayout('TB')}>Vertical</Button>
-                    <Button variant='outline' onClick={() => onLayout('LR')}>Horizontal</Button>
+                    <Button variant='outline' onClick={() => onLayout('LR')}>Vertical</Button>
+                    <Button variant='outline' onClick={() => onLayout('TB')}>Horizontal</Button>
                 </Flex>
             </Panel>
             <Panel position="bottom-right" className="flex flex-col gap-4">
@@ -543,7 +546,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
                             <FiInfo className='ml-1 cursor-pointer inline' />
                         </Heading>
                     </Tooltip>
-                    {!deductionLoading ? <Text size="5" weight="bold" className='absolute top-[55%] z-10 left-[40%]'>{warmthMessage}</Text> :
+                    {!deductionLoading ? <Text size="5" weight="bold" className='absolute top-[53%] z-10 left-[37%]'>{warmthMessage}</Text> :
                         <Spinner className='absolute top-[40%] z-10 left-[45%]' />}
                     <Progress size={'3'} max={100} duration="10s" value={gameState.deduction.warmth} color={warmthBarColor} className='h-32 w-32 rotate-[270deg] m-auto' />
                     <Tooltip content="Your partner will provide feedback on your deductions here." className='z-10'>
@@ -602,6 +605,16 @@ const VotingRound: React.FC<VotingRoundProps> = ({
 }) => {
     const [activeConversation, setActiveConversation] = useState<Conversation | undefined>(undefined);
 
+    const conversationsBySuspect = gameState.rounds
+        .find((round) => round.type === "interrogation")
+        ?.conversations.reduce((acc, conversation) => {
+            if (!acc[conversation.suspect]) {
+                acc[conversation.suspect] = [];
+            }
+            acc[conversation.suspect].push(conversation);
+            return acc;
+        }, {} as Record<string, Conversation[]>) || [];
+
     return (
         <Flex direction="row" gap="4" className="h-full">
             <Tabs.Root defaultValue="deduction" className="w-full h-full">
@@ -613,65 +626,98 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                 <Tabs.Content value="interrogations" className="h-full">
                     <Flex gap="4">
                         <Box className="w-1/4 p-2 border-r flex flex-col gap-4">
-                            {gameState.rounds
-                                .find((round) => round.type === "interrogation")
-                                ?.conversations.map((conversation, index) => (
-                                    <Flex direction="column" gap="4" key={conversation.suspect + index}>
-                                        <Card
-                                            variant="surface"
-                                            className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
-                                            onClick={() => setActiveConversation(conversation)}
-                                        >
-                                            <Text size="2" weight="bold">
-                                                {gameState.suspects.find((suspect) => suspect.id === conversation.suspect)?.name}
-                                            </Text>
-                                            <Text size="1" weight="light" ml="4">
-                                                #{conversation.suspect}
-                                            </Text>
-                                        </Card>
+                        <ScrollArea style={{ height: '60vh', width: '100%' }}>
+                            {Object.entries(conversationsBySuspect).map(([suspectId, conversations], index) => {
+                                const suspect = gameState.suspects.find((suspect) => suspect.id === suspectId);
+                                return (
+                                    <Flex direction="column" gap="4" key={suspectId}>
+                                        <Flex align={'center'}>
+                                            <Avatar src={getSupabaseImageURL(suspect?.imgSrc || '')} fallback={suspect?.name.charAt(0) || '?'} size="4" />
+                                            <Text size="4" weight="bold" ml="4"> {suspect?.name}, {suspect?.identity} </Text>
+                                        </Flex>
+                                        <Separator orientation="horizontal" size="4" />
+                                        {conversations.map((conversation, index) => {
+                                            return (
+                                                <Flex direction="column" gap="4" key={`${suspectId}_${index}`}>
+                                                    <Card
+                                                        variant="surface"
+                                                        className="p-4 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
+                                                        onClick={() => setActiveConversation(conversation)}
+                                                    >
+                                                        <Text size="2" weight="bold">
+                                                            Conversation #{index + 1}
+                                                        </Text>
+                                                        <Text size="1" weight="light" ml="4">
+                                                            #{conversation.suspect}
+                                                        </Text>
+                                                    </Card>
+                                                </Flex>
+                                            );
+                                        })}
                                         {index <
                                             (gameState?.rounds
                                                 ?.find((round) => round.type === "interrogation")
                                                 ?.conversations.length || 1) -
                                             1 && <Separator orientation="horizontal" size="4" />}
                                     </Flex>
-                                ))}
+                                );
+                            })}
+                            </ScrollArea>
                         </Box>
                         <Box className="w-3/4 p-2">
                             {activeConversation && (
                                 <Box className="interrogationChat w-full overflow-y-auto p-4 rounded-lg h-full">
+                                    <ScrollArea style={{ height: '60vh', width: '100%' }}>
                                     {activeConversation.responses.map((response, index) => (
-                                        <Tooltip
-                                            key={index}
-                                            content={<Text size="2">Create a new lead from this statement</Text>}
-                                            className="p-1"
-                                        >
-                                            <Flex
-                                                className="gap-5 py-3 hover:border-green-300 hover:border rounded-lg transition-all duration-100 hover:cursor-pointer"
-                                                onClick={() => {
-                                                    handleCreateNewdeductionNode({
-                                                        id: `statement-${index}`,
-                                                        type: "statement",
-                                                        data: {
-                                                            speaker: response.speaker,
-                                                            message: response.message,
-                                                        },
-                                                    });
-                                                }}
-                                            >
-                                                <Box ml="2" mb="2">
-                                                    <Text as="p" weight="bold" size="3">
-                                                        {response.speaker}
-                                                    </Text>
-                                                </Box>
-                                                <Box className="col-span-7">
+                                        <Grid columns={'8'} gapY={'4'}>
+                                            <Box ml="2" mb="4" p={'4'}>
+                                                <Text as="p" weight="bold" size="3">
+                                                    {response.speaker}
+                                                </Text>
+                                            </Box>
+                                            {response.speaker !== 'Detective' ?
+                                                <Tooltip
+                                                    key={index}
+                                                    content={<Text size="2">Create a new lead from this statement</Text>}
+                                                    className="p-1"
+                                                >
+
+                                                    <Box
+                                                        className={` flex flex-col mb-4 p-4 col-span-7 border rounded-lg transition-all duration-100 ${
+                                                            gameState?.deduction.nodes.some(node => node.id === `statement-${index}-${activeConversation.suspect}`)
+                                                                ? 'border-green-500'
+                                                                : 'border-gray-700 hover:border-green-300 animate-pulse hover:cursor-pointer'
+                                                        }`}
+                                                        onClick={() => {
+                                                            if (!gameState?.deduction.nodes.some(node => node.id === `statement-${index}-${activeConversation.suspect}`)) {
+                                                                handleCreateNewdeductionNode({
+                                                                    id: `statement-${index}-${activeConversation.suspect}`,
+                                                                    type: "statement",
+                                                                    data: {
+                                                                        speaker: response.speaker,
+                                                                        message: response.message,
+                                                                    },
+                                                                });
+                                                            }
+                                                        }}
+                                                    >
+                                                        {gameState?.deduction.nodes.some(node => node.id === `statement-${index}-${activeConversation.suspect}`) && (
+                                                            <Text size="1" className="mb-2 text-green-500">Added</Text>
+                                                        )}
+                                                        <Text align="left" as="span">
+                                                            {response.message}
+                                                        </Text>
+                                                    </Box>
+                                                </Tooltip> :
+                                                <Box className="mb-4 p-4 col-span-7">
                                                     <Text align="left" as="span">
                                                         {response.message}
                                                     </Text>
-                                                </Box>
-                                            </Flex>
-                                        </Tooltip>
+                                                </Box>}
+                                        </Grid>
+
                                     ))}
+                                    </ScrollArea>
                                 </Box>
                             )}
                         </Box>
@@ -797,20 +843,20 @@ const Interrogation: React.FC<InterrogationProps> = ({
                                         <AnimatedText animationSpeed={50} size='xs' message='The suspect enters the room for interrogation. Begin the interrogation. ask them about the crime, and their involvement in it.' />
                                     </Flex>
                                     {interrogationTranscript.map((conversationItem, index) => (
-                                            <Flex key={index} className='col-span-8 gap-5 py-3'>
-                                                <Box ml="2" mb="2">
-                                                    <Text as="p" weight="bold" size="3">
-                                                        {Math.floor(conversationItem.timestamp / 60)}:
-                                                        {conversationItem.timestamp % 60 < 10 ? '0' : ''}
-                                                        {conversationItem.timestamp % 60}
-                                                    </Text>
-                                                </Box>
-                                                <Box className="col-span-7">
-                                                    <Text align="left" as="span">
-                                                        {conversationItem.audioTranscript}
-                                                    </Text>
-                                                </Box>
-                                            </Flex>
+                                        <Flex key={index} className='col-span-8 gap-5 py-3'>
+                                            <Box ml="2" mb="2">
+                                                <Text as="p" weight="bold" size="3">
+                                                    {Math.floor(conversationItem.timestamp / 60)}:
+                                                    {conversationItem.timestamp % 60 < 10 ? '0' : ''}
+                                                    {conversationItem.timestamp % 60}
+                                                </Text>
+                                            </Box>
+                                            <Box className="col-span-7">
+                                                <Text align="left" as="span">
+                                                    {conversationItem.audioTranscript}
+                                                </Text>
+                                            </Box>
+                                        </Flex>
                                     ))}
                                     <Flex direction={'column'} className='w-full'>
                                         {responseLoading && (
@@ -1287,7 +1333,7 @@ const SingleGame = () => {
             }
         }
         updateAmplitudeData();
-    }, [wavStreamPlayerRef.current , wavStreamPlayerRef.current.analyser]);
+    }, [wavStreamPlayerRef.current, wavStreamPlayerRef.current.analyser]);
 
 
     useEffect(() => {
@@ -1309,13 +1355,13 @@ const SingleGame = () => {
                 setDeductionSubmitted(true);
             })
 
-            
+
             socket.on('game-over', () => {
                 setShowGameOver(true);
             });
 
             socket.on('realtime:transcript:done:user', handleUserAudioTranscriptEvent);
-            
+
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
 
             socket.on('realtime:transcript:delta:assistant', handleRealtimeAudioTranscriptEvent);
@@ -1646,7 +1692,7 @@ const SingleGame = () => {
                                         {gameState?.allEvidence?.map((item, index) => (
                                             <Card key={index} variant="surface" className="p-4">
                                                 <Flex gap="2" align="center">
-                                                <Avatar size="6" fallback={item.description.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
+                                                    <Avatar size="6" fallback={item.description.charAt(0)} src={getSupabaseImageURL(item.imgSrc)} className='w-32 h-32' />
                                                     <Box>
                                                         <Text>{item.description}</Text>
                                                     </Box>

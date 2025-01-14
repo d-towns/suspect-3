@@ -22,6 +22,36 @@ async function changeGameState(roomId) {
 
     gameState.rounds.find(round => round.type === 'interrogation').status = 'inactive';
     gameState.rounds.find(round => round.type === 'voting').status = 'active';
+    gameState.outcome = 'not_yet_determined';
+    gameState.status = 'active';
+
+    gameState.deduction.nodes = [];
+    gameState.deduction.edges = [];
+
+    gameState.suspects.forEach((suspect) => {
+      gameState.deduction.nodes.push({
+        id: suspect.id,
+        type: "suspect",
+        data: {
+          identity: suspect.identity,
+          name: suspect.name,
+          temperment: suspect.temperment,
+        },
+      });
+    });
+
+    gameState.allEvidence.forEach((evidence) => {
+      gameState.deduction.nodes.push({
+        id: evidence.id,
+        type: "evidence",
+        data: {
+          id: evidence.id,
+          description: evidence.description,
+        },
+      });
+    });
+
+    console.log(gameState);
 
     await GameRoomService.updateGameRoom(roomId, { game_state: GameRoomService.encryptGameState(gameState) });
 
