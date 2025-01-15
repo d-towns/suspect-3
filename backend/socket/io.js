@@ -139,7 +139,7 @@ export class GameRoomSocketServer {
       socket.lastHeartbeat = Date.now();
 
       // Start the heartbeat check interval for the socket that just connected
-      setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
+      // setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL);
     });
   }
 

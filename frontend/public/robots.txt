@@ -1,0 +1,35 @@
+User-agent: *
+Allow: /game
+Allow: /leaderboard
+Allow: /about
+Allow: /blog
+Allow: /privacy
+Allow: /terms
+Allow: /contact
+Allow: /sitemap.xml
+Allow: /*.js
+Allow: /*.css
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.gif
+Allow: /*.svg
+Allow: /*.ico
+
+# Protect sensitive routes
+Disallow: /admin
+Disallow: /api/
+Disallow: /users/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /internal/
+Disallow: /dev/
+
+# Prevent caching of game states
+Disallow: /game/*/state
+Disallow: /game/session/*
+
+# Rate limiting hints for good bots
+Crawl-delay: 10
+
+# Sitemap location
+Sitemap: https://yourgame.com/sitemap.xml
