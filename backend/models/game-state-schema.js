@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const CrimeTypes = ['Theft', 
+  'Embezzlement', 
+  'Public corruption',
+  'Bribery',
+  'Money laundering',
+  'Poltical Assassination',
+];
+
 export const ConversationResponseSchema = z
   .object({
     speaker: z.string(),
@@ -52,7 +60,13 @@ export const MultiPlayerGameStateSchema = z
       .describe("The current status of the game"),
     crime: z
       .object({
-        type: z.string(),
+        type: z.enum(['Theft', 
+          'Embezzlement', 
+          'Public corruption',
+          'Bribery',
+          'Money laundering',
+          'Poltical Assassination',
+        ]),
         location: z.string(),
         time: z.string(),
         description: z.string(),
