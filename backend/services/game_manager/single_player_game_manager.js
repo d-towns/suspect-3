@@ -13,6 +13,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
 import { SocketEvents } from "../../socket/events_schema.js";
+import { CrimeTypes } from "../../models/game-state-schema.js";
 
 /** the game loop
  * Single Player:
@@ -42,8 +43,8 @@ export class SinglePlayerGameManager extends GameManager {
     this.llmImageService = new ReplicateImageService();
     this.currentPhase = null;
     this.loadProgress = 0;
-    this.interrogationTimer = 9 * 60; // 10 minutes in seconds
-    this.deductionTimer = 50 * 60; // 5 minutes in seconds
+    this.interrogationTimer = 10 * 60; // 10 minutes in seconds
+    this.deductionTimer = 10 * 60; // 10 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
@@ -60,7 +61,9 @@ export class SinglePlayerGameManager extends GameManager {
 
   createCrime() {
     console.log(`Creating crime scenario for single players game`);
-    const crime = `Create a crime scenario for a single player game. the player in this game is ${this.playerId}. Create identities for each suspect and evidence gathered from the scene of the crime`;
+    const crimeType = CrimeTypes[Math.floor(Math.random() * CrimeTypes.length)];
+
+    const crime = `Create a crime scenario for a single player game. The type of the crime is ${crimeType}. the player in this game is ${this.playerId}. Create identities for each suspect and evidence gathered from the scene of the crime`;
     return crime;
   }
 
