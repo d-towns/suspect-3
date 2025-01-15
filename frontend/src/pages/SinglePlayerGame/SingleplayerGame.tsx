@@ -1412,6 +1412,8 @@ const SingleGame = () => {
 
         return () => {
             if (socket) {
+                emitEvent('room:leave', roomId);
+
                 console.log('Removing listeners');
                 socket.off('game:updated');
                 socket.off('round:tick');

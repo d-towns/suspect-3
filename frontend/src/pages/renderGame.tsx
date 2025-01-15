@@ -36,9 +36,9 @@ const RenderGame: React.FC = () => {
         fetchRoom();
     }, [roomId]);
 
-    if (loading) {
-        return <Loading />;
-    }
+    // if (loading) {
+    //     return <Loading />;
+    // }
 
     if(!user || !gameRoom) {
         return <Loading />

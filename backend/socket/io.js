@@ -8,7 +8,7 @@ import { GameRoomService } from "../services/game_room/game_room.service.js";
 import { GameRoomManagerFactory } from "../services/game_manager/game_manager_factory.js";
 import { SocketEvents } from "./events_schema.js";
 
-dotenv.config({path: "../.env"});
+dotenv.config({ path: "../.env" });
 
 export class GameRoomSocketServer {
   static instance = null;
@@ -27,17 +27,19 @@ export class GameRoomSocketServer {
     return GameRoomSocketServer.instance;
   }
 
-
   constructor(httpServer) {
     if (GameRoomSocketServer.instance) {
       return GameRoomSocketServer.instance;
     }
-    if(!httpServer) {
+    if (!httpServer) {
       throw new Error("HTTP Server is required to create a socket server");
     }
     this.io = new Server(httpServer, {
       cors: {
-        origin: process.env.NODE_ENV === "dev" ? process.env.FRONTEND_URL : process.env.PROD_FRONTEND_URL,
+        origin:
+          process.env.NODE_ENV === "dev"
+            ? process.env.FRONTEND_URL
+            : process.env.PROD_FRONTEND_URL,
         methods: ["GET", "POST", "PUT", "DELETE"],
         credentials: true,
       },
@@ -61,8 +63,7 @@ export class GameRoomSocketServer {
       )
       .subscribe();
 
-
-      // keeps track of all the round timers for each room in this socket server
+    // keeps track of all the round timers for each room in this socket server
     this.roomGameManagers = new Map();
     this.attachServerListeners();
 
@@ -98,15 +99,29 @@ export class GameRoomSocketServer {
     this.io.close();
   }
 
-
   attachServerListeners() {
     this.io.on("connection", (socket) => {
-      socket.on(SocketEvents.USER_SET, this.handleSetUserDetails.bind(this, socket));
-      socket.on(SocketEvents.DISCONNECT, this.handleDisconnect.bind(this, socket));
+      socket.on(
+        SocketEvents.USER_SET,
+        this.handleSetUserDetails.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.DISCONNECT,
+        this.handleDisconnect.bind(this, socket)
+      );
       socket.on(SocketEvents.ROOM_JOIN, this.handleJoinRoom.bind(this, socket));
-      socket.on(SocketEvents.ROOM_LEAVE, this.handleLeaveRoom.bind(this, socket));
-      socket.on(SocketEvents.REALTIME_START, this.handleStartInterrogation.bind(this, socket));
-      socket.on(SocketEvents.CHAT_MESSAGE, this.handleChatMessage.bind(this, socket));
+      socket.on(
+        SocketEvents.ROOM_LEAVE,
+        this.handleLeaveRoom.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.REALTIME_START,
+        this.handleStartInterrogation.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.CHAT_MESSAGE,
+        this.handleChatMessage.bind(this, socket)
+      );
       socket.on(
         SocketEvents.PLAYER_LIST,
         this.handleOnlinePlayersList.bind(this, socket)
@@ -115,25 +130,58 @@ export class GameRoomSocketServer {
         SocketEvents.REALTIME_AUDIO_DELTA_USER,
         this.handleRealtimeAudioResponse.bind(this, socket)
       );
-      socket.on(SocketEvents.REALTIME_END, this.handleEndInterrogation.bind(this, socket));
-      socket.on(SocketEvents.DEDUCTION_LEAD_CREATED, this.handleDeductionLeadCreated.bind(this, socket));
-      socket.on(SocketEvents.DEDUCTION_NODE_CREATED, this.handleDeductionNodeCreated.bind(this, socket));
-      socket.on(SocketEvents.DEDUCTION_LEAD_REMOVED, this.handleDeductionLeadRemoved.bind(this, socket));
-      socket.on(SocketEvents.DEDUCTION_SUBMIT, this.handleSubmitDeduction.bind(this, socket));
-      socket.on(SocketEvents.LEADERBOARD_UPDATED, this.handleLeaderboardUpdate.bind(this, socket));
+      socket.on(
+        SocketEvents.REALTIME_END,
+        this.handleEndInterrogation.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.DEDUCTION_LEAD_CREATED,
+        this.handleDeductionLeadCreated.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.DEDUCTION_NODE_CREATED,
+        this.handleDeductionNodeCreated.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.DEDUCTION_LEAD_REMOVED,
+        this.handleDeductionLeadRemoved.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.DEDUCTION_SUBMIT,
+        this.handleSubmitDeduction.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.LEADERBOARD_UPDATED,
+        this.handleLeaderboardUpdate.bind(this, socket)
+      );
 
       // heartbeat lister for client sockets connected to this server
-      socket.on(SocketEvents.HEARTBEAT, this.handleHeartbeat.bind(this, socket));
+      socket.on(
+        SocketEvents.HEARTBEAT,
+        this.handleHeartbeat.bind(this, socket)
+      );
 
       // called when the host of a game starts the game from the looby
 
-      socket.on(SocketEvents.GAME_CREATE, this.handleCreateInitialGameState.bind(this, socket));
-      socket.on(SocketEvents.GAME_START, this.handleStartGame.bind(this, socket));
+      socket.on(
+        SocketEvents.GAME_CREATE,
+        this.handleCreateInitialGameState.bind(this, socket)
+      );
+      socket.on(
+        SocketEvents.GAME_START,
+        this.handleStartGame.bind(this, socket)
+      );
       // called when a player navigates to the game page
-      socket.on(SocketEvents.GAME_JOINED, this.handleJoinedGame.bind(this, socket));
+      socket.on(
+        SocketEvents.GAME_JOINED,
+        this.handleJoinedGame.bind(this, socket)
+      );
       socket.on(SocketEvents.GAME_END, this.handleEndGame.bind(this, socket));
       // called when a player readies up in the game lobby
-      socket.on(SocketEvents.PLAYER_READY, this.handlePlayerReady.bind(this, socket));
+      socket.on(
+        SocketEvents.PLAYER_READY,
+        this.handlePlayerReady.bind(this, socket)
+      );
 
       // Initialize lastHeartbeat for the socket that just connected
       socket.lastHeartbeat = Date.now();
@@ -143,90 +191,98 @@ export class GameRoomSocketServer {
     });
   }
 
-      /**
+  /**
    * Attaches listeners to the game manager's events and forwards them to the client sockets.
    *
    * @param {GameRoomManager} manager - The game manager instance.
    * @param {string} roomId - The ID of the room.
    */
-      attachGameManagerListeners(manager, roomId) {
-        manager.on(SocketEvents.GAME_ERROR, (data) => {
-          this.emitToRoom(roomId, SocketEvents.GAME_ERROR, data);
-        });
-        manager.on(SocketEvents.GAME_CREATED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.GAME_CREATED, data);
-        });
-  
-        manager.on(SocketEvents.GAME_STARTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.GAME_STARTED, data);
-        });
-  
-        manager.on(SocketEvents.GAME_UPDATED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.GAME_UPDATED, data);
-        });
+  attachGameManagerListeners(manager, roomId) {
+    manager.on(SocketEvents.GAME_ERROR, (data) => {
+      this.emitToRoom(roomId, SocketEvents.GAME_ERROR, data);
+    });
+    manager.on(SocketEvents.GAME_CREATED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.GAME_CREATED, data);
+    });
 
-        manager.on(SocketEvents.GAME_LOAD_UPDATED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.GAME_LOAD_UPDATED, data);
-        });
-  
-        manager.on(SocketEvents.ROUND_TICK, (data) => {
-          this.emitToRoom(roomId, SocketEvents.ROUND_TICK, data);
-        });
-  
-        manager.on(SocketEvents.PHASE_STARTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.PHASE_STARTED, data);
-        });
-  
-        manager.on(SocketEvents.PHASE_ENDED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.PHASE_ENDED, data);
-        });
-        manager.on(SocketEvents.LEADERBOARD_STARTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.LEADERBOARD_STARTED, data);
-        });
-        manager.on(SocketEvents.LEADERBOARD_FINISHED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.LEADERBOARD_FINISHED, data);
-        });
-  
-        manager.on(SocketEvents.DEDUCTION_STARTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.DEDUCTION_STARTED, data);
-        });
-        manager.on(SocketEvents.DEDUCTION_COMPLETED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.DEDUCTION_COMPLETED, data);
-        });
-        manager.on(SocketEvents.DEDUCTION_ERROR, (data) => {
-          this.emitToRoom(roomId, SocketEvents.DEDUCTION_ERROR, data);
-        });
-  
-        manager.on(SocketEvents.REALTIME_CONNECTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_CONNECTED, data);
-        });
-        manager.on(SocketEvents.REALTIME_DISCONNECTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_DISCONNECTED, data);
-        });
-        manager.on(SocketEvents.REALTIME_STARTED, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_STARTED, data);
-        });
-        manager.on(SocketEvents.REALTIME_MESSAGE, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_MESSAGE, data);
-        });
-        manager.on(SocketEvents.REALTIME_TRANSCRIPT_DONE_USER, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_TRANSCRIPT_DONE_USER, data);
-        });
-        manager.on(SocketEvents.REALTIME_AUDIO_DELTA_ASSISTANT, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_AUDIO_DELTA_ASSISTANT, data);
-        });
-        manager.on(SocketEvents.REALTIME_TRANSCRIPT_DELTA_ASSISTANT, (data) => {
-          this.emitToRoom(roomId, SocketEvents.REALTIME_TRANSCRIPT_DELTA_ASSISTANT, data);
-        });
-    
-        // Add more listeners as needed based on game manager events
-      }
-  
+    manager.on(SocketEvents.GAME_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.GAME_STARTED, data);
+    });
 
+    manager.on(SocketEvents.GAME_UPDATED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.GAME_UPDATED, data);
+    });
+
+    manager.on(SocketEvents.GAME_LOAD_UPDATED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.GAME_LOAD_UPDATED, data);
+    });
+
+    manager.on(SocketEvents.ROUND_TICK, (data) => {
+      this.emitToRoom(roomId, SocketEvents.ROUND_TICK, data);
+    });
+
+    manager.on(SocketEvents.PHASE_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.PHASE_STARTED, data);
+    });
+
+    manager.on(SocketEvents.PHASE_ENDED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.PHASE_ENDED, data);
+    });
+    manager.on(SocketEvents.LEADERBOARD_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.LEADERBOARD_STARTED, data);
+    });
+    manager.on(SocketEvents.LEADERBOARD_FINISHED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.LEADERBOARD_FINISHED, data);
+    });
+
+    manager.on(SocketEvents.DEDUCTION_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.DEDUCTION_STARTED, data);
+    });
+    manager.on(SocketEvents.DEDUCTION_COMPLETED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.DEDUCTION_COMPLETED, data);
+    });
+    manager.on(SocketEvents.DEDUCTION_ERROR, (data) => {
+      this.emitToRoom(roomId, SocketEvents.DEDUCTION_ERROR, data);
+    });
+
+    manager.on(SocketEvents.REALTIME_CONNECTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_CONNECTED, data);
+    });
+    manager.on(SocketEvents.REALTIME_DISCONNECTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_DISCONNECTED, data);
+    });
+    manager.on(SocketEvents.REALTIME_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_STARTED, data);
+    });
+    manager.on(SocketEvents.REALTIME_MESSAGE, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_MESSAGE, data);
+    });
+    manager.on(SocketEvents.REALTIME_TRANSCRIPT_DONE_USER, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_TRANSCRIPT_DONE_USER, data);
+    });
+    manager.on(SocketEvents.REALTIME_AUDIO_DELTA_ASSISTANT, (data) => {
+      this.emitToRoom(
+        roomId,
+        SocketEvents.REALTIME_AUDIO_DELTA_ASSISTANT,
+        data
+      );
+    });
+    manager.on(SocketEvents.REALTIME_TRANSCRIPT_DELTA_ASSISTANT, (data) => {
+      this.emitToRoom(
+        roomId,
+        SocketEvents.REALTIME_TRANSCRIPT_DELTA_ASSISTANT,
+        data
+      );
+    });
+
+    // Add more listeners as needed based on game manager events
+  }
 
   // TODO: these attributes should be set on the socket.data object
   handleSetUserDetails(socket, userEmail, userName, userId, roomId) {
-    console.log(`User details: ${userEmail}, ${userName}, ${userId}, ${roomId}`);
+    console.log(
+      `User details: ${userEmail}, ${userName}, ${userId}, ${roomId}`
+    );
     socket.userEmail = userEmail;
     socket.userName = userName;
     socket.isReady = false;
@@ -234,7 +290,7 @@ export class GameRoomSocketServer {
     socket.roomId = roomId;
   }
 
-  // this could be moved to a 
+  // this could be moved to a
   handleDisconnect(socket) {
     console.log(`User ${socket.userEmail} disconnected`);
     const room = this.io.sockets.adapter.rooms.get(socket.roomId);
@@ -273,6 +329,18 @@ export class GameRoomSocketServer {
   handleLeaveRoom(socket, roomId, userEmail, userName) {
     socket.leave(roomId);
     console.log(`User ${userEmail} left room ${roomId}`);
+    // if there are no sockets left in the room, then get the room manager and clear the round timer
+    const playersInRoom = this.getPlayersInRoom(roomId);
+    if (playersInRoom.length === 0) {
+      const manager = this.roomGameManagers.get(roomId);
+      if (manager && manager.clearRoundTimer) {
+        manager.clearRoundTimer(true);
+        if (!manager.endGameTimeoutId) {
+          manager.startEndGameTimer();
+        }
+        // BOOKMARK 1
+      }
+    }
     socket.to(roomId).emit(SocketEvents.PLAYER_LEFT, { userEmail, userName });
   }
 
@@ -281,31 +349,40 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(roomId).startGame();
     } catch (error) {
       console.error(`Error in handleStartGame: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
   async handleEndGame(socket, params) {
     try {
-      // if there is no game room manager i need to create one and 
-      const manager = this.roomGameManagers.get(params.roomId)
-      if(manager) {
+      // if there is no game room manager i need to create one and
+      const manager = this.roomGameManagers.get(params.roomId);
+      if (manager) {
         manager.endGame();
       } else {
-        const gameRoom = await GameRoomService.getGameRoom(params.roomId || roomId);
+        const gameRoom = await GameRoomService.getGameRoom(
+          params.roomId || roomId
+        );
         const game_state = GameRoomService.decryptGameState(
           gameRoom.game_state
         );
-        const playerIds = [{id: params.userId}];
-        const gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, game_state);
-
+        const playerIds = [{ id: params.userId }];
+        const gameManager = GameRoomManagerFactory.createGameRoomManager(
+          gameRoom,
+          playerIds,
+          game_state
+        );
 
         gameManager.endGame();
       }
     } catch (error) {
       console.error(`Error in handleEndGame: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
-    } 
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
+    }
   }
 
   /**
@@ -320,21 +397,25 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(socket.roomId).runDeductionAnalysis(deduction);
     } catch (error) {
       console.error(`Error in handleSubmitDeduction: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
   async handleStartInterrogation(socket, suspectId) {
     try {
-      if(!socket.roomId) {
-    console.log("Socket room id is undefined");
-    return;
+      if (!socket.roomId) {
+        console.log("Socket room id is undefined");
+        return;
       }
       console.log("Starting interrogation for suspect:", suspectId);
       this.roomGameManagers.get(socket.roomId).startInterrogation(suspectId);
     } catch (error) {
       console.error(`Error in handleStartInterrogation: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
@@ -344,7 +425,9 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(socket.roomId).endInterrogation();
     } catch (error) {
       console.error(`Error in handleEndInterrogation: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
@@ -353,17 +436,23 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(socket.roomId).startNextPhase();
     } catch (error) {
       console.error(`Error in handleStartNextRound: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
   async handleDeductionLeadCreated(socket, nodes) {
     try {
       const { sourceNode, targetNode, type } = nodes;
-      this.roomGameManagers.get(socket.roomId).createNewLead(sourceNode, targetNode, type);
+      this.roomGameManagers
+        .get(socket.roomId)
+        .createNewLead(sourceNode, targetNode, type);
     } catch (error) {
       console.error(`Error in handleDeductionLeadCreated: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
@@ -372,7 +461,9 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(socket.roomId).createNewDeductionNode(node);
     } catch (error) {
       console.error(`Error in handleDeductionNodeCreated: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
@@ -381,16 +472,22 @@ export class GameRoomSocketServer {
       this.roomGameManagers.get(socket.roomId).removeLead(leadId);
     } catch (error) {
       console.error(`Error in handleDeductionLeadRemoved: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
   async handleLeaderboardUpdate(socket, leaderboard) {
     try {
-      this.roomGameManagers.get(socket.roomId).calculateGameResults(leaderboard);
+      this.roomGameManagers
+        .get(socket.roomId)
+        .calculateGameResults(leaderboard);
     } catch (error) {
       console.error(`Error in handleLeaderboardUpdate: ${error.message}`);
-      this.emitToRoom(socket.roomId, SocketEvents.ERROR, { message: error.message });
+      this.emitToRoom(socket.roomId, SocketEvents.ERROR, {
+        message: error.message,
+      });
     }
   }
 
@@ -408,7 +505,9 @@ export class GameRoomSocketServer {
     const room = this.io.sockets.adapter.rooms.get(roomId);
     const numReceivers = room ? room.size : 0;
     console.log(`${numReceivers} sockets are going to receive this message`);
-    socket.to(roomId).emit(SocketEvents.CHAT_MESSAGE, { userEmail, message, userName });
+    socket
+      .to(roomId)
+      .emit(SocketEvents.CHAT_MESSAGE, { userEmail, message, userName });
   }
 
   getPlayersInRoom(roomId) {
@@ -477,7 +576,6 @@ export class GameRoomSocketServer {
     console.log(`Starting game in room ${roomId}`);
     this.emitToRoom(roomId, SocketEvents.GAME_CREATING);
     try {
-
       //TODO: use a built in socket.io function for getting all sockets in a room
       const room = this.io.sockets.adapter.rooms.get(roomId);
       const playerIds = Array.from(room).map((socketId) => {
@@ -488,12 +586,16 @@ export class GameRoomSocketServer {
           username: socket.userName,
         };
       });
-      console.log("Player IDs: ", playerIds + '\n\n\n');
+      console.log("Player IDs: ", playerIds + "\n\n\n");
       const gameRoom = await GameRoomService.getGameRoom(roomId);
-      const manager =  GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, null);
+      const manager = GameRoomManagerFactory.createGameRoomManager(
+        gameRoom,
+        playerIds,
+        null
+      );
 
-      this.attachGameManagerListeners(manager,roomId);
-      
+      this.attachGameManagerListeners(manager, roomId);
+
       this.roomGameManagers.set(roomId, manager);
 
       manager.createInitialGameState(roomId, playerIds);
@@ -506,12 +608,13 @@ export class GameRoomSocketServer {
     }
   }
 
-
   async handleJoinedGame(socket, roomId, userId) {
     if (socket.inGame === undefined) {
       socket.inGame = true;
       console.log(
-        `User ${socket.userEmail} joined the game in room ${socket.roomId || roomId}`
+        `User ${socket.userEmail} joined the game in room ${
+          socket.roomId || roomId
+        }`
       );
       const room = this.io.sockets.adapter.rooms.get(socket.roomId || roomId);
       if (room) {
@@ -519,7 +622,9 @@ export class GameRoomSocketServer {
           const s = this.io.sockets.sockets.get(socketId);
           return s.inGame;
         });
-        const gameRoom = await GameRoomService.getGameRoom(socket.roomId || roomId);
+        const gameRoom = await GameRoomService.getGameRoom(
+          socket.roomId || roomId
+        );
         const game_state = GameRoomService.decryptGameState(
           gameRoom.game_state
         );
@@ -527,14 +632,7 @@ export class GameRoomSocketServer {
         // console log all the variables being checked
 
         let gameManager = this.roomGameManagers.get(socket.roomId);
-        console.log("All in game:", allInGame);
-        console.log("Host ID:", gameRoom.host_id === socket.userId);
-        console.log(
-          "Has GameManager:",
-          gameManager !== undefined
-        );
-        console.log("Game State Status:", game_state.status !== "finished");
-        if(!gameManager) {
+        if (!gameManager) {
           const playerIds = Array.from(room).map((socketId) => {
             const socket = this.io.sockets.sockets.get(socketId);
             return {
@@ -543,31 +641,30 @@ export class GameRoomSocketServer {
               username: socket.userName,
             };
           });
-          
-          gameManager = GameRoomManagerFactory.createGameRoomManager(gameRoom, playerIds, game_state);
-          this.attachGameManagerListeners(gameManager,roomId);
-        
+
+          gameManager = GameRoomManagerFactory.createGameRoomManager(
+            gameRoom,
+            playerIds,
+            game_state
+          );
+          this.attachGameManagerListeners(gameManager, roomId);
+
           this.roomGameManagers.set(roomId, gameManager);
         }
         console.log("All in game:", allInGame);
         console.log("Host ID:", gameRoom.host_id === socket.userId);
-        console.log(
-          "Has GameManager:",
-          gameManager !== undefined
-        );
+        console.log("Has GameManager:", gameManager !== undefined);
         console.log("Game State Status:", game_state.status !== "finished");
         if (
           allInGame &&
           gameRoom.host_id === socket.userId &&
           gameManager !== undefined &&
-          game_state.status === 'active'
+          game_state.status === "active"
         ) {
-          console.log(  "asdfasdf" + game_state.status);
           gameManager.startGame();
           console.log(
             `All players in room ${socket.roomId} have joined the game. Game is eligible to start...`
-          );  
-
+          );
         }
       }
     }
@@ -581,7 +678,11 @@ export class GameRoomSocketServer {
     );
     socket
       .to(roomId)
-      .emit(SocketEvents.PLAYER_READY, { email: userEmail, username: userName, isReady });
+      .emit(SocketEvents.PLAYER_READY, {
+        email: userEmail,
+        username: userName,
+        isReady,
+      });
 
     const room = this.io.sockets.adapter.rooms.get(roomId);
     if (room) {
@@ -627,8 +728,6 @@ export class GameRoomSocketServer {
       this.io.to(roomId).emit(SocketEvents.PLAYER_LIST, playerData);
     }
   }
-
-
 
   checkAllPlayersReady(roomId) {
     const room = this.io.sockets.adapter.rooms.get(roomId);

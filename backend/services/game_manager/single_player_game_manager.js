@@ -48,6 +48,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
+    this.endGameTimeoutId = null;
     // TODO: on construction, the game manager should try to pull the game state from the database
     if (typeof gameState === "string") {
       this.gameState = JSON.parse(gameState);
@@ -63,7 +64,93 @@ export class SinglePlayerGameManager extends GameManager {
     console.log(`Creating crime scenario for single players game`);
     const crimeType = CrimeTypes[Math.floor(Math.random() * CrimeTypes.length)];
 
-    const crime = `Create a crime scenario for a single player game. The type of the crime is ${crimeType}. the player in this game is ${this.playerId}. Create identities for each suspect and evidence gathered from the scene of the crime`;
+    const crime = `Generate an intricate ${crimeType} case for Detective ${this.playerId}.
+
+CRIME SCENE OVERVIEW:
+- Location: [Generate specific address, building type, and surrounding environment]
+- Time of Discovery: [Time and date]
+- Weather Conditions: [Weather details that could affect evidence]
+- First Responder: [Name and initial observations]
+
+VICTIM PROFILE:
+- Name: [Full name]
+- Age: [Age]
+- Occupation: [Job title and workplace]
+- Last Known Activities: [Timeline of victim's last 24 hours]
+- Social Connections: [Key relationships, conflicts, or recent changes]
+- Financial Status: [Recent transactions, debts, or unusual patterns]
+
+CRIME SCENE DETAILS:
+- Primary Evidence: [3-4 key pieces of physical evidence]
+- Forensic Findings: [DNA, fingerprints, trace evidence]
+- Digital Evidence: [Phone records, security footage, social media]
+- Environmental Factors: [Signs of struggle, forced entry, staging]
+- Missing Items: [If applicable]
+- Witness Statements: [2-3 initial witness accounts with contradictions]
+
+SUSPECTS (Generate 3-5):
+For each suspect:
+- Full Name & Age
+- Connection to Victim
+- Alibi & Verification Status
+- Behavioral Observations
+- Physical Description
+- Potential Motives
+- Financial/Phone Records
+- Known Associates
+- Criminal History (if any)
+- Suspicious Activities
+
+RED HERRINGS:
+- Generate 2-3 misleading clues
+- Create false connections between suspects
+- Plant contradictory evidence
+
+INVESTIGATION LEADS:
+- Priority Witnesses to Interview
+- Surveillance Locations
+- Document Trail
+- Digital Footprints
+- Financial Transactions
+- Timeline Discrepancies
+
+HIDDEN ELEMENTS:
+- Concealed Relationships
+- Secret Motives
+- Undiscovered Evidence
+- Timeline Gaps
+- Environmental Factors
+
+COMPLEXITY FACTORS:
+- Multiple Crime Scenes
+- Interconnected Cases
+- Professional Involvement
+- Cover-up Attempts
+- Time-Sensitive Elements
+
+PROGRESSION TRIGGERS:
+- Key Evidence Thresholds
+- Witness Availability
+- Laboratory Results
+- Surveillance Findings
+- Document Processing
+
+OPTIONAL MECHANICS:
+- Time Pressure Elements
+- Resource Management
+- Reputation System
+- Department Politics
+- Media Involvement
+
+Generate the scenario ensuring:
+1. Multiple viable suspects with convincing motives
+2. Evidence that points in different directions
+3. A logical but non-obvious solution
+4. Interconnected relationships between characters
+5. Environmental storytelling elements
+6. Progressive revelation of information
+7. Multiple investigative paths
+8. Satisfying "aha" moments for clever players`;
     return crime;
   }
 
@@ -108,6 +195,7 @@ export class SinglePlayerGameManager extends GameManager {
         }
 
         this.gameState.status = "setup";
+      
 
         // create images for the game
         await this.#createImagesForGame();
@@ -121,6 +209,7 @@ export class SinglePlayerGameManager extends GameManager {
         // add the game state and thread id to the database
         await GameRoomService.updateGameRoom(this.roomId, {
           thread_id: this.threadId,
+          status: "active",
           game_state: GameRoomService.encryptGameState(this.gameState),
         });
 
@@ -172,6 +261,11 @@ export class SinglePlayerGameManager extends GameManager {
     // use the llm service to create a message in the thread that says the game has started
     try {
       console.log("Starting game...");
+      if(this.endGameTimeoutId) {
+        clearTimeout(this.endGameTimeoutId);
+        this.endGameTimeoutId = null;
+        console.log("\nCleared end game timeout\n");
+      }
       if (this.gameState.status !== "active") {
         this.llmGameService.addMessageToThread(this.threadId, {
           role: "assistant",
@@ -181,6 +275,7 @@ export class SinglePlayerGameManager extends GameManager {
       // get the game room from the database and set the game state to active
       this.gameState.status = "active";
       GameRoomService.updateGameRoom(this.roomId, {
+        status: "active",
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
 
@@ -203,9 +298,17 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   startInterrogationPhase() {
+    console.log("\n\nStarting interrogation phase..., timer: \n\n", this.roundTimer);
     try {
       if (this.roundTimer > 0) {
         console.log("Round timer is still running, keeping the current timer");
+        const { clear } = startInterval(
+          this.roundTimer,
+          this.emitRoundTick.bind(this),
+          this.endInterrogationPhase.bind(this)
+        );
+
+        this.clearRoundTimer = clear;
       } else {
         const { clear } = startInterval(
           this.interrogationTimer,
@@ -337,7 +440,7 @@ export class SinglePlayerGameManager extends GameManager {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
       this.emit("game:updated", this.gameState);
-      this.emit("deduction:completed", {}); 
+      this.emit("deduction:completed", {});
     } catch (error) {
       console.error("Error analyzing deduction graph:", error);
       this.emit("deduction:error", error);
@@ -558,21 +661,18 @@ export class SinglePlayerGameManager extends GameManager {
         .find((round) => round.type === "interrogation")
         .conversations.some((conversation) => conversation.active);
 
-
       if (interrogationRoundIsActive) {
-
         const activeConversation = this.gameState.rounds
           .find((round) => round.type === "interrogation")
           .conversations.find((conversation) => conversation.active);
 
-          if (activeConversation) {
-            activeConversation.active = false;
-          }
-
+        if (activeConversation) {
+          activeConversation.active = false;
+        }
       }
       const interrogationRound = this.gameState.rounds.find(
         (round) => round.type === "interrogation"
-      )
+      );
       if (interrogationRound) interrogationRound.status = "completed";
       // save the game state to the database
       await GameRoomService.updateGameRoom(this.roomId, {
@@ -592,6 +692,7 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async startDeductionPhase() {
+    console.log("\n\nStarting deduction phase..., timer: \n\n", this.roundTimer);
     try {
       if (this.roundTimer > 0) {
         console.log("Round timer is still running, cannot start new phase");
@@ -604,7 +705,7 @@ export class SinglePlayerGameManager extends GameManager {
         );
         this.clearRoundTimer = clear;
       }
-      
+
       this.currentPhase = "deduction";
       this.emit("phase:started", { phase: this.currentPhase });
       if (!this.gameState.rounds.some((round) => round.type === "voting")) {
@@ -815,66 +916,77 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async #createImagesForGame() {
-    try {
-      const basePrompt = "a retro 16-bit style";
-      const categories = [
-        {
-          type: "suspects",
-          items: this.gameState.suspects,
-          bucket: ImageBuckets.Suspect,
-          description: (item) =>
-            `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
-          assignSrc: (i, url) => {
-            this.gameState.suspects[i].imgSrc = url;
-          },
-        },
-        {
-          type: "evidence",
-          items: this.gameState.allEvidence,
-          bucket: ImageBuckets.Evidence,
-          description: (item) => `in the setting of a ${this.gameState.crime.location}, an image of ${item.description}`,
-          assignSrc: (i, url) => {
-            this.gameState.allEvidence[i].imgSrc = url;
-          },
-        },
-        {
-          type: "offenseReport",
-          items: this.gameState.crime.offenseReport,
-          bucket: ImageBuckets.OffenseReport,
-          description: (item) => `in the setting of a ${this.gameState.crime.location}, image of ${item.description}`,
-          assignSrc: (i, url) => {
-            this.gameState.crime.offenseReport[i].imgSrc = url;
-          },
-        },
-      ];
+    const devMode = process.env.NODE_ENV === "dev";
 
-      for (const category of categories) {
-        console.log(`\n creating images for ${category.type} \n`);
-        for (let i = 0; i < category.items.length; i++) {
-          const item = category.items[i];
-          const prompt = `${basePrompt} ${category.description(item)}`;
-          const image = await this.llmImageService.createImage(prompt);
-          const publicUrl = await StorageService.uploadImage(
-            image,
-            category.bucket,
-            `${this.roomId}_${item.id}.png`
-          );
-          category.assignSrc(i, publicUrl);
-          this.emit(SocketEvents.GAME_LOAD_UPDATED, {
-            progress: (this.loadProgress += 5),
-          });
+    try {
+      if (devMode) {
+        // fake loading time for testing
+        console.log("\nCreating fake for game...\n");
+        await new Promise((resolve) => {
+          setTimeout(() => {
+            this.emit(SocketEvents.GAME_LOAD_UPDATED, {
+              progress: (this.loadProgress += 50),
+            });
+            resolve();
+          }, 5000);
+        });
+        return;
+      } else {
+        const basePrompt = "a retro 16-bit style";
+        const categories = [
+          {
+            type: "suspects",
+            items: this.gameState.suspects,
+            bucket: ImageBuckets.Suspect,
+            description: (item) =>
+              `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
+            assignSrc: (i, url) => {
+              this.gameState.suspects[i].imgSrc = url;
+            },
+          },
+          {
+            type: "evidence",
+            items: this.gameState.allEvidence,
+            bucket: ImageBuckets.Evidence,
+            description: (item) =>
+              `in the setting of a ${this.gameState.crime.location}, an image of ${item.description}`,
+            assignSrc: (i, url) => {
+              this.gameState.allEvidence[i].imgSrc = url;
+            },
+          },
+          {
+            type: "offenseReport",
+            items: this.gameState.crime.offenseReport,
+            bucket: ImageBuckets.OffenseReport,
+            description: (item) =>
+              `in the setting of a ${this.gameState.crime.location}, image of ${item.description}`,
+            assignSrc: (i, url) => {
+              this.gameState.crime.offenseReport[i].imgSrc = url;
+            },
+          },
+        ];
+
+        for (const category of categories) {
+          console.log(`\n creating images for ${category.type} \n`);
+          for (let i = 0; i < category.items.length; i++) {
+            const item = category.items[i];
+            const prompt = `${basePrompt} ${category.description(item)}`;
+            const image = await this.llmImageService.createImage(prompt);
+            const publicUrl = await StorageService.uploadImage(
+              image,
+              category.bucket,
+              `${this.roomId}_${item.id}.png`
+            );
+            category.assignSrc(i, publicUrl);
+            this.emit(SocketEvents.GAME_LOAD_UPDATED, {
+              progress: (this.loadProgress += 5),
+            });
+          }
         }
       }
     } catch (error) {
       console.log(error);
     }
-    // fake loading time for testing
-    //   await new Promise((resolve) => {
-    //     setTimeout(() => {
-    //       this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 50 });
-    //       resolve();
-    //     }, 5000);
-    // });
   }
 
   async endGame() {
@@ -895,6 +1007,18 @@ export class SinglePlayerGameManager extends GameManager {
     }
   }
 
+  async startEndGameTimer() {
+    try {
+      console.log("\n\nStarting end game timer...\n\n");
+      this.endGameTimeoutId = setTimeout(() => {
+        this.endGame()
+      }, 180000)
+    } catch (error) {
+      console.error("Error starting end game timer:", error);
+      this.emit("error", error);
+    }
+  }
+
   async calculateGameResults() {
     try {
       if (this.gameState.status === "finished") {
@@ -902,7 +1026,7 @@ export class SinglePlayerGameManager extends GameManager {
         this.emit("leaderboard:started", {});
         console.log("Game finished, calculating ELO changes...");
 
-        if(this.clearRoundTimer) {
+        if (this.clearRoundTimer) {
           this.clearRoundTimer(true);
         }
 

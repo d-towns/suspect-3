@@ -99,7 +99,7 @@ const PlayMenu: React.FC = () => {
     roomsService.getActiveGamesForUser(user.id).then((games) => {
       setActiveGames(games);
     });
-  }, [user]);
+  }, []);
 
   const handleSetUsername = async () => {
     try {
