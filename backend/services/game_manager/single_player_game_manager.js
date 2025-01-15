@@ -85,8 +85,6 @@ export class SinglePlayerGameManager extends GameManager {
         thread.id
       );
 
-
-
       if (!this.gameState) {
         console.error("Error creating initial game state");
         return null;
@@ -94,7 +92,9 @@ export class SinglePlayerGameManager extends GameManager {
         // TODO: use a chat completion to check for errors in the game state upon initial creation
         // this.gameState = await this.checkGameState();
 
-        this.emit(SocketEvents.GAME_LOAD_UPDATED, {progress: this.loadProgress += 50})
+        this.emit(SocketEvents.GAME_LOAD_UPDATED, {
+          progress: (this.loadProgress += 50),
+        });
         if (
           this.gameState.rounds.find((round) => round.type === "interrogation")
             .conversations.length !== 0
@@ -109,7 +109,11 @@ export class SinglePlayerGameManager extends GameManager {
         // create images for the game
         await this.#createImagesForGame();
 
-        console.log(" \n\n\n game state post image creation", this.gameState, '\n\n\n'); 
+        console.log(
+          " \n\n\n game state post image creation",
+          this.gameState,
+          "\n\n\n"
+        );
 
         // add the game state and thread id to the database
         await GameRoomService.updateGameRoom(this.roomId, {
@@ -164,95 +168,95 @@ export class SinglePlayerGameManager extends GameManager {
   startGame() {
     // use the llm service to create a message in the thread that says the game has started
     try {
-    console.log("Starting game...");
-    if (this.gameState.status !== "active") {
-      this.llmGameService.addMessageToThread(this.threadId, {
-        role: "assistant",
-        content: "The game has started. set the game_state status to active",
+      console.log("Starting game...");
+      if (this.gameState.status !== "active") {
+        this.llmGameService.addMessageToThread(this.threadId, {
+          role: "assistant",
+          content: "The game has started. set the game_state status to active",
+        });
+      }
+      // get the game room from the database and set the game state to active
+      this.gameState.status = "active";
+      GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
       });
-    }
-    // get the game room from the database and set the game state to active
-    this.gameState.status = "active";
-    GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
 
-    // emit the game started event
-    this.emit("game:started", {});
-    this.emit("game:updated", this.gameState);
-    const activeRound = this.gameState.rounds.find(
-      (round) => round.status === "active"
-    );
-    console.log("Active round:", activeRound);
-    if (activeRound && activeRound.type === "interrogation") {
-      this.startInterrogationPhase();
-    } else {
-      this.startDeductionPhase();
+      // emit the game started event
+      this.emit("game:started", {});
+      this.emit("game:updated", this.gameState);
+      const activeRound = this.gameState.rounds.find(
+        (round) => round.status === "active"
+      );
+      console.log("Active round:", activeRound);
+      if (activeRound && activeRound.type === "interrogation") {
+        this.startInterrogationPhase();
+      } else {
+        this.startDeductionPhase();
+      }
+    } catch (error) {
+      console.error("Error starting game:", error);
+      this.emit("error", error.message);
     }
-  } catch (error) {
-    console.error("Error starting game:", error);
-    this.emit("error", error.message);
   }
-}
 
   startInterrogationPhase() {
     try {
-    if (this.roundTimer > 0) {
-      console.log("Round timer is still running, keeping the current timer");
-    } else {
-      const { clear } = startInterval(
-        this.interrogationTimer,
-        this.emitRoundTick.bind(this),
-        this.endInterrogationPhase.bind(this)
-      );
+      if (this.roundTimer > 0) {
+        console.log("Round timer is still running, keeping the current timer");
+      } else {
+        const { clear } = startInterval(
+          this.interrogationTimer,
+          this.emitRoundTick.bind(this),
+          this.endInterrogationPhase.bind(this)
+        );
 
-      this.clearRoundTimer = clear;
+        this.clearRoundTimer = clear;
+      }
+
+      console.log("Starting interrogation phase...");
+      this.currentPhase = "interrogation";
+      this.emit("phase:started", { phase: this.currentPhase });
+      // ... set up a 10-minute timer. On expire, go to next phase ...
+      // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
+
+      // if there is an active conversation in the interrogation phase, we should open a realtime session using startInterrogation
+      // if there is no active conversation, we should just wait for the player to initiate one
+      const activeConversation = this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.find((conversation) => conversation.active);
+
+      console.log("Active conversation", activeConversation);
+      if (activeConversation) {
+        this.startInterrogation(activeConversation.suspect);
+      }
+    } catch (error) {
+      console.error("Error starting interrogation phase:", error);
+      this.emit("error", error.message);
     }
-
-    console.log("Starting interrogation phase...");
-    this.currentPhase = "interrogation";
-    this.emit("phase:started", { phase: this.currentPhase });
-    // ... set up a 10-minute timer. On expire, go to next phase ...
-    // we should be caching the timer in redis so that if the server restarts, the timer will continue where it left off
-
-    // if there is an active conversation in the interrogation phase, we should open a realtime session using startInterrogation
-    // if there is no active conversation, we should just wait for the player to initiate one
-    const activeConversation = this.gameState.rounds
-      .find((round) => round.type === "interrogation")
-      .conversations.find((conversation) => conversation.active);
-
-    console.log("Active conversation", activeConversation);
-    if (activeConversation) {
-      this.startInterrogation(activeConversation.suspect);
-    }
-  } catch (error) {
-    console.error("Error starting interrogation phase:", error);
-    this.emit("error", error.message);
   }
-}
 
   async createNewLead(sourceNode, targetNode, type) {
-    try{
-    const newLead = {
-      source_node: sourceNode,
-      target_node: targetNode,
-      type: type,
-    };
-    this.gameState.deduction.edges.push(newLead);
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
-    this.emit("game:updated", this.gameState);
-    await this.#calculateWarmth();
-    this.emit("deduction:completed", {});
-  } catch (error) {
-    console.error("Error creating new lead:", error);
-    this.emit("deduction:error", error);
-  }
+    try {
+      const newLead = {
+        source_node: sourceNode,
+        target_node: targetNode,
+        type: type,
+      };
+      this.gameState.deduction.edges.push(newLead);
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+      this.emit("game:updated", this.gameState);
+      await this.#calculateWarmth();
+      this.emit("deduction:completed", {});
+    } catch (error) {
+      console.error("Error creating new lead:", error);
+      this.emit("deduction:error", error);
+    }
   }
 
   async removeLead(edgeId) {
-    console.log(" \n\n Removing edge", edgeId, '\n');
+    console.log(" \n\n Removing edge", edgeId, "\n");
     try {
       const index = this.gameState.deduction.edges.findIndex((edge) => {
         const [sourceNodeId, targetNodeId] = edgeId.split("_");
@@ -326,15 +330,14 @@ export class SinglePlayerGameManager extends GameManager {
         this.gameState.deduction.feedback = [];
       }
       this.gameState.deduction.feedback.push(result.explanation);
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+      this.emit("game:updated", this.gameState);
     } catch (error) {
       console.error("Error analyzing deduction graph:", error);
       this.emit("deduction:error", error);
     }
-
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
-    this.emit("game:updated", this.gameState);
   }
 
   addUserAudioToInputBuffer(audioBuffer) {
@@ -346,22 +349,20 @@ export class SinglePlayerGameManager extends GameManager {
   }
 
   async createNewDeductionNode(node) {
-    try{
-    console.log("Creating new deduction node", this.gameState);
-    this.gameState.deduction.nodes.push(node);
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
-    this.emit("game:updated", this.gameState);
-  } catch (error) {
-
-    console.error("Error creating new deduction node:", error);
-    this.emit("deduction:error", error);
-  }
+    try {
+      console.log("Creating new deduction node", this.gameState);
+      this.gameState.deduction.nodes.push(node);
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+      this.emit("game:updated", this.gameState);
+    } catch (error) {
+      console.error("Error creating new deduction node:", error);
+      this.emit("deduction:error", error);
+    }
   }
 
   startNextPhase() {
-
     if (this.roundTimer == null) {
       console.log("game hasnt started, cannot start new phase");
       return;
@@ -383,147 +384,158 @@ export class SinglePlayerGameManager extends GameManager {
    */
   async startInterrogation(suspectId) {
     try {
-    console.log("Starting interrogation with suspect", suspectId + "\n\n");
-    const realtimeSocket = await this.llmGameService.openRealtimeConversation();
-    const activeSuspect = this.gameState.suspects.find(
-      (suspect) => suspect.id === suspectId
-    );
+      console.log("Starting interrogation with suspect", suspectId + "\n\n");
+      const realtimeSocket =
+        await this.llmGameService.openRealtimeConversation();
+      const activeSuspect = this.gameState.suspects.find(
+        (suspect) => suspect.id === suspectId
+      );
 
-    this.realtimeHandler = new SinglePlayerRealtimeHandler(
-      realtimeSocket,
-      this,
-      activeSuspect
-    );
+      this.realtimeHandler = new SinglePlayerRealtimeHandler(
+        realtimeSocket,
+        this,
+        activeSuspect
+      );
 
-    this.realtimeHandler.addCustomMessageListener(async (data) => {
-      const parsed = JSON.parse(data);
-
-      const activeSuspect = this.gameState.rounds
-        .find((round) => round.type === "interrogation")
-        .conversations?.at(-1)?.suspect;
-
-      const transcriptionEventTypes = [
-        "response.audio_transcript.done",
-        "conversation.item.input_audio_transcription.completed",
-      ];
-
-      if (transcriptionEventTypes.includes(parsed.type)) {
-        // add the transcription to the game state active conversation
-        this.gameState.rounds
-          .find((round) => round.type === "interrogation")
-          .conversations?.at(-1)
-          ?.responses.push({
-            speaker:
-              parsed.type === "response.audio_transcript.done"
-                ? activeSuspect
-                : "Detective",
-            message: parsed.transcript,
-          });
-
-        await GameRoomService.updateGameRoom(this.roomId, {
-          game_state: GameRoomService.encryptGameState(this.gameState),
-        });
-      }
-    });
-
-    const activeConversation = this.gameState.rounds
-      .find((round) => round.type === "interrogation")
-      .conversations.find((conversation) => conversation.active);
-
-    if (!activeConversation) {
-      this.llmGameService.addMessageToThread(this.threadId, {
-        role: "assistant",
-        content: `The interrogation of ${activeSuspect.name}, ${activeSuspect.identity} has begun.`,
-      });
-      this.gameState.rounds
-        .find((round) => round.type === "interrogation")
-        .conversations.push({
-          suspect: suspectId,
-          active: true,
-          responses: [],
-        });
-      await GameRoomService.updateGameRoom(this.roomId, {
-        game_state: GameRoomService.encryptGameState(this.gameState),
-      });
-    }
-
-    this.emit("game:updated", this.gameState);
-
-    this.emit("realtime:started", { suspectId });
-  } catch (error) {
-    console.error("Error starting interrogation:", error);
-    this.emit("error", error.message);
-  }
-  }
-
-  async endInterrogation() {
-    try{
-    if (!this.realtimeHandler) {
-      console.log("No realtime session.");
-      return;
-    }
-
-    await new Promise((resolve) => {
-      const event = {
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: "You are free to go. The interrogation is over.",
-            },
-          ],
-        },
-      };
-
-      const responseListener = async (data) => {
+      this.realtimeHandler.addCustomMessageListener(async (data) => {
         const parsed = JSON.parse(data);
-        if (parsed.type === "response.audio.done") {
-          console.log("Response done event received");
-          setTimeout(() => {
-            this.realtimeHandler.closeRealtimeConversation();
-            this.realtimeHandler = null;
-          }, 10000);
 
-          // Remove this listener so we only handle one final response
+        const activeSuspect = this.gameState.rounds
+          .find((round) => round.type === "interrogation")
+          .conversations?.at(-1)?.suspect;
+
+        const transcriptionEventTypes = [
+          "response.audio_transcript.done",
+          "conversation.item.input_audio_transcription.completed",
+        ];
+
+        if (transcriptionEventTypes.includes(parsed.type)) {
+          // add the transcription to the game state active conversation
           this.gameState.rounds
-            .find((round) => round.type == "interrogation")
-            .conversations.find(
-              (conversation) => conversation.active
-            ).active = false;
+            .find((round) => round.type === "interrogation")
+            .conversations?.at(-1)
+            ?.responses.push({
+              speaker:
+                parsed.type === "response.audio_transcript.done"
+                  ? activeSuspect
+                  : "Detective",
+              message: parsed.transcript,
+            });
 
           await GameRoomService.updateGameRoom(this.roomId, {
             game_state: GameRoomService.encryptGameState(this.gameState),
           });
-
-          setTimeout(() => {
-            this.emit("game:updated", this.gameState);
-          }, 5000);
         }
-        if (parsed.type === "response.audio_transcript.done") {
-          await this.llmGameService.addMessageToThread(this.threadId, {
-            role: "assistant",
-            content: `The interrogation of ${this.realtimeHandler.responder.name}, ID:${this.realtimeHandler.responder.id} has concluded.`,
+      });
+
+      const activeConversation = this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.find((conversation) => conversation.active);
+
+      if (!activeConversation) {
+        this.llmGameService.addMessageToThread(this.threadId, {
+          role: "assistant",
+          content: `The interrogation of ${activeSuspect.name}, ${activeSuspect.identity} has begun.`,
+        });
+        this.gameState.rounds
+          .find((round) => round.type === "interrogation")
+          .conversations.push({
+            suspect: suspectId,
+            active: true,
+            responses: [],
           });
-          this.emit("realtime:ended", {});
-          this.realtimeHandler.removeCustomMessageListener(responseListener);
-          resolve();
-        }
-      };
+        await GameRoomService.updateGameRoom(this.roomId, {
+          game_state: GameRoomService.encryptGameState(this.gameState),
+        });
+      }
 
-      // Attach the custom listener
-      this.realtimeHandler.addCustomMessageListener(responseListener);
+      this.emit("game:updated", this.gameState);
 
-      // Send the "end interrogation" message
-      this.realtimeHandler.sendMessage(event);
-      // Then send a response.create event
-      this.realtimeHandler.sendMessage({ type: "response.create" });
-    });
-  } catch (error) {
-    console.error("Error ending interrogation:", error);
-    this.emit("error", error);
+      this.emit("realtime:started", { suspectId });
+    } catch (error) {
+      console.error("Error starting interrogation:", error);
+      this.emit("error", error.message);
+    }
+  }
+
+  async endInterrogation() {
+    try {
+      if (!this.realtimeHandler) {
+        console.log("No realtime session.");
+        return;
+      }
+
+      await new Promise((resolve, reject) => {
+        const event = {
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "You are free to go. The interrogation is over.",
+              },
+            ],
+          },
+        };
+
+        const responseListener = async (data) => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === "response.audio.done") {
+              console.log("Response done event received");
+              setTimeout(() => {
+                this.realtimeHandler.closeRealtimeConversation();
+                this.realtimeHandler = null;
+              }, 10000);
+
+              // Remove this listener so we only handle one final response
+              const activeRound = this.gameState.rounds
+                .find((round) => round.type == "interrogation")
+                .conversations.find((conversation) => conversation.active);
+
+              if (activeRound) {
+                activeRound.active = false;
+              }
+
+              await GameRoomService.updateGameRoom(this.roomId, {
+                game_state: GameRoomService.encryptGameState(this.gameState),
+              });
+
+              setTimeout(() => {
+                this.emit("game:updated", this.gameState);
+              }, 5000);
+            }
+            if (parsed.type === "response.audio_transcript.done") {
+              await this.llmGameService.addMessageToThread(this.threadId, {
+                role: "assistant",
+                content: `The interrogation of ${this.realtimeHandler.responder.name}, ID:${this.realtimeHandler.responder.id} has concluded.`,
+              });
+              this.emit("realtime:ended", {});
+              this.realtimeHandler.removeCustomMessageListener(
+                responseListener
+              );
+              resolve();
+            }
+          } catch (error) {
+            console.error("Error handling response:", error);
+            this.emit("error", error.message);
+            reject();
+          }
+        };
+
+        // Attach the custom listener
+        this.realtimeHandler.addCustomMessageListener(responseListener);
+
+        // Send the "end interrogation" message
+        this.realtimeHandler.sendMessage(event);
+        // Then send a response.create event
+        this.realtimeHandler.sendMessage({ type: "response.create" });
+      });
+    } catch (error) {
+      console.error("Error ending interrogation:", error);
+      this.emit("error", error);
     }
   }
 
@@ -533,218 +545,221 @@ export class SinglePlayerGameManager extends GameManager {
    */
   async endInterrogationPhase() {
     try {
-    this.emit("phase:ended", { phase: this.currentPhase });
+      this.emit("phase:ended", { phase: this.currentPhase });
 
-    if (this.realtimeHandler) {
-      this.endInterrogation();
-    }
+      if (this.realtimeHandler) {
+        this.endInterrogation();
+      }
 
-    if (
-      this.gameState.rounds
-        .find((round) => round.type === "interrogation")
-        .conversations.some((conversation) => conversation.active)
-    ) {
-      this.gameState.rounds
-        .find((round) => round.type === "interrogation")
-        .conversations.find(
-          (conversation) => conversation.active
-        ).active = false;
-    }
-    this.gameState.rounds.find(
-      (round) => round.type === "interrogation"
-    ).status = "completed";
-    // save the game state to the database
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
-    this.emit("game:updated", this.gameState);
-    // if the game is not over, start the deduction phase
-    if (this.gameState.status !== "finished") {
-      this.startDeductionPhase();
-    } else {
-      this.emit("game:finished", {});
-    }
-  } catch (error) {
-    console.error("Error ending interrogation phase:", error);
-    this.emit("error", error.message);
-  }
-  }
-
-  async startDeductionPhase() {
-    try{
-    if (this.roundTimer > 0) {
-      console.log("Round timer is still running, cannot start new phase");
-      return;
-    } else {
-
-    const { clear } = startInterval(
-      this.deductionTimer,
-      this.emitRoundTick.bind(this),
-      this.endDeductionPhase.bind(this)
-    );
-    this.clearRoundTimer = clear;
-  }
-  this.currentPhase = "deduction";
-  this.emit("phase:started", { phase: this.currentPhase });
-    if(!this.gameState.rounds.some((round) => round.type === 'voting')) {
-      this.gameState.rounds.push({
-        type: 'voting',
-        status: 'active',
-        conversations: [],
-      });
-    }
-
-    // if the game state deduction object is empty, we should places nodes in the graph for each suspect and evidence
-    if (this.gameState.deduction.nodes.length === 0) {
-      this.gameState.deduction.nodes = [];
-      this.gameState.deduction.edges = [];
-
-      this.gameState.suspects.forEach((suspect) => {
-        this.gameState.deduction.nodes.push({
-          id: suspect.id,
-          type: "suspect",
-          data: {
-            identity: suspect.identity,
-            name: suspect.name,
-            temperment: suspect.temperment,
-          },
-        });
-      });
-
-      this.gameState.allEvidence.forEach((evidence) => {
-        this.gameState.deduction.nodes.push({
-          id: evidence.id,
-          type: "evidence",
-          data: {
-            id: evidence.id,
-            description: evidence.description,
-          },
-        });
-      });
-      // update the game state with the new nodes
+      if (
+        this.gameState.rounds
+          .find((round) => round.type === "interrogation")
+          .conversations.some((conversation) => conversation.active)
+      ) {
+        this.gameState.rounds
+          .find((round) => round.type === "interrogation")
+          .conversations.find(
+            (conversation) => conversation.active
+          ).active = false;
+      }
+      this.gameState.rounds.find(
+        (round) => round.type === "interrogation"
+      ).status = "completed";
+      // save the game state to the database
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
-
       this.emit("game:updated", this.gameState);
+      // if the game is not over, start the deduction phase
+      if (this.gameState.status !== "finished") {
+        this.startDeductionPhase();
+      } else {
+        this.emit("game:finished", {});
+      }
+    } catch (error) {
+      console.error("Error ending interrogation phase:", error);
+      this.emit("error", error.message);
     }
-  } catch (error) {
-    console.error("Error starting deduction phase:", error);
-    this.emit("error", error.message);
   }
 
+  async startDeductionPhase() {
+    try {
+      if (this.roundTimer > 0) {
+        console.log("Round timer is still running, cannot start new phase");
+        return;
+      } else {
+        const { clear } = startInterval(
+          this.deductionTimer,
+          this.emitRoundTick.bind(this),
+          this.endDeductionPhase.bind(this)
+        );
+        this.clearRoundTimer = clear;
+      }
+      this.currentPhase = "deduction";
+      this.emit("phase:started", { phase: this.currentPhase });
+      if (!this.gameState.rounds.some((round) => round.type === "voting")) {
+        this.gameState.rounds.push({
+          type: "voting",
+          status: "active",
+          conversations: [],
+        });
+      } else {
+        // set the voting round to active
+        console.log("Setting voting round to active");
+        this.gameState.rounds.find((round) => round.type === "voting").status =
+          "active";
+      }
+
+      // if the game state deduction object is empty, we should places nodes in the graph for each suspect and evidence
+      if (this.gameState.deduction.nodes.length === 0) {
+        this.gameState.deduction.nodes = [];
+        this.gameState.deduction.edges = [];
+
+        this.gameState.suspects.forEach((suspect) => {
+          this.gameState.deduction.nodes.push({
+            id: suspect.id,
+            type: "suspect",
+            data: {
+              identity: suspect.identity,
+              name: suspect.name,
+              temperment: suspect.temperment,
+            },
+          });
+        });
+
+        this.gameState.allEvidence.forEach((evidence) => {
+          this.gameState.deduction.nodes.push({
+            id: evidence.id,
+            type: "evidence",
+            data: {
+              id: evidence.id,
+              description: evidence.description,
+            },
+          });
+        });
+        // update the game state with the new nodes
+        await GameRoomService.updateGameRoom(this.roomId, {
+          game_state: GameRoomService.encryptGameState(this.gameState),
+        });
+
+        this.emit("game:updated", this.gameState);
+      }
+    } catch (error) {
+      console.error("Error starting deduction phase:", error);
+      this.emit("error", error.message);
+    }
   }
 
   async endDeductionPhase() {
     // tell listeners that the deduction phase has ended
     try {
-    this.emit("phase:ended", { phase: this.currentPhase });
+      this.emit("phase:ended", { phase: this.currentPhase });
 
-    this.gameState.rounds.find((round) => round.type === "voting").status =
-      "completed";
-    this.gameState.status = "finished";
+      this.gameState.rounds.find((round) => round.type === "voting").status =
+        "completed";
+      this.gameState.status = "finished";
 
-    // save the game state to the database
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
+      // save the game state to the database
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
 
-    this.emit("game:updated", this.gameState);
+      this.emit("game:updated", this.gameState);
 
-    // check if the game is over ( is should be ) and then run the elo rating calculation
-    await this.calculateGameResults();
-  } catch (error) {
-    console.error("Error ending deduction phase:", error);
-    this.emit("error", error.message);
-  }
+      // check if the game is over ( is should be ) and then run the elo rating calculation
+      await this.calculateGameResults();
+    } catch (error) {
+      console.error("Error ending deduction phase:", error);
+      this.emit("error", error.message);
+    }
   }
 
   async runDeductionAnalysis() {
     try {
-    console.log("Running deduction analysis...");
-    this.emit("deduction:started", {});
+      console.log("Running deduction analysis...");
+      this.emit("deduction:started", {});
 
-    let adj = {};
-    console.log("Deduction graph", this.gameState.deduction.edges);
-    for (const edge of this.gameState.deduction.edges) {
-      if (!adj[edge.source_node.id]) {
-        adj[edge.source_node.id] = [];
-      }
-      adj[edge.source_node.id].push({
-        target: edge.target_node.id,
-        type: edge.type,
-      });
-    }
-    let implicatedSuspect = null;
-    let maxImplications = 0;
-    let suspectImplications = {};
-    let visited = new Set();
-
-    console.log("Adjacency list", JSON.stringify(adj));
-
-    function dfs(currentNode, path, edgeTypes) {
-      if (visited.has(currentNode)) return;
-      visited.add(currentNode);
-      path.push(currentNode);
-      // when we reach a node
-      console.log("Current node", currentNode);
-      if (!adj[currentNode] || adj[currentNode].length === 0) {
-        return;
-      }
-      for (const edge of adj[currentNode]) {
-        if (edge.type === "implicates") {
-          if (!suspectImplications[edge.target]) {
-            suspectImplications[edge.target] = 0;
-          }
-          suspectImplications[edge.target]++;
+      let adj = {};
+      console.log("Deduction graph", this.gameState.deduction.edges);
+      for (const edge of this.gameState.deduction.edges) {
+        if (!adj[edge.source_node.id]) {
+          adj[edge.source_node.id] = [];
         }
-        dfs(edge.target, [...path], [...edgeTypes, edge.type]);
+        adj[edge.source_node.id].push({
+          target: edge.target_node.id,
+          type: edge.type,
+        });
       }
-      visited.delete(currentNode);
-    }
+      let implicatedSuspect = null;
+      let maxImplications = 0;
+      let suspectImplications = {};
+      let visited = new Set();
 
-    for (const node of Object.keys(adj)) {
-      dfs(node, [], []);
-    }
+      console.log("Adjacency list", JSON.stringify(adj));
 
-    for (const [suspectId, implications] of Object.entries(
-      suspectImplications
-    )) {
-      if (implications > maxImplications) {
-        maxImplications = implications;
-        implicatedSuspect = suspectId;
+      function dfs(currentNode, path, edgeTypes) {
+        if (visited.has(currentNode)) return;
+        visited.add(currentNode);
+        path.push(currentNode);
+        // when we reach a node
+        console.log("Current node", currentNode);
+        if (!adj[currentNode] || adj[currentNode].length === 0) {
+          return;
+        }
+        for (const edge of adj[currentNode]) {
+          if (edge.type === "implicates") {
+            if (!suspectImplications[edge.target]) {
+              suspectImplications[edge.target] = 0;
+            }
+            suspectImplications[edge.target]++;
+          }
+          dfs(edge.target, [...path], [...edgeTypes, edge.type]);
+        }
+        visited.delete(currentNode);
       }
+
+      for (const node of Object.keys(adj)) {
+        dfs(node, [], []);
+      }
+
+      for (const [suspectId, implications] of Object.entries(
+        suspectImplications
+      )) {
+        if (implications > maxImplications) {
+          maxImplications = implications;
+          implicatedSuspect = suspectId;
+        }
+      }
+      const culprit = this.gameState.suspects.find(
+        (suspect) => suspect.isCulprit
+      );
+      console.log("Implicated suspect", implicatedSuspect, culprit.id);
+      this.emit("deduction:completed", {});
+      if (culprit.id === implicatedSuspect) {
+        this.gameState.status = "finished";
+        this.gameState.outcome = "win";
+      } else {
+        this.gameState.status = "finished";
+        this.gameState.outcome = "lose";
+      }
+      this.calculateGameResults();
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+      this.emit("game:updated", this.gameState);
+    } catch (error) {
+      console.error("Error running deduction analysis:", error);
+      this.emit("error", error);
     }
-    const culprit = this.gameState.suspects.find(
-      (suspect) => suspect.isCulprit
-    );
-    console.log("Implicated suspect", implicatedSuspect, culprit.id);
-    this.emit("deduction:completed", {});
-    if (culprit.id === implicatedSuspect) {
-      this.gameState.status = "finished";
-      this.gameState.outcome = "win";
-    } else {
-      this.gameState.status = "finished";
-      this.gameState.outcome = "lose";
-    }
-    this.calculateGameResults();
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-    });
-    this.emit("game:updated", this.gameState);
-  } catch (error) {
-    console.error("Error running deduction analysis:", error);
-    this.emit("error", error);
-  }
   }
 
   #getPreviousSuspectConversations(suspect) {
     try {
-    return this.gameState.rounds
-      .find((round) => round.type === "interrogation")
-      .conversations.filter(
-        (conversation) => conversation.suspect === suspect.id
-      );
+      return this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.filter(
+          (conversation) => conversation.suspect === suspect.id
+        );
     } catch (error) {
       console.error("Error getting previous suspect conversations:", error);
       this.emit("error", error);
@@ -753,66 +768,73 @@ export class SinglePlayerGameManager extends GameManager {
 
   async summarizePreviousConversations(suspect) {
     try {
-    const previousConversations = this.#getPreviousSuspectConversations(suspect);
-    console.log("Previous conversations:", previousConversations);
-    if (previousConversations.length === 0) {
-      return "This is the first conversation with the detective.";
+      const previousConversations =
+        this.#getPreviousSuspectConversations(suspect);
+      console.log("Previous conversations:", previousConversations);
+      if (previousConversations.length === 0) {
+        return "This is the first conversation with the detective.";
+      }
+
+      const summarySchema = z.object({
+        summary: z.string(),
+      });
+      const response = await this.llmGameService.createChatCompletion(
+        [
+          {
+            role: "system",
+            content: "You are an assistant summarizing previous conversations.",
+          },
+          {
+            role: "assistant",
+            content: `Summarize the previous conversations with suspect ${suspect.name}.`,
+          },
+          {
+            role: "user",
+            content: `Given the previous conversations with suspect ${
+              suspect.name
+            }: ${JSON.stringify(previousConversations)}`,
+          },
+        ],
+        zodResponseFormat(summarySchema, "summary")
+      );
+      return response.summary;
+    } catch (error) {
+      console.error("Error summarizing previous conversations:", error);
+      this.emit("error", error);
     }
-
-    const summarySchema = z.object({
-      summary: z.string(),
-    });
-    const response = await this.llmGameService.createChatCompletion(
-      [
-        {
-          role: "system",
-          content: "You are an assistant summarizing previous conversations.",
-        },
-        {
-          role: "assistant",
-          content: `Summarize the previous conversations with suspect ${suspect.name}.`,
-        },
-        {
-          role: "user",
-          content: `Given the previous conversations with suspect ${suspect.name}: ${JSON.stringify(
-            previousConversations
-          )}`,
-        },
-      ],
-      zodResponseFormat(summarySchema, "summary")
-    );
-    return response.summary;
-  } catch (error) {
-    console.error("Error summarizing previous conversations:", error);
-    this.emit("error", error);
   }
-  }
-
 
   async #createImagesForGame() {
     try {
-      const basePrompt = 'a retro 16-bit style';
+      const basePrompt = "a retro 16-bit style";
       const categories = [
         {
-          type: 'suspects',
+          type: "suspects",
           items: this.gameState.suspects,
           bucket: ImageBuckets.Suspect,
-          description: (item) => `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
-          assignSrc: (i, url) => { this.gameState.suspects[i].imgSrc = url; },
+          description: (item) =>
+            `headshot of ${item.name}, a ${item.identity} with a ${item.temperment} temperment.`,
+          assignSrc: (i, url) => {
+            this.gameState.suspects[i].imgSrc = url;
+          },
         },
         {
-          type: 'evidence',
+          type: "evidence",
           items: this.gameState.allEvidence,
           bucket: ImageBuckets.Evidence,
           description: (item) => `image of ${item.description}`,
-          assignSrc: (i, url) => { this.gameState.allEvidence[i].imgSrc = url; },
+          assignSrc: (i, url) => {
+            this.gameState.allEvidence[i].imgSrc = url;
+          },
         },
         {
-          type: 'offenseReport',
+          type: "offenseReport",
           items: this.gameState.crime.offenseReport,
           bucket: ImageBuckets.OffenseReport,
           description: (item) => `image of ${item.description}`,
-          assignSrc: (i, url) => { this.gameState.crime.offenseReport[i].imgSrc = url; },
+          assignSrc: (i, url) => {
+            this.gameState.crime.offenseReport[i].imgSrc = url;
+          },
         },
       ];
 
@@ -822,108 +844,115 @@ export class SinglePlayerGameManager extends GameManager {
           const item = category.items[i];
           const prompt = `${basePrompt} ${category.description(item)}`;
           const image = await this.llmImageService.createImage(prompt);
-          const publicUrl = await StorageService.uploadImage(image, category.bucket, `${this.roomId}_${item.id}.png`);
+          const publicUrl = await StorageService.uploadImage(
+            image,
+            category.bucket,
+            `${this.roomId}_${item.id}.png`
+          );
           category.assignSrc(i, publicUrl);
-          this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 5 });
+          this.emit(SocketEvents.GAME_LOAD_UPDATED, {
+            progress: (this.loadProgress += 5),
+          });
         }
       }
     } catch (error) {
       console.log(error);
     }
     // fake loading time for testing
-  //   await new Promise((resolve) => {
-  //     setTimeout(() => {
-  //       this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 50 });
-  //       resolve();
-  //     }, 5000);
-  // });
+    //   await new Promise((resolve) => {
+    //     setTimeout(() => {
+    //       this.emit(SocketEvents.GAME_LOAD_UPDATED, { progress: this.loadProgress += 50 });
+    //       resolve();
+    //     }, 5000);
+    // });
   }
 
   async endGame() {
     try {
-    console.log("Ending game...");
-    this.gameState.status = "finished";
-    this.gameState.outcome = "lose";
-    
-    await GameRoomService.updateGameRoom(this.roomId, {
-      game_state: GameRoomService.encryptGameState(this.gameState),
-      status: "finished",
-    });
-    this.emit("game:updated", this.gameState);
-    this.calculateGameResults();
-  } catch (error) {
-    console.error("Error ending game:", error);
-    this.emit("error", error);
-  }
-  }
+      console.log("Ending game...");
+      this.gameState.status = "finished";
+      this.gameState.outcome = "lose";
 
-
+      await GameRoomService.updateGameRoom(this.roomId, {
+        game_state: GameRoomService.encryptGameState(this.gameState),
+        status: "finished",
+      });
+      this.emit("game:updated", this.gameState);
+      this.calculateGameResults();
+    } catch (error) {
+      console.error("Error ending game:", error);
+      this.emit("error", error);
+    }
+  }
 
   async calculateGameResults() {
     try {
-    if (this.gameState.status === "finished") {
-      this.emit("game:finished", {});
-      this.emit("leaderboard:started", {});
-      console.log("Game finished, calculating ELO changes...");
+      if (this.gameState.status === "finished") {
+        this.emit("game:finished", {});
+        this.emit("leaderboard:started", {});
+        console.log("Game finished, calculating ELO changes...");
 
-      const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
-        this.playerId
-      );
+        const playerStats =
+          await LeaderboardService.getLeaderboardStatsForPlayer(this.playerId);
 
-      console.log("Player stats:", playerStats);
+        console.log("Player stats:", playerStats);
 
-      await this.llmEloService.addPlayerEloToThread(this.threadId, playerStats, this.gameState.outcome);
-      const leaderboardUpdates = await this.llmEloService.processGameThread(
-        this.threadId
-      );
-
-      // update the leaderboard table
-      console.log("Leaderboard updates:", leaderboardUpdates);
-
-      leaderboardUpdates.playerResults =
-        leaderboardUpdates.playerResults.filter((result) => {
-          // check if the result.playerId is a valid uuid
-          console.log(
-            "Checking player ID:",
-            result.playerId,
-            uuidValidate(result.playerId)
-          );
-          return uuidValidate(result.playerId);
-        });
-      console.log("Updating player stats:", leaderboardUpdates.playerResults);
-      await LeaderboardService.updatePlayerStats(
-        leaderboardUpdates.playerResults,
-        this.roomId
-      );
-
-      const { oldRating, newRating, badges } =
-        leaderboardUpdates.playerResults.find(
-          (result) => result.playerId === this.playerId
+        await this.llmEloService.addPlayerEloToThread(
+          this.threadId,
+          playerStats,
+          this.gameState.outcome
+        );
+        const leaderboardUpdates = await this.llmEloService.processGameThread(
+          this.threadId
         );
 
-      console.log(oldRating, newRating, badges);
+        // update the leaderboard table
+        console.log("Leaderboard updates:", leaderboardUpdates);
 
-      // emit the leaderboard updates to the client
-      this.emit(SocketEvents.LEADERBOARD_FINISHED, {
-        oldRating,
-        newRating,
-        badges,
-      });
+        leaderboardUpdates.playerResults =
+          leaderboardUpdates.playerResults.filter((result) => {
+            // check if the result.playerId is a valid uuid
+            console.log(
+              "Checking player ID:",
+              result.playerId,
+              uuidValidate(result.playerId)
+            );
+            return uuidValidate(result.playerId);
+          });
+        console.log("Updating player stats:", leaderboardUpdates.playerResults);
+        await LeaderboardService.updatePlayerStats(
+          leaderboardUpdates.playerResults,
+          this.roomId
+        );
 
-      console.log("Game results and ELO changes processed successfully");
-    } else {
-      return false;
+        const { oldRating, newRating, badges } =
+          leaderboardUpdates.playerResults.find(
+            (result) => result.playerId === this.playerId
+          );
+
+        console.log(oldRating, newRating, badges);
+
+        // emit the leaderboard updates to the client
+        this.emit(SocketEvents.LEADERBOARD_FINISHED, {
+          oldRating,
+          newRating,
+          badges,
+        });
+
+        console.log("Game results and ELO changes processed successfully");
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error("Error calculating game results:", error);
+      this.emit("error", error);
     }
-  } catch (error) {
-    console.error("Error calculating game results:", error);
-    this.emit("error", error);
-  }
   }
 
   assignVoiceToSuspect(suspect) {
     const maleVoices = ["ash", "ballad", "echo", "verse"];
     const femaleVoices = ["coral", "alloy", "echo", "shimmer", "sage"];
-    if(suspect.gender === 'male') {
+    if (suspect.gender === "male") {
       return maleVoices[Math.floor(Math.random() * maleVoices.length)];
     } else {
       return femaleVoices[Math.floor(Math.random() * femaleVoices.length)];
@@ -936,26 +965,25 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
 
   const start = () => {
     try {
-    console.log("Starting interval...");
-    let number = initialNumber;
+      console.log("Starting interval...");
+      let number = initialNumber;
 
-    intervalId = setInterval(() => {
-      number--;
-      if (tickCallback) {
-        tickCallback(number);
-      }
-      if (number <= 0) {
-
-        clearInterval(intervalId);
-        if (doneCallback) {
-          doneCallback();
+      intervalId = setInterval(() => {
+        number--;
+        if (tickCallback) {
+          tickCallback(number);
         }
-        console.log("Interval cleared automatically.");
-      }
-    }, 1000);
-  } catch (error) {
-    console.error("Error starting interval:", error);
-  }
+        if (number <= 0) {
+          clearInterval(intervalId);
+          if (doneCallback) {
+            doneCallback();
+          }
+          console.log("Interval cleared automatically.");
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("Error starting interval:", error);
+    }
   };
 
   // Immediately start the interval
@@ -968,14 +996,14 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
 
     clear: () => {
       try {
-      clearInterval(intervalId);
-      if (doneCallback) {
-        doneCallback();
+        clearInterval(intervalId);
+        if (doneCallback) {
+          doneCallback();
+        }
+        console.log("Interval cleared on demand.");
+      } catch (error) {
+        console.error("Error clearing interval:", error);
       }
-      console.log("Interval cleared on demand.");
-    } catch (error) {
-      console.error("Error clearing interval:", error);
-    }
     },
   };
 }
