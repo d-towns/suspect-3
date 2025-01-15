@@ -569,8 +569,7 @@ export class SinglePlayerGameManager extends GameManager {
       const interrogationRound = this.gameState.rounds.find(
         (round) => round.type === "interrogation"
       )
-
-      interrogationRound?.status = "completed";
+      if (interrogationRound) interrogationRound.status = "completed";
       // save the game state to the database
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
