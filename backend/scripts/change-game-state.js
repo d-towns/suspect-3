@@ -20,8 +20,8 @@ async function changeGameState(roomId) {
         return;
     }
 
-    gameState.rounds.find(round => round.type === 'interrogation').status = 'active';
-    gameState.rounds.find(round => round.type === 'voting').status = 'inactive';
+    gameState.rounds.find(round => round.type === 'interrogation').status = 'completed';
+    gameState.rounds.find(round => round.type === 'voting').status = 'active';
     gameState.outcome = 'not_yet_determined';
     gameState.status = 'active';
 

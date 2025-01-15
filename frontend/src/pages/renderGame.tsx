@@ -36,7 +36,11 @@ const RenderGame: React.FC = () => {
         fetchRoom();
     }, [roomId]);
 
-    if(!user) {
+    if (loading) {
+        return <Loading />;
+    }
+
+    if(!user || !gameRoom) {
         return <Loading />
     }
 
@@ -57,11 +61,6 @@ const RenderGame: React.FC = () => {
             </Card>
             </Flex>
         )
-    }
-
-
-    if (loading) {
-        return <div>Loading...</div>;
     }
 
     if (error || !gameRoom) {

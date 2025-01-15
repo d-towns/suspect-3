@@ -334,6 +334,7 @@ export class SinglePlayerGameManager extends GameManager {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
       this.emit("game:updated", this.gameState);
+      this.emit("deduction:completed", {}); 
     } catch (error) {
       console.error("Error analyzing deduction graph:", error);
       this.emit("deduction:error", error);
@@ -828,7 +829,7 @@ export class SinglePlayerGameManager extends GameManager {
           type: "evidence",
           items: this.gameState.allEvidence,
           bucket: ImageBuckets.Evidence,
-          description: (item) => `image of ${item.description}`,
+          description: (item) => `in the setting of a ${this.gameState.crime.location}, an image of ${item.description}`,
           assignSrc: (i, url) => {
             this.gameState.allEvidence[i].imgSrc = url;
           },
@@ -837,7 +838,7 @@ export class SinglePlayerGameManager extends GameManager {
           type: "offenseReport",
           items: this.gameState.crime.offenseReport,
           bucket: ImageBuckets.OffenseReport,
-          description: (item) => `image of ${item.description}`,
+          description: (item) => `in the setting of a ${this.gameState.crime.location}, image of ${item.description}`,
           assignSrc: (i, url) => {
             this.gameState.crime.offenseReport[i].imgSrc = url;
           },
@@ -897,6 +898,10 @@ export class SinglePlayerGameManager extends GameManager {
         this.emit("game:finished", {});
         this.emit("leaderboard:started", {});
         console.log("Game finished, calculating ELO changes...");
+
+        if(this.clearRoundTimer) {
+          this.clearRoundTimer(true);
+        }
 
         const playerStats =
           await LeaderboardService.getLeaderboardStatsForPlayer(this.playerId);
@@ -1000,10 +1005,10 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
     // give the ability to clear the interval on demand and call the doneCallback
     // ex. All voting round votes are in so we can clear the interval and move on to the next round
 
-    clear: () => {
+    clear: (skipDoneCallback = false) => {
       try {
         clearInterval(intervalId);
-        if (doneCallback) {
+        if (doneCallback && !skipDoneCallback) {
           doneCallback();
         }
         console.log("Interval cleared on demand.");

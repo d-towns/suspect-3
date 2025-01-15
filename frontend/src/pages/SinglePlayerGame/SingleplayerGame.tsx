@@ -121,16 +121,16 @@ const ChiefCard: React.FC<ChiefCardProps> = ({ defaultMessage, messages = [] }) 
             variant='ghost'
             className={`w-[200px] text-center h-fit border-gray-700 border p-1`}
         >
-            <Flex gap="4" direction="column" align="center">
+            <Flex gap="2" direction="column" align="center">
                 <Box className="relative">
                     <Avatar
                         src="https://i.ibb.co/GJWMFtf/chief-1.webp"
                         fallback="C"
-                        size="4"
+                        size="5"
                     />
                     {unreadCount > 0 && (
                         <Box
-                            className="absolute top-3 right-0 w-10 h-4 rounded-full"
+                            className="absolute top-3 left-24  w-10 h-4 rounded-full"
 
                         >
                             <Text size="1" align="center" mb={'4'} style={{ backgroundColor: 'darkred' }} className='rounded-xl py-1 px-2'>
@@ -383,7 +383,7 @@ const getLayoutedElements = (
 ) => {
     const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
     // create a ranking function that will order the nodes based on their type
-    g.setGraph({ rankdir: options.direction, align: 'DR', ranksep: 50, nodesep: 50  });
+    g.setGraph({ rankdir: options.direction, align: 'DR', ranksep: 250, nodesep: 50  });
 
     edges.forEach((edge) => g.setEdge(edge.source, edge.target));
     nodes.forEach((node) =>
@@ -434,6 +434,7 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
             label: edge.type,
         }));
         setEdges(initialEdges);
+        // onLayout('LR');
         console.log('Initial nodes', initialNodes);
         console.log('Initial edges', initialEdges);
     }, []);
@@ -499,6 +500,8 @@ const DeductionFlow: React.FC<DeductionFlowProps> = ({
         },
         [gameState, handleCreateNewLead],
     );
+
+    
 
     return (
         <ReactFlow
@@ -631,7 +634,7 @@ const VotingRound: React.FC<VotingRoundProps> = ({
                                 const suspect = gameState.suspects.find((suspect) => suspect.id === suspectId);
                                 return (
                                     <Flex direction="column" gap="4" key={suspectId}>
-                                        <Flex align={'center'}>
+                                        <Flex align={'center'} mt={'3'}>
                                             <Avatar src={getSupabaseImageURL(suspect?.imgSrc || '')} fallback={suspect?.name.charAt(0) || '?'} size="4" />
                                             <Text size="4" weight="bold" ml="4"> {suspect?.name}, {suspect?.identity} </Text>
                                         </Flex>
