@@ -548,23 +548,29 @@ export class SinglePlayerGameManager extends GameManager {
       this.emit("phase:ended", { phase: this.currentPhase });
 
       if (this.realtimeHandler) {
-        this.endInterrogation();
+        await this.endInterrogation();
       }
+      const interrogationRoundIsActive = this.gameState.rounds
+        .find((round) => round.type === "interrogation")
+        .conversations.some((conversation) => conversation.active);
 
-      if (
-        this.gameState.rounds
+
+      if (interrogationRoundIsActive) {
+
+        const activeConversation = this.gameState.rounds
           .find((round) => round.type === "interrogation")
-          .conversations.some((conversation) => conversation.active)
-      ) {
-        this.gameState.rounds
-          .find((round) => round.type === "interrogation")
-          .conversations.find(
-            (conversation) => conversation.active
-          ).active = false;
+          .conversations.find((conversation) => conversation.active);
+
+          if (activeConversation) {
+            activeConversation.active = false;
+          }
+
       }
-      this.gameState.rounds.find(
+      const interrogationRound = this.gameState.rounds.find(
         (round) => round.type === "interrogation"
-      ).status = "completed";
+      )
+
+      interrogationRound?.status = "completed";
       // save the game state to the database
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
@@ -595,6 +601,7 @@ export class SinglePlayerGameManager extends GameManager {
         );
         this.clearRoundTimer = clear;
       }
+      
       this.currentPhase = "deduction";
       this.emit("phase:started", { phase: this.currentPhase });
       if (!this.gameState.rounds.some((round) => round.type === "voting")) {
