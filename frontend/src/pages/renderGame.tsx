@@ -6,6 +6,7 @@ import { roomsService } from '../services/rooms.service';
 import { GameRoom } from '../models';
 import { useAuth } from '../context/auth.context';
 import { Button, Card, Flex, Heading } from '@radix-ui/themes';
+import Loading from '../components/loading';
 
 const RenderGame: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -34,6 +35,10 @@ const RenderGame: React.FC = () => {
 
         fetchRoom();
     }, [roomId]);
+
+    if(!user) {
+        return <Loading />
+    }
 
 
     if(gameRoom?.host_id !== user?.id){

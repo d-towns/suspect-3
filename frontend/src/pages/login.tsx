@@ -80,12 +80,13 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ open, onOpenChange }) => {
                 <form onSubmit={handleMagicLink}>
                   <TextField.Root
                     placeholder="Enter your email"
+                    disabled={loading}
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
-                  <Button type="submit" mt="2" className='w-full'>
+                  <Button type="submit" mt="2" className='w-full' disabled={loading}> 
                     {!loading && 'Send Login Link'}
                     {loading && <Spinner />}
                   </Button>
@@ -94,9 +95,11 @@ const LoginDialog: React.FC<LoginDialogProps> = ({ open, onOpenChange }) => {
                 <Button
                   size="2"
                   className="bg-white text-black"
-                  onClick={() => loginWithGoogle()}
+                  disabled={loading}
+                  onClick={() => { setLoading(true); loginWithGoogle()}}
                 >
-                  <FcGoogle size={'24'} /> Sign In with Google
+                  { loading && <Spinner />}
+                  { !loading && <> <FcGoogle size={'24'} /> Sign In with Google </>}
                 </Button>
                 <Text size="2" align="center" mt="6">
                   By signing up, you are agreeing to{' '}

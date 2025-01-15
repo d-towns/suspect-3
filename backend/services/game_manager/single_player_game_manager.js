@@ -43,7 +43,7 @@ export class SinglePlayerGameManager extends GameManager {
     this.currentPhase = null;
     this.loadProgress = 0;
     this.interrogationTimer = 9 * 60; // 10 minutes in seconds
-    this.deductionTimer = 9 * 60; // 5 minutes in seconds
+    this.deductionTimer = 50 * 60; // 5 minutes in seconds
     this.roundTimer = 0;
     this.clearRoundTimer = null;
     this.realtimeHandler = null;
@@ -621,7 +621,6 @@ export class SinglePlayerGameManager extends GameManager {
           },
         });
       });
-
       // update the game state with the new nodes
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
@@ -866,7 +865,6 @@ export class SinglePlayerGameManager extends GameManager {
       this.emit("game:finished", {});
       this.emit("leaderboard:started", {});
       console.log("Game finished, calculating ELO changes...");
-      if (this.clearRoundTimer) this.clearRoundTimer();
 
       const playerStats = await LeaderboardService.getLeaderboardStatsForPlayer(
         this.playerId
@@ -937,6 +935,7 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
   let intervalId;
 
   const start = () => {
+    try {
     console.log("Starting interval...");
     let number = initialNumber;
 
@@ -946,6 +945,7 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
         tickCallback(number);
       }
       if (number <= 0) {
+
         clearInterval(intervalId);
         if (doneCallback) {
           doneCallback();
@@ -953,6 +953,9 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
         console.log("Interval cleared automatically.");
       }
     }, 1000);
+  } catch (error) {
+    console.error("Error starting interval:", error);
+  }
   };
 
   // Immediately start the interval
@@ -964,11 +967,15 @@ function startInterval(initialNumber, tickCallback, doneCallback) {
     // ex. All voting round votes are in so we can clear the interval and move on to the next round
 
     clear: () => {
+      try {
       clearInterval(intervalId);
       if (doneCallback) {
         doneCallback();
       }
       console.log("Interval cleared on demand.");
+    } catch (error) {
+      console.error("Error clearing interval:", error);
+    }
     },
   };
 }

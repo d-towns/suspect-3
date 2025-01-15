@@ -105,8 +105,7 @@ const Home: React.FC = () => {
         {/* <Link to='/login'> <Text size={'8'} as='span' className='main-link'>Play</Text></Link> */}
         <Separator orientation="vertical" size={'2'} />
         <Link to='/faq' className='hover:scale-105 transition ease-in-out duration-200'> <Text size={{initial: '6', md: '8'}} as='span' className='main-link z-10'>How To Play</Text></Link>
-        <Separator orientation="vertical" size={'2'} />
-        <Link to='/leaderboard' className='hover:scale-105 transition ease-in-out duration-200'> <Text size={{initial: '6', md: '8'}}as='span' className='main-link'>Leaderboard </Text></Link>
+      
       </Flex>
       </motion.div>
       </Flex>
