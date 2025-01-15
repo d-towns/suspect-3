@@ -789,6 +789,7 @@ interface InterrogationProps {
     socket: Socket; // Adjust this type based on your socket implementation
     emitEvent: (event: string, data: any) => void;
     handleAudioRecorded: (arrayBuffer: ArrayBuffer) => void;
+    handleAudioReceived: () => void;
     handleEndInterrogation: () => void
     audioAmplitudeData: Float32Array
 }
@@ -1295,6 +1296,7 @@ const SingleGame = () => {
     };
 
     const handleRealtimeAudioDeltaEvent = async (params: { speaker: string, audio: Int16Array }) => {
+        setResponseLoading(false);
         console.log('Received audio delta:', params);
         const { audio } = params;
         // check if params is a int16array
@@ -1368,6 +1370,14 @@ const SingleGame = () => {
             socket.on('realtime:audio:delta:assistant', handleRealtimeAudioDeltaEvent);
 
             socket.on('realtime:transcript:delta:assistant', handleRealtimeAudioTranscriptEvent);
+
+            socket.on('realtime:speech:started', () => {
+                setAudioTranscribing(true);
+            });
+
+            socket.on('realtime:audio:done:assistant', () => {
+                setResponseLoading(false);
+            });
 
             socket.on('realtime:message', handleRealtimeAudioTranscriptEvent);
 
@@ -1459,6 +1469,12 @@ const SingleGame = () => {
         setAudioTranscribing(true);
         setResponseLoading(true);
     }
+
+    const handleAudioReceived = () => {
+        setAudioTranscribing(true);
+        setResponseLoading(true);
+    }
+
 
     const handleVoteSubmission = () => {
         if (!roomId || !killerVote || !socket) {
@@ -1582,6 +1598,7 @@ const SingleGame = () => {
                         userInterrogationTranscript={userInterrogationTranscript}
                         suspectInterrogationTranscript={suspectInterrogationTranscript}
                         handleEndInterrogation={handleEndInterrogation}
+                        handleAudioReceived={handleAudioReceived}
                         responseLoading={responseLoading}
                         audioTranscribing={audioTranscribing}
                         socket={socket}

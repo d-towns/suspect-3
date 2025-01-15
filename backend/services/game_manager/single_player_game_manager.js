@@ -696,7 +696,13 @@ Generate the scenario ensuring:
     try {
       if (this.roundTimer > 0) {
         console.log("Round timer is still running, cannot start new phase");
-        return;
+        const { clear } = startInterval(
+          this.roundTimer,
+          this.emitRoundTick.bind(this),
+          this.endInterrogationPhase.bind(this)
+        );
+
+        this.clearRoundTimer = clear;
       } else {
         const { clear } = startInterval(
           this.deductionTimer,
@@ -778,7 +784,7 @@ Generate the scenario ensuring:
       this.emit("game:updated", this.gameState);
 
       // check if the game is over ( is should be ) and then run the elo rating calculation
-      await this.calculateGameResults();
+      await this.endGame();
     } catch (error) {
       console.error("Error ending deduction phase:", error);
       this.emit("error", error.message);
@@ -853,7 +859,7 @@ Generate the scenario ensuring:
         this.gameState.status = "finished";
         this.gameState.outcome = "lose";
       }
-      this.calculateGameResults();
+      this.endGame();
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
       });

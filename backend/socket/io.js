@@ -245,6 +245,10 @@ export class GameRoomSocketServer {
       this.emitToRoom(roomId, SocketEvents.DEDUCTION_ERROR, data);
     });
 
+    manager.on(SocketEvents.REALTIME_SPEECH_STARTED, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_SPEECH_STARTED, data);
+    });
+
     manager.on(SocketEvents.REALTIME_CONNECTED, (data) => {
       this.emitToRoom(roomId, SocketEvents.REALTIME_CONNECTED, data);
     });
@@ -273,6 +277,10 @@ export class GameRoomSocketServer {
         SocketEvents.REALTIME_TRANSCRIPT_DELTA_ASSISTANT,
         data
       );
+    });
+
+    manager.on(SocketEvents.REALTIME_AUDIO_DONE_ASSISTANT, (data) => {
+      this.emitToRoom(roomId, SocketEvents.REALTIME_AUDIO_DONE_ASSISTANT, data);
     });
 
     // Add more listeners as needed based on game manager events

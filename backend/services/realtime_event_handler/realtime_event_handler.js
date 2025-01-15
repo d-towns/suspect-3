@@ -57,6 +57,9 @@ export default class RealtimeEventHandler {
         case "response.audio.done":
           await this.handleResponseAudioDone(event);
           break;
+        case 'input_audio_buffer.speech_started':
+          await this.handleSpeechStarted(event);
+          break;
 
         case "response.done":
           this.handleResponseDone(event);
@@ -172,6 +175,11 @@ export default class RealtimeEventHandler {
         JSON.stringify(event.response.status_details.error)
       );
     }
+  }
+
+  async handleSpeechStarted(event) {
+    console.log("Speech started");
+    this.gameManager.emit("realtime:speech:started", event);
   }
 
   async handleAudioTranscriptDone(event, activeSuspect) {

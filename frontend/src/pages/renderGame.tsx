@@ -12,7 +12,6 @@ const RenderGame: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const {user} = useAuth();
     const [gameRoom, setGameRoom] = useState<GameRoom | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -26,8 +25,6 @@ const RenderGame: React.FC = () => {
                 }
             } catch (err) {
                 setError('Failed to fetch game room.');
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -36,9 +33,6 @@ const RenderGame: React.FC = () => {
         fetchRoom();
     }, [roomId]);
 
-    // if (loading) {
-    //     return <Loading />;
-    // }
 
     if(!user || !gameRoom) {
         return <Loading />

@@ -7,12 +7,12 @@ import { Flex, IconButton, Button, Spinner } from '@radix-ui/themes';
 interface AudioRecorderParams {
   socket: Socket;
   emitEvent: (event: string, data: any) => void;
-  onAudioRecorded: (buffer: ArrayBuffer) => void;
+  onAudioRecorded?: (buffer: ArrayBuffer) => void;
   loadingSessionEnd: boolean;
   handleEndInterrogation: () => void;
 };
 
-const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAudioRecorded, loadingSessionEnd, handleEndInterrogation }: AudioRecorderParams) => {
+const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, loadingSessionEnd, handleEndInterrogation }: AudioRecorderParams) => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   // const [recordingTime, setRecordingTime] = useState<number>(0);
   const recorderRef = useRef<WavRecorder | null>(null);
@@ -21,7 +21,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
     if (socket) {
       socket.on('round-end', () => {
         if (isRecording) {
-          stopRecording(true);
+          stopRecording();
         }
       });
 
@@ -53,6 +53,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
 
         // Encode binary string to Base64
         const base64String = btoa(binary);
+
         emitEvent('realtime:audio:delta:user', { audioBuffer: base64String });
 
       }, 32000);
@@ -69,13 +70,13 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
     }
   };
 
-  const stopRecording = async (rejectCallback: boolean = false) => {
+  const stopRecording = async () => {
     try {
       if (recorderRef.current) {
         await recorderRef.current.pause();
         const finalAudio = await recorderRef.current.end();
 
-        const arrayBuffer = await finalAudio.blob.arrayBuffer();
+        await finalAudio.blob.arrayBuffer();
         if (socket) {
           emitEvent('realtime-audio-response-end', {});
         } else {
@@ -83,7 +84,7 @@ const AudioRecorder: React.FC<AudioRecorderParams> = ({ socket, emitEvent, onAud
         }
 
 
-        if (!rejectCallback) onAudioRecorded(arrayBuffer);
+        // if (!rejectCallback) onAudioRecorded(arrayBuffer);
 
         setIsRecording(false);
         // if (timerRef.current) {
