@@ -42,4 +42,8 @@ export default class LLMGameService {
     throw new Error('Method not implemented');
   }
 
+  getThreadRuns(threadId) {
+    throw new Error('Method not implemented');
+  }
+
 }

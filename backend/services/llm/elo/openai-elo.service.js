@@ -212,6 +212,20 @@ Analyze the game thread thoroughly to assign appropriate ELO changes and badges.
       const eventHandler = new EventHandler(this.client);
       eventHandler.on("event", eventHandler.onEvent.bind(eventHandler));
 
+      const runs = await this.client.beta.threads.runs.list(
+        threadId,
+      );
+
+      const activeRuns = runs?.data?.filter(run => ['in_progress', 'requires_action'].includes(run.status));
+
+      // if there is an active run, return 
+      if (activeRuns.length > 0) {
+        console.log("Active runs found, cannot calculate ELO changes", activeRuns);
+        return;
+      }
+
+
+
       stream = await this.client.beta.threads.runs.stream(
         threadId,
         {
