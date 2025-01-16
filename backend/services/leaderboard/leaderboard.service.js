@@ -1,4 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+dotenv.config({path: '../../.env'});
+
 export class LeaderboardService {
     static async getLeaderboard() {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -32,6 +35,17 @@ export class LeaderboardService {
             .in("user_id", playerIds);
         if (error) {
             throw new Error(`Error getting leaderboard stats for players: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async createLeaderboardEntry(userId) {
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        const { data, error } = await supabase
+            .from("leaderboard")
+            .insert({ user_id: userId, elo: 1000 }).select();
+        if (error) {
+            throw new Error(`Error creating leaderboard entry: ${error.message}`);
         }
         return data;
     }

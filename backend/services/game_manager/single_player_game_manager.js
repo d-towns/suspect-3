@@ -1036,8 +1036,13 @@ Generate the scenario ensuring:
           this.clearRoundTimer(true);
         }
 
-        const playerStats =
+        let playerStats =
           await LeaderboardService.getLeaderboardStatsForPlayer(this.playerId);
+
+        // if there is no leaderboard entry to the user, then
+        if(playerStats.length === 0 ) {
+          playerStats = await LeaderboardService.createLeaderboardEntry(this.playerId);
+        }
 
         console.log("Player stats:", playerStats);
 
