@@ -26,8 +26,8 @@ const Profile = () => {
             try {
                 setLoading(true);
                 const statsResponse = await leaderboardService.getUserStats(user.id);
-                if (statsResponse.success && statsResponse.stats) {
-                    setLeaderboardStats(statsResponse.stats);
+                if (statsResponse.success && Array.isArray(statsResponse.stats)) {
+                    setLeaderboardStats(statsResponse.stats[0]);
                 } else {
                     setError(statsResponse.message || 'Failed to fetch stats');
                 }
