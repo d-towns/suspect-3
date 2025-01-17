@@ -15,7 +15,7 @@ export interface LeaderboardEntry {
 export interface LeaderboardResponse {
     success: boolean;
     leaderboard?: LeaderboardEntry[];
-    stats?: LeaderboardEntry;
+    stats?: LeaderboardEntry | LeaderboardEntry[]
     entry?: LeaderboardEntry;
     message?: string;
     page?: number;
