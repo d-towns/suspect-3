@@ -75,7 +75,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
 };
 
 const PlayMenu: React.FC = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const { socket} = useSocketContext();
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -103,7 +103,19 @@ const PlayMenu: React.FC = () => {
 
   const handleSetUsername = async () => {
     try {
-      await supabase.auth.updateUser({ data: { username } });
+     const {data, error} =  await supabase.auth.updateUser({ data: { username } });
+      if (error) {
+        throw error;
+      }
+      if(data?.user) {
+        const userData = {
+          id: data.user.id,
+          email: data.user.email || '',
+          username: data.user.user_metadata.username
+        }
+        setUser(userData);
+        }
+        
       setShowUsernameModal(false);
     } catch (error) {
       console.error(error);
