@@ -92,7 +92,7 @@ const Home: React.FC = () => {
     >
 
       <AnimatedText className='text-7xl md:text-9xl main-header ' animationSpeed={200}  message="Suspect" />
-      <AnimatedText className='text-lg main-link mb-5' animationSpeed={300} message="v0.93-beta" />
+      <AnimatedText className='text-lg main-link mb-5' animationSpeed={300} message="v0.93-alpha" />
       <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
