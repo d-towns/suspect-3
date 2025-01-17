@@ -755,8 +755,10 @@ const MultiplayerGame = () => {
       if (!user) {
         return;
       }
-      leaderboardService.getUserStats(user?.id || '').then((response) => {
-        setPlayerElo(prev => ({ ...prev, currentElo: response?.stats?.elo || 0 }));
+      leaderboardService.getUserStats(user?.id || '').then((response : any) => {
+        if(response.stats && Array.isArray(response.stats)) {
+        setPlayerElo(prev => ({ ...prev, currentElo: response.stats[0].elo || 0 }));
+        }
       });
     }
 
