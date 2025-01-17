@@ -3,6 +3,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axiosInstance from '../utils/axios-instance';
 import {supabase} from '../utils/supabase-client';
+import { leaderboardService } from '../services/leaderboard.service';
 
 // Define the User interface
 interface User {
@@ -15,6 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  setUser: (user: User | null) => void;
   login: (email: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
@@ -111,7 +113,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         },
       })
+      if(data?.user) {
+      const userLeadearboard = await leaderboardService.getUserStats(data?.user['id']);
+      if(Array.isArray(userLeadearboard.stats) && userLeadearboard.stats?.length === 0) {
+        const leaderboardEntry = await leaderboardService.createLeaderboardEntry(data?.user['id']);
+        console.log('Leaderboard entry created:', leaderboardEntry);
+      }
+
+      
       setUser(data?.user);
+      }
       if (error) {
         console.error('Login error:', error);
         throw error;
@@ -131,10 +142,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       // const response = await api.post('users/login', { provider: 'google' });
-      supabase.auth.signInWithOAuth({
+     await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { scopes: 'email', redirectTo: authRedirectUrl,  }
       });
+
       // const userData = {
       //   id: response.data.session.user.id,
       //   email: response.data.session.user.email,
@@ -198,6 +210,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const contextValue: AuthContextType = {
     user,
     loading,
+    setUser, 
     login,
     signup,
     logout,
