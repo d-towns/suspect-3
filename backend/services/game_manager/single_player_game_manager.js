@@ -593,7 +593,7 @@ Generate the scenario ensuring:
             if (parsed.type === "response.audio.done") {
               console.log("Response done event received");
               setTimeout(() => {
-                this.realtimeHandler.closeRealtimeConversation();
+                this.realtimeHandler?.closeRealtimeConversation();
                 this.realtimeHandler = null;
               }, 10000);
 
