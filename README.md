@@ -58,7 +58,3 @@ Suspect is a web-based multiplayer game that combines mystery, strategy, and dec
 ## Contributing
 
 Contributions are welcome! Please fork the repository and create a pull request with your changes.
-
-## License
-
-This project is licensed under the MIT License.
