@@ -53,12 +53,12 @@ const ModeCard: React.FC<ModeCardProps> = ({
             className="block object-cover w-full h-64 sm:h-80 md:h-[50vh] bg-gray-200"
           />
         </Inset>
-        <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
         { blocked && (
-          <Text as="p" color="orange" size={{ sm: '2', md: '3', lg: '4' }}>
+          <Text as="p" align={'center'} color="orange" size={{ sm: '2', md: '3', lg: '4' }}>
             This mode is currently under construction
           </Text>
         )}
+        <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
           <Strong style={{textDecoration: blocked ? 'line-through': 'none'}}>{altText} Mode</Strong>
         </Text>
         <Separator my="3" size="4" />
@@ -121,10 +121,6 @@ const PlayMenu: React.FC = () => {
       console.error(error);
     }
   };
-
-  if (socket) {
-    console.log('socket connected');
-  }
 
   const createRoom = async (mode: 'single' | 'multi') => {
     if (!user) return;

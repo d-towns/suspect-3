@@ -368,7 +368,7 @@ export class GameRoomSocketServer {
       // if there is no game room manager i need to create one and
       const manager = this.roomGameManagers.get(params.roomId);
       if (manager) {
-        manager.endGame();
+        manager.endGame('lose');
       } else {
         const gameRoom = await GameRoomService.getGameRoom(
           params.roomId || roomId

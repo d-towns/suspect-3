@@ -66,7 +66,7 @@ export interface Evidence {
 }
 
 export interface GameState {
-    status: 'setup' | 'active' | 'finished';
+    status: 'creating' | 'setup' | 'active' | 'finished';
     crime?: Crime;
     rounds: Round[];
     allEvidence: Evidence[];

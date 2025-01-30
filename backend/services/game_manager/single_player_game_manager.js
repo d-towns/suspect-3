@@ -150,7 +150,11 @@ Generate the scenario ensuring:
 5. Environmental storytelling elements
 6. Progressive revelation of information
 7. Multiple investigative paths
-8. Satisfying "aha" moments for clever players`;
+8. Satisfying "aha" moments for clever players
+
+Make sure that the interrogation round status is active and the voting round status is inactive.
+
+`;
     return crime;
   }
 
@@ -173,6 +177,7 @@ Generate the scenario ensuring:
         status : 'creating',
       }
       await GameRoomService.updateGameRoom(this.roomId, {
+        thread_id: this.threadId,
         status: "setup", // TODO: this is confusing considering that the game state also has a status field
         game_state: GameRoomService.encryptGameState(this.gameState),
       });
@@ -187,12 +192,15 @@ Generate the scenario ensuring:
         console.error("Error creating initial game state");
         return null;
       } else {
-        // TODO: use a chat completion to check for errors in the game state upon initial creation
-        // this.gameState = await this.checkGameState();
 
+
+
+        // update the load progress of the game creation
         this.emit(SocketEvents.GAME_LOAD_UPDATED, {
           progress: (this.loadProgress += 50),
         });
+
+        // hacky code to make sure that the game state is in the correct state
         if (
           this.gameState.rounds.find((round) => round.type === "interrogation")
             .conversations.length !== 0
@@ -200,6 +208,13 @@ Generate the scenario ensuring:
           this.gameState.rounds.find(
             (round) => round.type === "interrogation"
           ).conversations = [];
+        }
+
+        if(this.gameState.rounds.some((round) => round.type === "voting")) {
+          this.gameState.rounds.find((round) => round.type === "voting").status = "inactive";
+        }
+        if(this.gameState.rounds.some((round) => round.type === "interrogation")) {
+          this.gameState.rounds.find((round) => round.type === "interrogation").status = "active";
         }
 
         this.gameState.status = "setup";
@@ -269,19 +284,19 @@ Generate the scenario ensuring:
     // use the llm service to create a message in the thread that says the game has started
     try {
       console.log("Starting game...");
+
+      // if the player left the game, and a end game timer was started, clear the timer
       if(this.endGameTimeoutId) {
         clearTimeout(this.endGameTimeoutId);
         this.endGameTimeoutId = null;
         console.log("\nCleared end game timeout\n");
       }
-      if (this.gameState.status !== "active") {
-        this.llmGameService.addMessageToThread(this.threadId, {
-          role: "assistant",
-          content: "The game has started. set the game_state status to active",
-        });
-      }
+
+      // if the ga
+
       // get the game room from the database and set the game state to active
       this.gameState.status = "active";
+
       GameRoomService.updateGameRoom(this.roomId, {
         status: "active",
         game_state: GameRoomService.encryptGameState(this.gameState),
@@ -290,6 +305,8 @@ Generate the scenario ensuring:
       // emit the game started event
       this.emit("game:started", {});
       this.emit("game:updated", this.gameState);
+
+      // start the active round
       const activeRound = this.gameState.rounds.find(
         (round) => round.status === "active"
       );
@@ -299,6 +316,7 @@ Generate the scenario ensuring:
       } else {
         this.startDeductionPhase();
       }
+
     } catch (error) {
       console.error("Error starting game:", error);
       this.emit("error", error.message);
@@ -306,10 +324,12 @@ Generate the scenario ensuring:
   }
 
   startInterrogationPhase() {
-    console.log("\n\nStarting interrogation phase..., timer: \n\n", this.roundTimer);
+    console.log("\n\nStarting interrogation phase..., timer: \n\n", this.roundTimer, this.clearRoundTimer);
+    
     try {
       if (this.roundTimer > 0) {
         console.log("Round timer is still running, keeping the current timer");
+        this.clearRoundTimer(true);
         const { clear } = startInterval(
           this.roundTimer,
           this.emitRoundTick.bind(this),
@@ -317,7 +337,8 @@ Generate the scenario ensuring:
         );
 
         this.clearRoundTimer = clear;
-      } else {
+      } else if(!this.clearRoundTimer) {
+        console.log("Round timer is not running, starting a new timer");
         const { clear } = startInterval(
           this.interrogationTimer,
           this.emitRoundTick.bind(this),
@@ -791,8 +812,7 @@ Generate the scenario ensuring:
 
       this.emit("game:updated", this.gameState);
 
-      // check if the game is over ( is should be ) and then run the elo rating calculation
-      await this.endGame();
+      this.runDeductionAnalysis();
     } catch (error) {
       console.error("Error ending deduction phase:", error);
       this.emit("error", error.message);
@@ -998,7 +1018,7 @@ Generate the scenario ensuring:
       console.log("Ending game...");
       this.gameState.status = "finished";
       this.gameState.outcome = outcome;
-
+      this.clearRoundTimer(true);
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
         status: "finished",
