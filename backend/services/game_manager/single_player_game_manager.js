@@ -852,18 +852,8 @@ Generate the scenario ensuring:
       );
       console.log("Implicated suspect", implicatedSuspect, culprit.id);
       this.emit("deduction:completed", {});
-      if (culprit.id === implicatedSuspect) {
-        this.gameState.status = "finished";
-        this.gameState.outcome = "win";
-      } else {
-        this.gameState.status = "finished";
-        this.gameState.outcome = "lose";
-      }
-      this.endGame();
-      await GameRoomService.updateGameRoom(this.roomId, {
-        game_state: GameRoomService.encryptGameState(this.gameState),
-      });
-      this.emit("game:updated", this.gameState);
+      const outcome = culprit.id === implicatedSuspect ? "win" : "lose";
+      this.endGame(outcome);
     } catch (error) {
       console.error("Error running deduction analysis:", error);
       this.emit("error", error);
@@ -995,11 +985,11 @@ Generate the scenario ensuring:
     }
   }
 
-  async endGame() {
+  async endGame(outcome) {
     try {
       console.log("Ending game...");
       this.gameState.status = "finished";
-      this.gameState.outcome = "lose";
+      this.gameState.outcome = outcome;
 
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
