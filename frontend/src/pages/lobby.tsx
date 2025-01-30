@@ -125,11 +125,16 @@ export const Lobby: React.FC = () => {
         }
       };
     }
+
+
     let cleanupListeners: Function;
+
     if (socket && socket.connected) {
       
       cleanupListeners = setupListeners();
     }
+
+
 
     return () => {
       if (cleanupListeners) cleanupListeners();
@@ -150,10 +155,14 @@ export const Lobby: React.FC = () => {
         const room = await roomsService.getRoom(roomId);
 
         console.log('Room:', room);
-
+        if(typeof room.game_state === 'string') { 
+          console.log('game state must be decrypted');
+          return;
+        }
         setLobbyState(prevState => ({
           ...prevState,
           room,
+          gameStarting: typeof room.game_state !== 'string' && room.game_state && room.game_state.status === 'creating' ? true : false,
           gameStatus: {
             ...prevState.gameStatus,
             userIsHost: room.host_id === user.id,

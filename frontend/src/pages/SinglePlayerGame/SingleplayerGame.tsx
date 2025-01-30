@@ -824,9 +824,12 @@ const Interrogation: React.FC<InterrogationProps> = ({
         i++;
     }
 
+    
+
 
     return (
         <>
+        {/* <HelperDialog type={'interrogation'}  /> */}
             <div className='grid grid-cols-1 grid-rows-[auto_1fr] gap-4'>
                 <h2 className="text-2xl font-bold w-full text-center h-fit">Interrogation</h2>
                 <Box
@@ -1455,6 +1458,7 @@ const SingleGame = () => {
 
             leaderboardService.getGameResultsForUser(roomId, user?.id || '').then((response) => {
                 const result = response.results[0];
+                if(!result) return;
                 setPlayerBadges(result.badges);
                 setLeaderboardUpdating(false);
                 setPlayerElo({ oldRating: result.old_rating, newRating: result.new_rating });

@@ -169,6 +169,14 @@ Generate the scenario ensuring:
 
       this.threadId = thread.id;
 
+      this.gameState = { 
+        status : 'creating',
+      }
+      await GameRoomService.updateGameRoom(this.roomId, {
+        status: "setup", // TODO: this is confusing considering that the game state also has a status field
+        game_state: GameRoomService.encryptGameState(this.gameState),
+      });
+
       // run the thread to get the initial game state
       this.gameState = await this.llmGameService.runGameThread(
         process.env.OPENAI_SINGLEPLAYER_GAMEMASTER_ASSISTANT_ID,
@@ -209,7 +217,7 @@ Generate the scenario ensuring:
         // add the game state and thread id to the database
         await GameRoomService.updateGameRoom(this.roomId, {
           thread_id: this.threadId,
-          status: "active",
+          status: "active", // TODO: this is confusing considering that the game state also has a status field
           game_state: GameRoomService.encryptGameState(this.gameState),
         });
 
@@ -924,7 +932,7 @@ Generate the scenario ensuring:
               progress: (this.loadProgress += 50),
             });
             resolve();
-          }, 5000);
+          }, 10000);
         });
         return;
       } else {
