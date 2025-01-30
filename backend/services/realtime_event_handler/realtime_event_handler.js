@@ -106,6 +106,7 @@ export default class RealtimeEventHandler {
     };
     session.input_audio_transcription = { model: "whisper-1" };
     session.voice = this.gameManager.assignVoiceToSuspect(responder);
+    delete session.custom_voice_id;
     delete session.id;
     delete session.object;
     delete session.expires_at;
