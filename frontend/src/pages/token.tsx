@@ -11,10 +11,13 @@ const TokenPage: React.FC = () => {
             const params = new URLSearchParams(hash);
             const tokenHash = params.get('token_hash');
             if (tokenHash) {
+                console.log('tokenHash', tokenHash);
                 const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
+                console.log('error', error);
                 if (error) {
                     console.error('Error verifying OTP:', error);
                 } else {
+                    console.log('OTP verified successfully');
                     navigate('/play');
                 }
             } else {
