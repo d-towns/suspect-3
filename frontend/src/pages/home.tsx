@@ -122,8 +122,8 @@ const Home: React.FC = () => {
     >
       
       <AnimatedText className='text-7xl md:text-9xl main-header ' animationSpeed={200}  message="Suspect" />
-      <AnimatedText className='text-lg main-link mb-5' animationSpeed={300} message="v0.93-alpha" />
-      <AnimatedText className='text-sm text-center main-link mb-5' animationSpeed={50} message="Solve crimes through AI voice conversation" />
+      <AnimatedText className='text-sm main-link mb-9' animationSpeed={300} message="v0.93-alpha" />
+      <AnimatedText className='text-sm md:text-lg text-center main-link mb-5' animationSpeed={50} message="Solve crimes through AI voice conversation" />
       <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
