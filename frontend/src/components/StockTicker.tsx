@@ -93,7 +93,7 @@ const StockTicker: React.FC<StockTickerProps> = ({
     >
       <div 
         ref={innerRef}
-        className="inline-flex whitespace-nowrap"
+        className="inline-flex whitespace-nowrap" 
       >
         {contentArray}
       </div>
