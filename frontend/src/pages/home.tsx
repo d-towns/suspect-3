@@ -106,7 +106,7 @@ const Home: React.FC = () => {
       align="center"
       justify="center"
       px="4"
-      className='h-full rounded-lg p-9 m-auto bg-[#111110] bg-opacity-50 backdrop-blur-sm'
+      className='h-full rounded-lg p-9 m-auto bg-[#111110] xl:w-[600px] md:w-[500px] bg-opacity-50 backdrop-blur-sm'
     >
       <AnimatedText className='text-7xl md:text-9xl main-header ' animationSpeed={200}  message="Suspect" />
       <AnimatedText className='text-sm main-link mb-9' animationSpeed={300} message="v0.93-alpha" />
