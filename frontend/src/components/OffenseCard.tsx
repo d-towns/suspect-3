@@ -88,7 +88,7 @@ export const OffenseReportCard: React.FC<OffenseReportCardProps> = ({ offenseRep
                 </Text>
                 <AnimatedText message={offenseReport.location} animationSpeed={150} />
             </div>
-            <div className='max-w-[600px] min-h-[100px]'>
+            <div className='max-w-[600px] min-h-[100px] text-wrap'>
                 <AnimatedText message={offenseReport.description} animationSpeed={50} />
             </div>
             {handleNext && (
