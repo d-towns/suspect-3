@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Flex, Text, Separator } from '@radix-ui/themes';
 import './home.css'
 import AnimatedText from '../components/animatedText';
-import { AnimatePresence, motion } from "motion/react"
+import { motion } from "motion/react"
 import { OffenseReportCard } from '../components/OffenseCard';
 import { OffenseReportItem } from '../models/game-state.model';
 import { useAuth } from '../context/auth.context';
