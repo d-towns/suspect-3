@@ -29,6 +29,12 @@ const sampleOffenses : OffenseReportItem[] = [
     imgSrc: '/single-player-splash.webp'
   },
   {
+    location: 'Flatlands Apartments',
+    time: '3:00 AM',
+    description: 'A person in a anonymous mask was seen near the crime scene. They were seen fleeing the scene on a bike.',
+    imgSrc: '/window-anon.webp'
+  },
+  {
     location: 'The Bozeman Hotel',
     time: '9:00 AM',
     description: 'The suspect entered the hotel at 9:00 AM and left at 9:30 AM. The victim was found dead at 9:15 AM.',
