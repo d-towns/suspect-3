@@ -32,6 +32,7 @@
     "react-router-dom": "^6.26.2",
     "react-transition-group": "^4.4.5",
     "socket.io-client": "^4.8.0",
+    "stripe": "^17.7.0",
     "wavtools": "file:src/wavtools"
   },
   "devDependencies": {
