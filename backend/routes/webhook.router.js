@@ -4,7 +4,7 @@ import { createSupabaseClient } from '../db/supabase.js';
 import stripe from 'stripe';
 dotenv.config({path: '../.env'});
 
-const stripe = new stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new stripe(process.env.STRIPE_TEST_PUBLISHABLE_KEY);
 
 const router = Router();
 
@@ -18,13 +18,13 @@ router.post("/activate", async (req, res) => {
             // const priceId = subscription.items.data[0].price.id;
       
             if(object.plan.product === process.env.CADET_PLAN_PRODUCT_ID) {
-                // const customer = await stripe.customers.retrieve(object.customer);
-                // handleSubscriptionCreated(customer.metadata.userId, 2);
+                const customer = await stripe.customers.retrieve(object.customer);
+                handleSubscriptionCreated(customer.metadata.userId, 2);
                 console.log('Cadet plan created')
                 
             } else if(object.plan.product === process.env.DETECTIVE_PLAN_PRODUCT_ID) {
-                // const customer = await stripe.customers.retrieve(object.customer);
-                // handleSubscriptionCreated(customer.metadata.userId, 3);
+                const customer = await stripe.customers.retrieve(object.customer);
+                handleSubscriptionCreated(customer.metadata.userId, 3);
                 console.log('Detective plan created');
             }
             break;
