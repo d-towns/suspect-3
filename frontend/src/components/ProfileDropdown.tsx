@@ -41,8 +41,8 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
         </DropdownMenu.Label>
 
         <DropdownMenu.Group className='md:hidden my-2'>
-        <Separator size={'4'} />
-        <RouterLink to="/play" color="gray">
+          <Separator size={'4'} />
+          <RouterLink to="/play" color="gray">
             <DropdownMenu.Item>
               Play
             </DropdownMenu.Item>
@@ -52,8 +52,12 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
               How To Play
             </RouterLink>
           </DropdownMenu.Item>
-
-          <RouterLink  to="/leaderboard" color="gray">
+          <DropdownMenu.Item>
+            <RouterLink to="/subscriptions" color="gray">
+              Subscriptions
+            </RouterLink>
+          </DropdownMenu.Item>
+          <RouterLink to="/leaderboard" color="gray">
             <DropdownMenu.Item>
               Leaderboard
             </DropdownMenu.Item>
@@ -63,9 +67,6 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ logout, username: ema
               Support
             </DropdownMenu.Item>
           </RouterLink>
-
-
-
         </DropdownMenu.Group>
         <DropdownMenu.Group className='my-2'>
           <Separator size={'4'} />

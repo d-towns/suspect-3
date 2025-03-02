@@ -10,6 +10,7 @@ import { Box, Flex, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
 import './navbar.css';
+import GameCredits from '../GameCredits';
 
 
 const Navbar: React.FC = () => {
@@ -65,10 +66,13 @@ const Navbar: React.FC = () => {
 
     const unauthenticatedLinks = (
       <>
-        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out  ' to="/faq" color="gray">
+        <RouterLink className='hover:scale-110 transition duration-200 ease-in-out' to="/faq" color="gray">
           How To Play
         </RouterLink>
-        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header' to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
+        <RouterLink className='hover:scale-110 transition duration-200 ease-in-out' to="/subscriptions" color="gray">
+          Subscriptions
+        </RouterLink>
+        <RouterLink className='hover:scale-110 transition duration-200 ease-in-out main-header' to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
           Donate 💜
         </RouterLink>
       </>
@@ -106,6 +110,7 @@ const Navbar: React.FC = () => {
           </Text>
         </RouterLink>
         <Flex align="center" justify={'center'} gap="6" className=' main-header '>
+          <GameCredits />
           <Flex  align="center" justify={'center'} gap="6" className='max-md:hidden'>
             {renderNavLinks()}
           </Flex>

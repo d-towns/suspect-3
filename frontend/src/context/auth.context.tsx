@@ -4,13 +4,14 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import axiosInstance from '../utils/axios-instance';
 import { supabase } from '../utils/supabase-client';
 import { leaderboardService } from '../services/leaderboard.service';
-import stripe from '../lib/stripe-client';
+import stripe from '../lib/stripe/client';
 
 // Define the User interface
 interface User {
   id: string;
   email: string;
   username: string;
+  stripeCustomerId: string;
 }
 
 // Define the AuthContext type
@@ -62,7 +63,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userData = {
           id: userResponse.user.id,
           email: userResponse.user.email,
-          username: userResponse.user.user_metadata.username
+          username: userResponse.user.user_metadata.username,
+          stripeCustomerId: userResponse.user.user_metadata.stripeCustomerId
         }
         setUser(userData);
       }
@@ -94,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
       if (data?.user) {
-        await createStripeCustomer(data?.user['email'], data?.user['id']);
+        // await createStripeCustomer(data?.user['email'], data?.user['id']);
 
         const userLeadearboard = await leaderboardService.getUserStats(data?.user['id']);
         if (Array.isArray(userLeadearboard.stats) && userLeadearboard.stats?.length === 0) {
@@ -150,7 +152,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userData = {
         id: response.data.session.user.id,
         email: response.data.session.user.email,
-        username: response.data.session.user.user_metadata.username
+        username: response.data.session.user.user_metadata.username,
+        stripeCustomerId: response.data.session.user.user_metadata.stripeCustomerId
       }
       setUser(userData);
     } catch (error) {

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { validate as uuidValidate } from "uuid";
 import ReplicateImageService from "../llm/image/replicate_image.service.js";
+import { UserSubscriptionService } from "../user_subscription/user_subscription.service.js";
 import { SocketEvents } from "../../socket/events_schema.js";
 import { CrimeTypes } from "../../models/game-state-schema.js";
 
@@ -161,6 +162,14 @@ Make sure that the interrogation round status is active and the voting round sta
   async createInitialGameState() {
     try {
       // create a game thread
+
+      // check if the user has enough game credits
+      const hasEnoughGameCredits = await UserSubscriptionService.hasSufficientCredits(this.playerId, 1);
+      if(!hasEnoughGameCredits) {
+        throw new Error("Insufficient game credits");
+      }
+      
+      // create a game thread
       const thread = await this.llmGameService.createGameThread();
 
       // add the crime message to the thread
@@ -171,11 +180,15 @@ Make sure that the interrogation round status is active and the voting round sta
 
       console.log(`Thread created: ${thread.id}`);
 
+      // update the game room with the thread id
       this.threadId = thread.id;
 
+      // set the game state to creating
       this.gameState = { 
         status : 'creating',
       }
+
+      // update the game room with the game state
       await GameRoomService.updateGameRoom(this.roomId, {
         thread_id: this.threadId,
         status: "setup", // TODO: this is confusing considering that the game state also has a status field
@@ -235,6 +248,10 @@ Make sure that the interrogation round status is active and the voting round sta
           status: "active", // TODO: this is confusing considering that the game state also has a status field
           game_state: GameRoomService.encryptGameState(this.gameState),
         });
+
+        // update the user subscription with the new game credits
+        await UserSubscriptionService.deductGameCredits(this.playerId, 1);
+
 
         // tell the socket server that the game has been created
         // TODO #io.js: the socket server needs to listen for the game-created event and emit that event to the client so that it can route to the correct game screen
