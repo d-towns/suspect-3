@@ -24,8 +24,8 @@ const GameCredits = () => {
   }, [user]);
 
   return (
-    <Text>
-      Game Credits: {credits}
+    <Text as='span'>
+      Trial Games Left: {credits}
     </Text>
   );
 };

@@ -8,6 +8,7 @@ import { supabase } from '../utils/supabase-client';
 import AnimatedText from '../components/animatedText';
 import './playMenu.css';
 import { GameRoom } from '../models';
+import GameCredits from '../components/GameCredits';
 
 interface ModeCardProps {
   createRoom: (mode: 'single' | 'multi') => void;
@@ -141,8 +142,8 @@ const PlayMenu: React.FC = () => {
   };
 
   return (
-    <Box>
-
+    <Box className="flex flex-col items-center">
+      <div style={{fontFamily:'Special Elite'}} className='mt-5'><GameCredits/></div>
       <Flex
         direction={{ initial: 'column', md: 'row' }}
         gap="6"

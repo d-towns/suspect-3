@@ -10,7 +10,6 @@ import { Box, Flex, Text } from '@radix-ui/themes';
 import { Switch } from '@radix-ui/react-switch';
 import { MdMusicNote, MdMusicOff } from "react-icons/md";
 import './navbar.css';
-import GameCredits from '../GameCredits';
 
 
 const Navbar: React.FC = () => {
@@ -70,7 +69,7 @@ const Navbar: React.FC = () => {
           How To Play
         </RouterLink>
         <RouterLink className='hover:scale-110 text-orange-500 transition duration-200 ease-in-out' to="/subscriptions" color="gray">
-          Subscriptions
+          <p>Purchase</p>
         </RouterLink>
       </>
     );
