@@ -41,7 +41,7 @@ const Subscriptions: React.FC = () => {
           price={10}
           features={cadetFeatures}
           buttonText="Subscribe Now"
-          buttonLink="https://buy.stripe.com/test_9AQ7wy8w48ZDaek288?prefilled_customer=cus_PZ666666666666"
+          priceId={import.meta.env.VITE_STRIPE_CADET_PRICE_ID}
         />
 
         <SubscriptionCard 
@@ -49,7 +49,7 @@ const Subscriptions: React.FC = () => {
           price={20}
           features={detectiveFeatures}
           buttonText="Upgrade Now"
-          buttonLink="https://example.com/detective-subscribe"
+          priceId={import.meta.env.VITE_STRIPE_DETECTIVE_PRICE_ID}
           isBestValue={true}
           buttonVariant="solid"
         />

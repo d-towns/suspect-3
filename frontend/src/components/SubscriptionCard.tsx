@@ -11,7 +11,7 @@ interface SubscriptionCardProps {
   period?: string;
   features: string[];
   buttonText: string;
-  buttonLink: string;
+  priceId: string;
   isBestValue?: boolean;
   buttonVariant?: 'solid' | 'soft' | 'outline' | 'ghost';
 }
@@ -23,7 +23,8 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   features,
   buttonText,
   isBestValue = false,
-  buttonVariant = 'soft'
+  buttonVariant = 'soft',
+  priceId
 }) => {
   const navigate = useNavigate();
   const {user } = useAuth();
@@ -38,7 +39,7 @@ const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       customer: user.stripeCustomerId,
       line_items: [
         {
-          price: 'price_1QxwngJZ71LDJbxgtWhXuzey',
+          price: priceId,
           quantity: 1,
         },
       ],
