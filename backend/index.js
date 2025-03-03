@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { createClient } from "@supabase/supabase-js";
+import { webhookRouter } from "./routes/webhook.router.js";
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +70,7 @@ const main = async () => {
     app.use('/api/games', gameRoomRouter);
     app.use('/api/invites', invitesRouter);
     app.use('/api/leaderboard', leaderboardRouter);
+    app.use('/webhook', webhookRouter);
     // Ping route to check if the server is running, return pong and ms of ping time
     app.get('/api/ping', (req, res) => {
         const pingTime = Date.now() - Number(req.headers['x-ping-time']);

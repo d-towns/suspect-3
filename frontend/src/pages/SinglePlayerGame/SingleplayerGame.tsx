@@ -22,8 +22,9 @@ import Dagre from '@dagrejs/dagre';
 import { findImplicatedSuspect, getSupabaseImageURL } from '../../utils/helpers';
 import '@xyflow/react/dist/style.css';
 import CircleVisualizer from '../../components/audioVisualizer';
+import { useToast } from '../../context/ToastContext/toast.context';
 
-/**
+/*
  * TODO:
  * seperate the multiplayer and single player game state schemas
  * change necessary refernces to players to suspects
@@ -1082,9 +1083,11 @@ interface GameOverProps {
     newRating: number | 0;
     badges: GameResultBadge[];
     leaderboardUpdating: boolean;
+    createNewGame: () => void
 }
 
-const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRating: newElo, badges, leaderboardUpdating }) => {
+const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRating: newElo, badges, leaderboardUpdating, createNewGame }) => {
+
     return (
         <Flex direction="column" gap="4">
             <Flex direction={{ sm: 'column', md: 'row' }} align="center" justify="between" width={'60%'} gap="9" className='m-auto'>
@@ -1113,6 +1116,7 @@ const GameOver: React.FC<GameOverProps> = ({ gameState, oldRating: elo, newRatin
                                 size="small"
                             />
                         ))}
+                    <Button className='w-full' size={'4'} onClick={createNewGame}>Play Again</Button>
                 </Flex>
             </Flex>
 
@@ -1195,7 +1199,7 @@ const SingleGame = () => {
     const navigate = useNavigate();
     const { roomId } = useParams<{ roomId: string }>();
     const [gameState, setGameState] = useState<SingleGameState | null>(null);
-
+    const { addToast } = useToast();
 
 
 
@@ -1418,6 +1422,11 @@ const SingleGame = () => {
 
             socket.on('leaderboard:updated', handleLeaderboardStatsUpdate);
 
+            socket.on("error", (error: any) => {
+                console.error('Socket error:', error);
+                addToast('Game Creation Error, please refresh and try again: ' + error);
+            });
+
 
             joinRoom(roomId);
 
@@ -1541,6 +1550,12 @@ const SingleGame = () => {
         emitEvent('realtime:end', roomId);
     }
 
+    const createNewGame = async () => {
+        if(!user) return
+        const roomId = await roomsService.createRoom(user.id, 'single');
+        navigate(`/lobby/${roomId}`);
+    }
+
     // const updateLeaderboard = () => {
     //     if (!socket) {
     //         return;
@@ -1560,7 +1575,7 @@ const SingleGame = () => {
         }
 
         if (gameIsOver) {
-            return <GameOver gameState={gameState} oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} leaderboardUpdating={leaderboardUpdating} />
+            return <GameOver gameState={gameState} oldRating={playerElo.oldRating} newRating={playerElo.newRating} badges={playerBadges} leaderboardUpdating={leaderboardUpdating} createNewGame={createNewGame}/>
         }
 
         if (resultsLoading) {

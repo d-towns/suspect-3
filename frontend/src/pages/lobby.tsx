@@ -119,9 +119,12 @@ export const Lobby: React.FC = () => {
           socket.off('chat:message');
           socket.off('player:ready');
           socket.off('player:ready:all');
-          socket.off('game-created');
           socket.off('player:left');
           socket.off('player:joined');
+          socket.off('game:load:updated');
+          socket.off('game:creating');
+          socket.off('game:created');
+          socket.off('error');
         }
       };
     }

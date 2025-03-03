@@ -65,11 +65,11 @@ const Navbar: React.FC = () => {
 
     const unauthenticatedLinks = (
       <>
-        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out  ' to="/faq" color="gray">
+        <RouterLink className='hover:scale-110 transition duration-200 ease-in-out' to="/faq" color="gray">
           How To Play
         </RouterLink>
-        <RouterLink className='hover:scale-110 transition duration-200  ease-in-out main-header' to="https://donate.stripe.com/eVa16xbg7be93egaEE" color="gray">
-          Donate 💜
+        <RouterLink className='hover:scale-110 text-orange-500 transition duration-200 ease-in-out' to="/subscriptions" color="gray">
+          <p>Purchase</p>
         </RouterLink>
       </>
     );
@@ -109,6 +109,9 @@ const Navbar: React.FC = () => {
           <Flex  align="center" justify={'center'} gap="6" className='max-md:hidden'>
             {renderNavLinks()}
           </Flex>
+
+        </Flex>
+        <Flex align="center" justify={'center'} gap="6" className='max-md:hidden'>
           {user && (
             <>
               <InvitesDropdown invites={invites} />

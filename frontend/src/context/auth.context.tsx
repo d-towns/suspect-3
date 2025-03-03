@@ -2,14 +2,16 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axiosInstance from '../utils/axios-instance';
-import {supabase} from '../utils/supabase-client';
+import { supabase } from '../utils/supabase-client';
 import { leaderboardService } from '../services/leaderboard.service';
+import stripe from '../lib/stripe/client';
 
 // Define the User interface
 interface User {
   id: string;
   email: string;
   username: string;
+  stripeCustomerId: string;
 }
 
 // Define the AuthContext type
@@ -52,27 +54,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = async () => {
     setLoading(true);
     try {
-      // const response = await api.get('users/get-user', {
-      //   withCredentials: true,
-      //   headers: {
-      //     'Content-Type': 'application/json, text/plain, */*',
-      // 'Set-Cookie': 'token=accessToken; Secure; Path=/; SameSite=None; HttpOnly',
-      //   },
-      // });
-      // console.log('Check auth response:', response);
 
-      const {data: userResponse, error} = await supabase.auth.getUser();
+      const { data: userResponse, error } = await supabase.auth.getUser();
       if (error) {
         throw error;
       }
-      if(userResponse.user && userResponse.user.email) {
-      const userData = {
-        id: userResponse.user.id,
-        email: userResponse.user.email,
-        username: userResponse.user.user_metadata.username
+      if (userResponse.user && userResponse.user.email) {
+        const userData = {
+          id: userResponse.user.id,
+          email: userResponse.user.email,
+          username: userResponse.user.user_metadata.username,
+          stripeCustomerId: userResponse.user.user_metadata.stripeCustomerId
+        }
+        setUser(userData);
       }
-      setUser(userData);
-    }
     } catch (error) {
       setUser(null);
     } finally {
@@ -80,24 +75,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Function to handle user login
-  // const login = async (email: string, password: string, provider: string = 'none') => {
-  //   setLoading(true);
-  //   try {
-  //     const response = await api.post('users/login', { email, password, provider });
-  //     const userData = {
-  //       id: response.data.session.user.id,
-  //       email: response.data.session.user.email,
-  //       username: response.data.session.user.user_metadata.username
-  //     }
-  //     setUser(userData);
-  //   } catch (error) {
-  //     console.error('Login error:', error);
-  //     throw error;
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   const login = async (email: string) => {
     setLoading(true);
@@ -106,6 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email,
         options: {
           // set this to false if you do not want the user to be automatically signed up
+
           shouldCreateUser: true,
           emailRedirectTo: authRedirectUrl,
           data: {
@@ -113,15 +91,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         },
       })
-      if(data?.user) {
-      const userLeadearboard = await leaderboardService.getUserStats(data?.user['id']);
-      if(Array.isArray(userLeadearboard.stats) && userLeadearboard.stats?.length === 0) {
-        const leaderboardEntry = await leaderboardService.createLeaderboardEntry(data?.user['id']);
-        console.log('Leaderboard entry created:', leaderboardEntry);
-      }
 
-      
-      setUser(data?.user);
+      // if we do not have a stripe customer with the user id, create one
+
+
+      if (data?.user) {
+        // await createStripeCustomer(data?.user['email'], data?.user['id']);
+
+        const userLeadearboard = await leaderboardService.getUserStats(data?.user['id']);
+        if (Array.isArray(userLeadearboard.stats) && userLeadearboard.stats?.length === 0) {
+          const leaderboardEntry = await leaderboardService.createLeaderboardEntry(data?.user['id']);
+          console.log('Leaderboard entry created:', leaderboardEntry);
+        }
+
+        setUser(data?.user);
       }
       if (error) {
         console.error('Login error:', error);
@@ -142,18 +125,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       // const response = await api.post('users/login', { provider: 'google' });
-     await supabase.auth.signInWithOAuth({
+      await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { scopes: 'email', redirectTo: authRedirectUrl,  }
+        options: { scopes: 'email', redirectTo: authRedirectUrl, }
       });
 
-      // const userData = {
-      //   id: response.data.session.user.id,
-      //   email: response.data.session.user.email,
-      //   username: response.data.session.user.user_metadata.username
-      // }
-      // setUser(userData);
-      
+      const user = await supabase.auth.getUser();
+      if (user.data.user?.email) {
+        await createStripeCustomer(user.data.user?.email, user.data.user?.id);
+      }
+
+
     } catch (error) {
       console.error('Provider login error:', error);
       throw error;
@@ -170,7 +152,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userData = {
         id: response.data.session.user.id,
         email: response.data.session.user.email,
-        username: response.data.session.user.user_metadata.username
+        username: response.data.session.user.user_metadata.username,
+        stripeCustomerId: response.data.session.user.user_metadata.stripeCustomerId
       }
       setUser(userData);
     } catch (error) {
@@ -206,11 +189,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const createStripeCustomer = async (email: string, userId: string) => {
+    const { data: stripeCustomer } = await stripe.customers.list({
+      email: email,
+    });
+    if (stripeCustomer.length === 0) {
+      await stripe.customers.create({ email: email, metadata: { userId: userId } });
+      await supabase.auth.updateUser({
+        data: {
+          stripeCustomerId: stripeCustomer[0].id,
+        },
+      });
+      console.log('Stripe customer created:', stripeCustomer);
+    }
+    console.log('Stripe customer already exists:', stripeCustomer);
+  }
+
   // Define the context value
   const contextValue: AuthContextType = {
     user,
     loading,
-    setUser, 
+    setUser,
     login,
     signup,
     logout,

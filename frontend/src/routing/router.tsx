@@ -13,6 +13,7 @@ import TokenPage from '../pages/token';
 import ErrorBoundary from '../pages/errorBoundary';
 import { ThemeProvider } from '../context/ThemeContext';
 import Changelog from '../pages/changelog';
+import Subscriptions from '../pages/Subscriptions';
 
 const router = createBrowserRouter([
   {
@@ -36,6 +37,10 @@ const router = createBrowserRouter([
         element: <Terms />,
       },
       {path: 'token', element: <TokenPage />},
+      {
+        path: 'subscriptions',
+        element: <Subscriptions />,
+      },
       
       {
         element: <ProtectedRoute />,
