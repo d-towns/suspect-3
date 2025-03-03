@@ -55,7 +55,7 @@ const ModeCard: React.FC<ModeCardProps> = ({
         </Inset>
         { blocked && (
           <Text as="p" align={'center'} color="orange" size={{ sm: '2', md: '3', lg: '4' }}>
-            This mode is currently under construction
+             Subscribe to Detective Tier to play
           </Text>
         )}
         <Text as="p" align="center" size={{ lg: '7', md: '5', sm: '4' }}>
@@ -111,7 +111,8 @@ const PlayMenu: React.FC = () => {
         const userData = {
           id: data.user.id,
           email: data.user.email || '',
-          username: data.user.user_metadata.username
+          username: data.user.user_metadata.username,
+          stripeCustomerId: data.user.user_metadata.stripeCustomerId
         }
         setUser(userData);
         }
