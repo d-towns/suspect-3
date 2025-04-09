@@ -639,18 +639,17 @@ Make sure that the interrogation round status is active and the voting round sta
             if (parsed.type === "response.audio.done") {
               console.log("Response done event received");
               setTimeout(() => {
-                const { conversationTotalTime } = this.realtimeHandler?.closeRealtimeConversation();
-                this.
+                this.realtimeHandler?.closeRealtimeConversation();
                 this.realtimeHandler = null;
               }, 10000);
 
-              // Remove this listener so we only handle one final response
-              const activeRound = this.gameState.rounds
+              const activeConvsersion = this.gameState.rounds
                 .find((round) => round.type == "interrogation")
                 .conversations.find((conversation) => conversation.active);
 
-              if (activeRound) {
-                activeRound.active = false;
+              if (activeConvsersion) {
+                activeConvsersion.active = false;
+                activeConvsersion.elapsedTime = Date.now() - this.realtimeHandler.conversationStartTime 
               }
 
               await GameRoomService.updateGameRoom(this.roomId, {
@@ -667,6 +666,8 @@ Make sure that the interrogation round status is active and the voting round sta
                 content: `The interrogation of ${this.realtimeHandler.responder.name}, ID:${this.realtimeHandler.responder.id} has concluded.`,
               });
               this.emit("realtime:ended", {});
+              
+              // Remove this listener so we only handle one final response
               this.realtimeHandler.removeCustomMessageListener(
                 responseListener
               );
@@ -1036,7 +1037,7 @@ Make sure that the interrogation round status is active and the voting round sta
       console.log("Ending game...");
       this.gameState.status = "finished";
       this.gameState.outcome = outcome;
-      this.clearRoundTimer(true);
+      if (this.clearRoundTimer) this.clearRoundTimer(true);
       await GameRoomService.updateGameRoom(this.roomId, {
         game_state: GameRoomService.encryptGameState(this.gameState),
         status: "finished",

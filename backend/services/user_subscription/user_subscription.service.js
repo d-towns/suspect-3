@@ -9,21 +9,19 @@ import { createClient } from '@supabase/supabase-js';
  * - Creating new subscriptions
  */
 export class UserSubscriptionService {
-  constructor() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-  }
+  static supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+  );
 
   /**
    * Get a user's subscription details
    * @param {string} userId - The user's ID
    * @returns {Promise<Object>} - The user's subscription details
    */
-  async getUserSubscription(userId) {
+  static async getUserSubscription(userId) {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await UserSubscriptionService.supabase
         .from('user_subscriptions')
         .select('*')
         .eq('user_id', userId)
@@ -48,7 +46,7 @@ export class UserSubscriptionService {
    * @param {boolean} isDelta - If true, add/subtract credits instead of setting directly
    * @returns {Promise<Object>} - The updated user subscription
    */
-  async updateGameCredits(userId, credits, isDelta = false) {
+  static async updateGameCredits(userId, credits, isDelta = false) {
     try {
       let updatedCredits = credits;
       
@@ -86,7 +84,7 @@ export class UserSubscriptionService {
    * @param {number} creditsToDeduct - Number of credits to deduct (default: 1)
    * @returns {Promise<boolean>} - True if successful, throws error otherwise
    */
-  async deductGameCredits(userId, creditsToDeduct = 1) {
+  static async deductGameCredits(userId, creditsToDeduct = 1) {
     try {
       const subscription = await this.getUserSubscription(userId);
       
@@ -113,7 +111,7 @@ export class UserSubscriptionService {
    * @param {number} gameCredits - Initial game credits
    * @returns {Promise<Object>} - The created user subscription
    */
-  async createUserSubscription(userId, subscriptionId, gameCredits) {
+  static async createUserSubscription(userId, subscriptionId, gameCredits) {
     try {
       // Check if user already has a subscription
       const existingSubscription = await this.supabase
@@ -173,7 +171,7 @@ export class UserSubscriptionService {
    * @param {boolean} active - Whether to activate or deactivate
    * @returns {Promise<Object>} - The updated user subscription
    */
-  async setSubscriptionStatus(userId, active) {
+  static async setSubscriptionStatus(userId, active) {
     try {
       const { data, error } = await this.supabase
         .from('user_subscriptions')
@@ -199,7 +197,7 @@ export class UserSubscriptionService {
    * @param {string} userId - The user's ID
    * @returns {Promise<boolean>} - True if user has an active subscription
    */
-  async hasActiveSubscription(userId) {
+  static async hasActiveSubscription(userId) {
     try {
       const subscription = await this.getUserSubscription(userId);
       return subscription && subscription.active;
@@ -215,7 +213,7 @@ export class UserSubscriptionService {
    * @param {number} requiredCredits - Number of credits required
    * @returns {Promise<boolean>} - True if user has sufficient credits
    */
-  async hasSufficientCredits(userId, requiredCredits = 1) {
+  static async hasSufficientCredits(userId, requiredCredits = 1) {
     try {
       const subscription = await this.getUserSubscription(userId);
       return subscription && subscription.game_credits_left >= requiredCredits;
@@ -230,7 +228,7 @@ export class UserSubscriptionService {
    * This would typically be called by a scheduled job
    * @returns {Promise<number>} - Number of subscriptions updated
    */
-  async refreshAllSubscriptionCredits() {
+  static async refreshAllSubscriptionCredits() {
     try {
       // Get all subscription plans to know how many credits to add
       const { data: subscriptionPlans, error: plansError } = await this.supabase
