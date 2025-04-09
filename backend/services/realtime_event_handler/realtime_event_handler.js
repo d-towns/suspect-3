@@ -13,6 +13,8 @@ export default class RealtimeEventHandler {
     this.lastAudioMessageTranscript = [];
     this.eventListeners = {};
     this.realtimeInstructions = null;
+    this.conversationStartTime = Date.now()
+    this.conversationEndTime = null
     this.ws.on("message", async (data) => {
       this.handleMessage(data, responder);
     });
@@ -286,7 +288,9 @@ export default class RealtimeEventHandler {
         return null;
       }
       this.ws.close();
-      return { status: "realtime_closed" };
+      this.conversationEndTime = Date.now()
+
+      return { status: "realtime_closed", conversationTotalTime: this.conversationEndTime - this.conversationStartTime };
     } catch (error) {
       console.error("Error sin closeRealtimeConversation:", error);
       return null;

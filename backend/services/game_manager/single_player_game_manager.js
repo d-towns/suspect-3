@@ -639,7 +639,8 @@ Make sure that the interrogation round status is active and the voting round sta
             if (parsed.type === "response.audio.done") {
               console.log("Response done event received");
               setTimeout(() => {
-                this.realtimeHandler?.closeRealtimeConversation();
+                const { conversationTotalTime } = this.realtimeHandler?.closeRealtimeConversation();
+                this.
                 this.realtimeHandler = null;
               }, 10000);
 
